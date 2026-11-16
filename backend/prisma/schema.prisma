@@ -1,0 +1,266 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum RequestStatus {
+  PENDING           // Initial request submitted by user
+  QUOTED            // Admin provided quotation
+  IN_PROGRESS       // 50% advance payment confirmed, admin working
+  DOCUMENT_UPLOADED // Admin uploaded final document, awaiting final 50% payment
+  COMPLETED         // 100% payment verified & document available for download
+  CANCELLED         // Cancelled by user or admin
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum PaymentMilestone {
+  ADVANCE_50        // 50% upfront to start work
+  FINAL_50          // 50% upon completion to unlock download
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum MessageType {
+  TEXT
+  FILE
+  QUOTATION_CARD
+  SYSTEM
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+// ==========================================
+// MODELS
+// ==========================================
+
+/// Synced 1-to-1 with Supabase auth.users
+model Profile {
+  id         String   @id // Matches Supabase auth.users uuid
+  email      String   @unique
+  fullName   String?
+  phone      String?
+  avatarUrl  String?
+  role       Role     @default(USER)
+  isBlocked  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relationships
+  requests          DocumentRequest[]
+  payments          Payment[]
+  messages          Message[]
+  uploadedDocuments FinalDocument[]   @relation("AdminUploadedDocuments")
+  auditLogs         AuditLog[]
+
+  @@map("profiles")
+}
+
+/// Core Document Request submitted by the user
+model DocumentRequest {
+  id          String        @id @default(uuid())
+  userId      String
+  user        Profile       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String        @db.Text
+  category    String?
+  priority    String        @default("NORMAL")
+  status      RequestStatus @default(PENDING)
+  
+  // Security lock: true until both Advance (50%) and Final (50%) payments are verified
+  isDownloadUnlocked Boolean @default(false)
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relationships
+  referenceFiles RequestFile[]
+  conversation   Conversation?
+  quotations     Quotation[]
+  payments       Payment[]
+  finalDocuments FinalDocument[]
+  auditLogs      AuditLog[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("document_requests")
+}
+
+/// Reference files uploaded by user with their request
+model RequestFile {
+  id                 String          @id @default(uuid())
+  requestId          String
+  request            DocumentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fileName           String
+  fileUrl            String
+  cloudinaryPublicId String
+  fileSize           Int             // Size in bytes
+  mimeType           String
+  createdAt          DateTime        @default(now())
+
+  @@index([requestId])
+  @@map("request_files")
+}
+
+/// Request-wise 1-to-1 chat channel between User and Admin
+model Conversation {
+  id        String          @id @default(uuid())
+  requestId String          @unique
+  request   DocumentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  messages  Message[]
+
+  @@map("conversations")
+}
+
+/// WhatsApp-style real-time message with delivery receipts
+model Message {
+  id             String        @id @default(uuid())
+  conversationId String
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         Profile       @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  senderRole     Role
+  messageType    MessageType   @default(TEXT)
+  content        String        @db.Text
+  metadata       Json?         // Quotation preview card or attachment metadata
+  status         MessageStatus @default(SENT)
+  
+  createdAt      DateTime      @default(now())
+  deliveredAt    DateTime?
+  readAt         DateTime?
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@map("messages")
+}
+
+/// Admin quotation with version tracking & 50-50 milestone breakdown
+model Quotation {
+  id              String          @id @default(uuid())
+  requestId       String
+  request         DocumentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  version         Int             @default(1)
+  
+  // Amounts stored in paise (integer) to avoid float rounding bugs (e.g., ₹1000 = 100000 paise)
+  totalAmount     Int
+  advanceAmount   Int             // 50% in paise
+  remainingAmount Int             // 50% in paise
+  currency        String          @default("INR")
+  
+  terms           String?         @db.Text
+  estimatedDays   Int?
+  status          QuotationStatus @default(SENT)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  payments        Payment[]
+
+  @@index([requestId])
+  @@map("quotations")
+}
+
+/// Razorpay payment records with webhook signature verification
+model Payment {
+  id                String           @id @default(uuid())
+  userId            String
+  user              Profile          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestId         String
+  request           DocumentRequest  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  quotationId       String
+  quotation         Quotation        @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  
+  milestone         PaymentMilestone
+  amount            Int              // Amount in paise
+  currency          String           @default("INR")
+  status            PaymentStatus    @default(PENDING)
+  
+  razorpayOrderId   String           @unique
+  razorpayPaymentId String?          @unique
+  razorpaySignature String?
+  receiptUrl        String?
+  paidAt            DateTime?
+
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([requestId])
+  @@index([razorpayOrderId])
+  @@map("payments")
+}
+
+/// Final completed document uploaded by Admin to Cloudinary (locked until full payment)
+model FinalDocument {
+  id                 String          @id @default(uuid())
+  requestId          String
+  request            DocumentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  uploadedByAdminId  String
+  admin              Profile         @relation("AdminUploadedDocuments", fields: [uploadedByAdminId], references: [id], onDelete: Cascade)
+  
+  title              String
+  fileName           String
+  cloudinaryPublicId String
+  secureUrl          String
+  fileSize           Int             // Size in bytes
+  mimeType           String
+  version            Int             @default(1)
+  downloadCount      Int             @default(0)
+
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([requestId])
+  @@map("final_documents")
+}
+
+/// Security & audit trail for critical actions
+model AuditLog {
+  id        String           @id @default(uuid())
+  actorId   String?
+  actor     Profile?         @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  requestId String?
+  request   DocumentRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  
+  action    String           // e.g. "QUOTATION_ACCEPTED", "ADVANCE_PAYMENT_VERIFIED", "FINAL_DOC_DOWNLOAD"
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+
+  createdAt DateTime         @default(now())
+
+  @@index([actorId])
+  @@index([requestId])
+  @@map("audit_logs")
+}
