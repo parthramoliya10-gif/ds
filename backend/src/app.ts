@@ -11,6 +11,7 @@ import authRoutes from './modules/auth/auth.routes.js';
 import requestRoutes from './modules/requests/request.routes.js';
 import quotationRoutes from './modules/quotations/quotation.routes.js';
 import paymentRoutes from './modules/payments/payment.routes.js';
+import chatRoutes from './modules/chat/chat.routes.js';
 
 export const createApp = (): Application => {
   const app = express();
@@ -81,6 +82,7 @@ export const createApp = (): Application => {
   app.use(`${env.API_PREFIX}/requests`, requestRoutes);
   app.use(`${env.API_PREFIX}/quotations`, quotationRoutes);
   app.use(`${env.API_PREFIX}/payments`, paymentRoutes);
+  app.use(`${env.API_PREFIX}/chat`, chatRoutes);
 
   // 8. 404 Fallback Handler
   app.use((req: Request, _res: Response, next: NextFunction) => {
