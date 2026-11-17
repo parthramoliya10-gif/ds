@@ -8,6 +8,7 @@ import { rateLimiter } from './middlewares/rateLimiter.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { ApiError } from './utils/apiError.js';
 import authRoutes from './modules/auth/auth.routes.js';
+import requestRoutes from './modules/requests/request.routes.js';
 
 export const createApp = (): Application => {
   const app = express();
@@ -68,6 +69,7 @@ export const createApp = (): Application => {
 
   // 7. Mount Module Routes
   app.use(`${env.API_PREFIX}/auth`, authRoutes);
+  app.use(`${env.API_PREFIX}/requests`, requestRoutes);
 
   // 8. 404 Fallback Handler
   app.use((req: Request, _res: Response, next: NextFunction) => {
