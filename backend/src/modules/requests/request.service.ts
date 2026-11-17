@@ -109,6 +109,9 @@ export class RequestService {
         ...docRequest,
         conversationId: conversation.id,
       };
+    }, {
+      maxWait: 15000,
+      timeout: 20000,
     });
 
     // Fetch complete request with files and conversation

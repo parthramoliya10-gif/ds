@@ -106,6 +106,9 @@ export class QuotationService {
       });
 
       return quotation;
+    }, {
+      maxWait: 15000,
+      timeout: 20000,
     });
 
     return newQuotation;

@@ -114,6 +114,9 @@ export class DocumentService {
       });
 
       return document;
+    }, {
+      maxWait: 15000,
+      timeout: 20000,
     });
 
     return finalDoc;

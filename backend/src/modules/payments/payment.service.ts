@@ -243,6 +243,9 @@ export class PaymentService {
         isDownloadUnlocked: updatedRequest.isDownloadUnlocked,
         requestStatus: updatedRequest.status,
       };
+    }, {
+      maxWait: 15000,
+      timeout: 20000,
     });
 
     return updatedState;
