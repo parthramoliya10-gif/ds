@@ -1,0 +1,181 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { DataTable, Column } from "@/components/shared/DataTable";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { mockRequests } from "@/lib/mock-data";
+import { Request } from "@/types";
+import { formatDate, isDeadlineUrgent } from "@/lib/utils";
+import { Plus, MessageSquare, Eye, FileText, Search } from "lucide-react";
+
+export default function UserRequestsListPage() {
+  const [activeTab, setActiveTab] = React.useState("all");
+  const [requests] = React.useState<Request[]>(mockRequests);
+
+  // Filter based on tab
+  const filteredRequests = React.useMemo(() => {
+    switch (activeTab) {
+      case "in_progress":
+        return requests.filter(
+          (r) => r.status === "in_progress" || r.status === "advance_paid"
+        );
+      case "pending":
+        return requests.filter(
+          (r) => r.status === "pending" || r.status === "quoted"
+        );
+      case "ready":
+        return requests.filter((r) => r.status === "ready");
+      case "completed":
+        return requests.filter(
+          (r) => r.status === "completed" || r.status === "delivered"
+        );
+      case "all":
+      default:
+        return requests;
+    }
+  }, [requests, activeTab]);
+
+  const columns: Column<Request>[] = [
+    {
+      header: "Req ID",
+      accessorKey: "id",
+      className: "font-mono text-[12px] font-medium w-24",
+      cell: (req) => (
+        <Link
+          href={`/user/requests/${req.id}`}
+          className="hover:underline font-mono font-medium text-foreground"
+        >
+          {req.id}
+        </Link>
+      ),
+    },
+    {
+      header: "Task & Subject",
+      accessorKey: "title",
+      cell: (req) => (
+        <div className="flex flex-col max-w-md">
+          <Link
+            href={`/user/requests/${req.id}`}
+            className="font-semibold text-foreground hover:underline line-clamp-1"
+          >
+            {req.title}
+          </Link>
+          <span className="text-[12px] text-muted-foreground">
+            {req.subject} • {req.pages} pages • {req.format}
+          </span>
+        </div>
+      ),
+    },
+    {
+      header: "Status",
+      accessorKey: "status",
+      cell: (req) => <StatusBadge status={req.status} />,
+    },
+    {
+      header: "Deadline",
+      accessorKey: "deadline",
+      cell: (req) => {
+        const urgent = req.urgent || isDeadlineUrgent(req.deadline);
+        return (
+          <div className="flex items-center space-x-2">
+            <span className="text-[13px] text-muted-foreground whitespace-nowrap">
+              {formatDate(req.deadline)}
+            </span>
+            {urgent && (
+              <StatusBadge status="urgent" label="Urgent" className="text-[10px] py-0 px-1.5 h-4" />
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      header: "Actions",
+      className: "text-right w-44",
+      cell: (req) => (
+        <div className="flex items-center justify-end space-x-1.5">
+          <Link href={`/user/chat/${req.id}`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-[12px] border-border text-foreground hover:bg-surface px-2.5"
+              title="Open Chat"
+            >
+              <MessageSquare className="h-3.5 w-3.5 mr-1" />
+              Chat
+            </Button>
+          </Link>
+          <Link href={`/user/requests/${req.id}`}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-[12px] border-border text-foreground hover:bg-surface px-2.5"
+            >
+              <Eye className="h-3.5 w-3.5 mr-1" />
+              Details
+            </Button>
+          </Link>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="My Requests"
+        description="Track all your university assignments, lab manuals, and reports from submission to download unlock."
+        action={
+          <Link href="/user/requests/new">
+            <Button size="sm" className="h-9">
+              <Plus className="h-4 w-4 mr-1.5" />
+              Create Request
+            </Button>
+          </Link>
+        }
+      />
+
+      {/* Status Filter Tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
+          <TabsList className="h-10 border border-border bg-surface p-1">
+            <TabsTrigger value="all" className="text-[12px]">All ({requests.length})</TabsTrigger>
+            <TabsTrigger value="in_progress" className="text-[12px]">In Progress</TabsTrigger>
+            <TabsTrigger value="pending" className="text-[12px]">Pending Quote</TabsTrigger>
+            <TabsTrigger value="ready" className="text-[12px]">Ready for Download</TabsTrigger>
+            <TabsTrigger value="completed" className="text-[12px]">Completed</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* Requests Data Table or Empty State */}
+      {filteredRequests.length === 0 ? (
+        <EmptyState
+          icon={<FileText className="h-6 w-6 stroke-[1.5]" />}
+          title="No requests found"
+          description={`There are currently no tasks in the '${activeTab}' category. Click below to submit a new college task.`}
+          action={
+            <Link href="/user/requests/new">
+              <Button size="sm" className="h-9">
+                <Plus className="h-4 w-4 mr-1.5" />
+                Submit a Task Request
+              </Button>
+            </Link>
+          }
+        />
+      ) : (
+        <DataTable
+          data={filteredRequests}
+          columns={columns}
+          searchKey="title"
+          searchPlaceholder="Search by task title or subject..."
+          pageSize={6}
+        />
+      )}
+    </div>
+  );
+}
