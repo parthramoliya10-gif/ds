@@ -13,6 +13,7 @@ import quotationRoutes from './modules/quotations/quotation.routes.js';
 import paymentRoutes from './modules/payments/payment.routes.js';
 import chatRoutes from './modules/chat/chat.routes.js';
 import documentRoutes from './modules/documents/document.routes.js';
+import adminRoutes from './modules/admin/admin.routes.js';
 
 export const createApp = (): Application => {
   const app = express();
@@ -85,6 +86,7 @@ export const createApp = (): Application => {
   app.use(`${env.API_PREFIX}/payments`, paymentRoutes);
   app.use(`${env.API_PREFIX}/chat`, chatRoutes);
   app.use(`${env.API_PREFIX}/documents`, documentRoutes);
+  app.use(`${env.API_PREFIX}/admin`, adminRoutes);
 
   // 8. 404 Fallback Handler
   app.use((req: Request, _res: Response, next: NextFunction) => {
