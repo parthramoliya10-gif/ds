@@ -9,6 +9,8 @@ import { errorHandler } from './middlewares/errorHandler.js';
 import { ApiError } from './utils/apiError.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import requestRoutes from './modules/requests/request.routes.js';
+import quotationRoutes from './modules/quotations/quotation.routes.js';
+import paymentRoutes from './modules/payments/payment.routes.js';
 
 export const createApp = (): Application => {
   const app = express();
@@ -52,8 +54,15 @@ export const createApp = (): Application => {
   // 4. Rate Limiting
   app.use(rateLimiter);
 
-  // 5. Body Parsers & Cookie Parser
-  app.use(express.json({ limit: '10mb' }));
+  // 5. Body Parsers & Cookie Parser (with rawBody capture for Webhook HMAC verification)
+  app.use(
+    express.json({
+      limit: '10mb',
+      verify: (req: Request, _res: Response, buf: Buffer) => {
+        (req as any).rawBody = buf;
+      },
+    })
+  );
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(cookieParser());
 
@@ -70,6 +79,8 @@ export const createApp = (): Application => {
   // 7. Mount Module Routes
   app.use(`${env.API_PREFIX}/auth`, authRoutes);
   app.use(`${env.API_PREFIX}/requests`, requestRoutes);
+  app.use(`${env.API_PREFIX}/quotations`, quotationRoutes);
+  app.use(`${env.API_PREFIX}/payments`, paymentRoutes);
 
   // 8. 404 Fallback Handler
   app.use((req: Request, _res: Response, next: NextFunction) => {
