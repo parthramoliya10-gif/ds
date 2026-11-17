@@ -1,0 +1,88 @@
+import { Request, Response, NextFunction } from 'express';
+import chatService from './chat.service.js';
+import { sendResponse } from '../../utils/apiResponse.js';
+import { ApiError } from '../../utils/apiError.js';
+
+export class ChatController {
+  /**
+   * GET /api/v1/chat/:requestId/messages
+   * Fetch conversation history
+   */
+  async getMessages(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new ApiError(401, 'Unauthorized');
+      }
+
+      const requestId = req.params.requestId as string;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+      const cursor = req.query.cursor as string | undefined;
+
+      const history = await chatService.getConversationMessages(requestId, req.user, {
+        limit,
+        cursor,
+      });
+
+      sendResponse({
+        res,
+        statusCode: 200,
+        message: 'Chat history retrieved successfully',
+        data: history,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/chat/:requestId/messages
+   * Post message via REST with optional file upload
+   */
+  async postMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new ApiError(401, 'Unauthorized');
+      }
+
+      const requestId = req.params.requestId as string;
+      const file = req.file as Express.Multer.File | undefined;
+      const message = await chatService.postMessage(req.user, requestId, req.body, file);
+
+      sendResponse({
+        res,
+        statusCode: 201,
+        message: 'Message sent successfully',
+        data: message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PATCH /api/v1/chat/:requestId/read
+   * Mark all unread messages as READ
+   */
+  async markRead(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new ApiError(401, 'Unauthorized');
+      }
+
+      const requestId = req.params.requestId as string;
+      const result = await chatService.markMessagesAsRead(req.user.id, requestId);
+
+      sendResponse({
+        res,
+        statusCode: 200,
+        message: 'Messages marked as read',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+}
+
+export const chatController = new ChatController();
+export default chatController;

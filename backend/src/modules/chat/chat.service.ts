@@ -1,0 +1,187 @@
+import { MessageStatus, MessageType, Role } from '@prisma/client';
+import prisma from '../../config/prisma.js';
+import { ApiError } from '../../utils/apiError.js';
+import { AuthenticatedUser } from '../../types/express.js';
+import { uploadBufferToCloudinary } from '../../utils/cloudinary.js';
+
+export interface GetMessagesOptions {
+  limit?: number;
+  cursor?: string; // Message ID for cursor pagination
+}
+
+export interface PostMessageInput {
+  content: string;
+  messageType?: MessageType;
+  metadata?: any;
+}
+
+export class ChatService {
+  /**
+   * Fetch conversation messages for a request with strict authorization
+   */
+  async getConversationMessages(
+    requestId: string,
+    user: AuthenticatedUser,
+    options: GetMessagesOptions = {}
+  ) {
+    // 1. Verify access to this request
+    const request = await prisma.documentRequest.findUnique({
+      where: { id: requestId },
+      select: { id: true, userId: true },
+    });
+
+    if (!request) {
+      throw new ApiError(404, 'Document request not found.');
+    }
+
+    if (user.role !== Role.ADMIN && request.userId !== user.id) {
+      throw new ApiError(403, 'Forbidden: You do not have permission to view this chat.');
+    }
+
+    // 2. Find conversation
+    const conversation = await prisma.conversation.findUnique({
+      where: { requestId },
+      select: { id: true },
+    });
+
+    if (!conversation) {
+      throw new ApiError(404, 'Conversation not found for this request.');
+    }
+
+    const limit = Math.min(options.limit || 50, 100);
+
+    // 3. Query messages with cursor-based pagination
+    const messages = await prisma.message.findMany({
+      where: { conversationId: conversation.id },
+      take: limit + 1,
+      ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
+      orderBy: { createdAt: 'desc' },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    const hasMore = messages.length > limit;
+    const items = hasMore ? messages.slice(0, limit) : messages;
+
+    return {
+      conversationId: conversation.id,
+      messages: items.reverse(), // chronologically ordered (oldest to newest)
+      nextCursor: hasMore ? items[items.length - 1].id : null,
+    };
+  }
+
+  /**
+   * Post a new message via REST (supports optional file attachments)
+   */
+  async postMessage(
+    user: AuthenticatedUser,
+    requestId: string,
+    data: PostMessageInput,
+    file?: Express.Multer.File
+  ) {
+    const request = await prisma.documentRequest.findUnique({
+      where: { id: requestId },
+      include: { conversation: true },
+    });
+
+    if (!request) {
+      throw new ApiError(404, 'Document request not found.');
+    }
+
+    if (user.role !== Role.ADMIN && request.userId !== user.id) {
+      throw new ApiError(403, 'Forbidden: You cannot post messages in this conversation.');
+    }
+
+    let conversation = request.conversation;
+    if (!conversation) {
+      conversation = await prisma.conversation.create({
+        data: { requestId },
+      });
+    }
+
+    let messageType = data.messageType || MessageType.TEXT;
+    let metadata = data.metadata || {};
+
+    // If file attached in chat, upload to Cloudinary
+    if (file) {
+      const uploadRes = await uploadBufferToCloudinary(
+        file.buffer,
+        'document-system/chat-files',
+        { resourceType: 'auto' }
+      );
+      messageType = MessageType.FILE;
+      metadata = {
+        ...metadata,
+        fileUrl: uploadRes.secureUrl,
+        publicId: uploadRes.publicId,
+        fileName: file.originalname,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+      };
+    }
+
+    const message = await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: user.id,
+        senderRole: user.role,
+        messageType,
+        content: data.content || (file ? `Shared a file: ${file.originalname}` : ''),
+        metadata,
+        status: MessageStatus.SENT,
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    return message;
+  }
+
+  /**
+   * Mark all unread messages in conversation as READ (WhatsApp blue ticks)
+   */
+  async markMessagesAsRead(userId: string, requestId: string) {
+    const conversation = await prisma.conversation.findUnique({
+      where: { requestId },
+      select: { id: true },
+    });
+
+    if (!conversation) {
+      return { count: 0 };
+    }
+
+    // Mark messages as READ if sender is NOT the current user
+    const result = await prisma.message.updateMany({
+      where: {
+        conversationId: conversation.id,
+        senderId: { not: userId },
+        status: { in: [MessageStatus.SENT, MessageStatus.DELIVERED] },
+      },
+      data: {
+        status: MessageStatus.READ,
+        readAt: new Date(),
+      },
+    });
+
+    return result;
+  }
+}
+
+export const chatService = new ChatService();
+export default chatService;
