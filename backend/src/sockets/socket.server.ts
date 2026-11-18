@@ -22,12 +22,17 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
     'http://127.0.0.1:3000',
   ];
 
+  if (env.CLIENT_URL.startsWith('https://') && !env.CLIENT_URL.startsWith('https://www.')) {
+    allowedOrigins.push(env.CLIENT_URL.replace('https://', 'https://www.'));
+  }
+
   io = new Server(httpServer, {
     cors: {
       origin: allowedOrigins,
       credentials: true,
       methods: ['GET', 'POST'],
     },
+    transports: ['polling', 'websocket'],
     pingTimeout: 30000,
     pingInterval: 25000,
   });
