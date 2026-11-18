@@ -79,24 +79,24 @@ describe('🔒 Security & Authorization Architecture Tests', () => {
   });
 
   describe('2. Milestone Calculation (Zero Floating Point Bug)', () => {
-    it('should accurately split odd amount without losing paise', () => {
-      // Total ₹1,001 = 100100 paise
-      const totalAmountPaise = 100100;
-      const advanceAmountPaise = Math.floor(totalAmountPaise / 2);
-      const remainingAmountPaise = totalAmountPaise - advanceAmountPaise;
+    it('should accurately split odd USD amount without losing cents', () => {
+      // Total $101 = 10100 cents
+      const totalAmountCents = 10100;
+      const advanceAmountCents = Math.floor(totalAmountCents / 2);
+      const remainingAmountCents = totalAmountCents - advanceAmountCents;
 
-      expect(advanceAmountPaise).toBe(50050);
-      expect(remainingAmountPaise).toBe(50050);
-      expect(advanceAmountPaise + remainingAmountPaise).toBe(totalAmountPaise);
+      expect(advanceAmountCents).toBe(5050);
+      expect(remainingAmountCents).toBe(5050);
+      expect(advanceAmountCents + remainingAmountCents).toBe(totalAmountCents);
     });
 
-    it('should handle fractional odd paise without precision loss', () => {
-      // Odd 99999 paise
-      const totalAmountPaise = 99999;
-      const advanceAmountPaise = Math.floor(totalAmountPaise / 2); // 49999
-      const remainingAmountPaise = totalAmountPaise - advanceAmountPaise; // 50000
+    it('should handle fractional odd cents without precision loss', () => {
+      // Odd 9999 cents ($99.99)
+      const totalAmountCents = 9999;
+      const advanceAmountCents = Math.floor(totalAmountCents / 2); // 4999
+      const remainingAmountCents = totalAmountCents - advanceAmountCents; // 5000
 
-      expect(advanceAmountPaise + remainingAmountPaise).toBe(totalAmountPaise);
+      expect(advanceAmountCents + remainingAmountCents).toBe(totalAmountCents);
     });
   });
 

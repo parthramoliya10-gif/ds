@@ -38,7 +38,7 @@ export class PaymentService {
     }
 
     // 2. Validate Milestone Requirements
-    let payableAmountPaise: number;
+    let payableAmountCents: number;
 
     if (milestone === PaymentMilestone.ADVANCE_50) {
       // Check if advance already paid
@@ -48,7 +48,7 @@ export class PaymentService {
       if (advanceAlreadyPaid) {
         throw new ApiError(400, '50% Advance payment has already been completed for this request.');
       }
-      payableAmountPaise = acceptedQuotation.advanceAmount;
+      payableAmountCents = acceptedQuotation.advanceAmount;
     } else {
       // FINAL_50 Milestone
       const advancePaid = request.payments.some(
@@ -65,16 +65,17 @@ export class PaymentService {
         throw new ApiError(400, '100% full payment has already been completed.');
       }
 
-      payableAmountPaise = acceptedQuotation.remainingAmount;
+      payableAmountCents = acceptedQuotation.remainingAmount;
     }
 
     // 3. Create Razorpay Order
+    const currency = acceptedQuotation.currency || 'USD';
     const receiptPrefix = milestone === PaymentMilestone.ADVANCE_50 ? 'adv' : 'fin';
     const receipt = `rcpt_${receiptPrefix}_${request.id.slice(0, 8)}_${Date.now()}`.slice(0, 40);
 
     const order = await razorpay.orders.create({
-      amount: payableAmountPaise,
-      currency: 'INR',
+      amount: payableAmountCents,
+      currency,
       receipt,
       notes: {
         requestId: request.id,
@@ -91,8 +92,8 @@ export class PaymentService {
         requestId: request.id,
         quotationId: acceptedQuotation.id,
         milestone,
-        amount: payableAmountPaise,
-        currency: 'INR',
+        amount: payableAmountCents,
+        currency,
         status: PaymentStatus.PENDING,
         razorpayOrderId: order.id,
       },
@@ -189,12 +190,12 @@ export class PaymentService {
       if (payment.milestone === PaymentMilestone.ADVANCE_50) {
         // Milestone 1 complete: Admin starts work
         newRequestStatus = RequestStatus.IN_PROGRESS;
-        chatContent = `🎉 50% Advance Payment (₹${payment.amount / 100}) verified successfully! Admin has started working on your document.`;
+        chatContent = `🎉 50% Advance Payment ($${(payment.amount / 100).toFixed(2)}) verified successfully! Admin has started working on your document.`;
       } else if (payment.milestone === PaymentMilestone.FINAL_50) {
         // Milestone 2 complete: Document download is UNLOCKED!
         newRequestStatus = RequestStatus.COMPLETED;
         isDownloadUnlocked = true;
-        chatContent = `🎉 Final 50% Payment (₹${payment.amount / 100}) verified! All milestones paid. Your final completed document download is now UNLOCKED!`;
+        chatContent = `🎉 Final 50% Payment ($${(payment.amount / 100).toFixed(2)}) verified! All milestones paid. Your final completed document download is now UNLOCKED!`;
       }
 
       // Update Document Request

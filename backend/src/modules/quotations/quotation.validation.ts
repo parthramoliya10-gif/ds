@@ -5,7 +5,7 @@ export const createQuotationSchema = z.object({
   totalAmount: z
     .number({ required_error: 'Total amount is required' })
     .positive('Total amount must be greater than zero')
-    .min(1, 'Minimum amount is ₹1'),
+    .min(1, 'Minimum amount is $1'),
   terms: z.string().max(2000).optional(),
   estimatedDays: z
     .number()

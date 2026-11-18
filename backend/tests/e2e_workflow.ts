@@ -126,15 +126,16 @@ async function runEndToEndVerification() {
     console.log('🔹 STEP 4: Admin provides Quotation...');
     const quotation = await quotationService.createQuotation(testAdminId, {
       requestId: newRequest.id,
-      totalAmount: 2000, // ₹2000
+      totalAmount: 200, // $200 USD
       estimatedDays: 2,
       terms: '50% advance to start legal verification, 50% upon final document delivery.',
     });
 
     console.log(`✅ Quotation Generated: ID = ${quotation.id} (v${quotation.version})`);
-    console.log(`   - Total Amount: ₹${quotation.totalAmount / 100} (${quotation.totalAmount} paise)`);
-    console.log(`   - Advance (50%): ₹${quotation.advanceAmount / 100} (${quotation.advanceAmount} paise)`);
-    console.log(`   - Remaining (50%): ₹${quotation.remainingAmount / 100} (${quotation.remainingAmount} paise)`);
+    console.log(`   - Total Amount: $${(quotation.totalAmount / 100).toFixed(2)} (${quotation.totalAmount} cents)`);
+    console.log(`   - Advance (50%): $${(quotation.advanceAmount / 100).toFixed(2)} (${quotation.advanceAmount} cents)`);
+    console.log(`   - Remaining (50%): $${(quotation.remainingAmount / 100).toFixed(2)} (${quotation.remainingAmount} cents)`);
+    console.log(`   - Currency: ${quotation.currency}`);
     console.log(`   - Quotation Status: ${quotation.status}`);
 
     const reqAfterQuote = await prisma.documentRequest.findUnique({ where: { id: newRequest.id } });
@@ -149,7 +150,7 @@ async function runEndToEndVerification() {
     console.log(`✅ Quotation Status: ${acceptResult.quotation.status} (ACCEPTED)`);
     console.log(`✅ Razorpay Advance Order Created: ${acceptResult.paymentOrder.orderId}`);
     console.log(`   - Milestone: ${acceptResult.paymentOrder.milestone}`);
-    console.log(`   - Advance Amount: ₹${acceptResult.paymentOrder.amount / 100}\n`);
+    console.log(`   - Advance Amount: $${(Number(acceptResult.paymentOrder.amount) / 100).toFixed(2)} (${acceptResult.paymentOrder.currency})\n`);
 
     // -------------------------------------------------------------
     // STEP 6: Milestone 1 (50% Advance) Payment Verification
@@ -269,7 +270,7 @@ async function runEndToEndVerification() {
     );
 
     console.log(`✅ Milestone 2 Razorpay Order Created: ${finalOrder.orderId}`);
-    console.log(`   - Final Remaining Amount: ₹${finalOrder.amount / 100}`);
+    console.log(`   - Final Remaining Amount: $${(Number(finalOrder.amount) / 100).toFixed(2)} (${finalOrder.currency})`);
 
     const finalOrderId = finalOrder.orderId;
     const finalPaymentId = `pay_fin_${Date.now()}`;
@@ -317,7 +318,7 @@ async function runEndToEndVerification() {
     console.log('🔹 STEP 12: Verifying Admin Dashboard Analytics & Audit Trail...');
     const stats = await adminService.getDashboardStats();
     console.log(`✅ Total Completed Requests: ${stats.requests.completed}`);
-    console.log(`✅ Total Revenue Earned: ₹${stats.finances.totalRevenue.rupees} (${stats.finances.totalRevenue.transactionCount} transactions)`);
+    console.log(`✅ Total Revenue Earned: $${stats.finances.totalRevenue.dollars.toFixed(2)} ${stats.finances.currency} (${stats.finances.totalRevenue.transactionCount} transactions)`);
 
     const auditTrail = await adminService.getAuditLogs({ limit: 10 });
     console.log(`✅ Audit Trail contains ${auditTrail.logs.length} logged security actions.`);

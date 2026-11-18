@@ -103,8 +103,8 @@ export class AdminService {
       }),
     ]);
 
-    const totalRevenuePaise = successfulPaymentsAggregate._sum.amount || 0;
-    const pendingRevenuePaise = pendingPaymentsAggregate._sum.amount || 0;
+    const totalRevenueCents = successfulPaymentsAggregate._sum.amount || 0;
+    const pendingRevenueCents = pendingPaymentsAggregate._sum.amount || 0;
 
     return {
       requests: {
@@ -122,14 +122,15 @@ export class AdminService {
         blockedUsers,
       },
       finances: {
+        currency: 'USD',
         totalRevenue: {
-          paise: totalRevenuePaise,
-          rupees: totalRevenuePaise / 100,
+          cents: totalRevenueCents,
+          dollars: totalRevenueCents / 100,
           transactionCount: successfulPaymentsAggregate._count,
         },
         pendingRevenue: {
-          paise: pendingRevenuePaise,
-          rupees: pendingRevenuePaise / 100,
+          cents: pendingRevenueCents,
+          dollars: pendingRevenueCents / 100,
           pendingTransactionsCount: pendingPaymentsAggregate._count,
         },
       },

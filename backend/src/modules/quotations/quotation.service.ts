@@ -7,7 +7,7 @@ import env from '../../config/env.js';
 
 export interface CreateQuotationInput {
   requestId: string;
-  totalAmount: number; // in Rupees from frontend
+  totalAmount: number; // in USD dollars from frontend
   terms?: string;
   estimatedDays?: number;
 }
@@ -27,10 +27,10 @@ export class QuotationService {
       throw new ApiError(404, 'Document request not found.');
     }
 
-    // 2. Strict integer math in paise (zero floating-point precision error)
-    const totalAmountPaise = Math.round(data.totalAmount * 100);
-    const advanceAmountPaise = Math.floor(totalAmountPaise / 2);
-    const remainingAmountPaise = totalAmountPaise - advanceAmountPaise;
+    // 2. Strict integer math in cents (zero floating-point precision error)
+    const totalAmountCents = Math.round(data.totalAmount * 100);
+    const advanceAmountCents = Math.floor(totalAmountCents / 2);
+    const remainingAmountCents = totalAmountCents - advanceAmountCents;
 
     // 3. Count previous quotations for versioning
     const previousQuotationsCount = await prisma.quotation.count({
@@ -54,9 +54,10 @@ export class QuotationService {
         data: {
           requestId: data.requestId,
           version,
-          totalAmount: totalAmountPaise,
-          advanceAmount: advanceAmountPaise,
-          remainingAmount: remainingAmountPaise,
+          totalAmount: totalAmountCents,
+          advanceAmount: advanceAmountCents,
+          remainingAmount: remainingAmountCents,
+          currency: 'USD',
           terms: data.terms,
           estimatedDays: data.estimatedDays,
           status: QuotationStatus.SENT,
@@ -77,13 +78,14 @@ export class QuotationService {
             senderId: adminId,
             senderRole: Role.ADMIN,
             messageType: MessageType.QUOTATION_CARD,
-            content: `Quotation (v${version}): ₹${data.totalAmount} (50% Advance: ₹${advanceAmountPaise / 100}, 50% Final: ₹${remainingAmountPaise / 100})`,
+            content: `Quotation (v${version}): $${(totalAmountCents / 100).toFixed(2)} (50% Advance: $${(advanceAmountCents / 100).toFixed(2)}, 50% Final: $${(remainingAmountCents / 100).toFixed(2)})`,
             metadata: {
               quotationId: quotation.id,
               version: quotation.version,
-              totalAmount: totalAmountPaise,
-              advanceAmount: advanceAmountPaise,
-              remainingAmount: remainingAmountPaise,
+              totalAmount: totalAmountCents,
+              advanceAmount: advanceAmountCents,
+              remainingAmount: remainingAmountCents,
+              currency: 'USD',
               estimatedDays: data.estimatedDays,
               terms: data.terms,
             },
@@ -100,7 +102,8 @@ export class QuotationService {
           metadata: {
             quotationId: quotation.id,
             version,
-            totalAmount: totalAmountPaise,
+            totalAmount: totalAmountCents,
+            currency: 'USD',
           },
         },
       });
@@ -174,10 +177,11 @@ export class QuotationService {
     });
 
     // 2. Generate Razorpay Order for Milestone 1 (50% Advance)
+    const currency = quotation.currency || 'USD';
     const receipt = `rcpt_adv_${quotation.id.slice(0, 8)}_${Date.now()}`.slice(0, 40);
     const razorpayOrder = await razorpay.orders.create({
       amount: quotation.advanceAmount,
-      currency: 'INR',
+      currency,
       receipt,
       notes: {
         requestId: quotation.requestId,
@@ -195,7 +199,7 @@ export class QuotationService {
         quotationId: quotation.id,
         milestone: 'ADVANCE_50',
         amount: quotation.advanceAmount,
-        currency: 'INR',
+        currency,
         status: 'PENDING',
         razorpayOrderId: razorpayOrder.id,
       },
@@ -209,7 +213,7 @@ export class QuotationService {
           senderId: userId,
           senderRole: Role.USER,
           messageType: MessageType.SYSTEM,
-          content: `Quotation (v${quotation.version}) accepted by user. 50% Advance payment initiated (₹${quotation.advanceAmount / 100}).`,
+          content: `Quotation (v${quotation.version}) accepted by user. 50% Advance payment initiated ($${(quotation.advanceAmount / 100).toFixed(2)}).`,
         },
       });
     }

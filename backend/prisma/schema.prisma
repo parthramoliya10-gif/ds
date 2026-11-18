@@ -172,11 +172,11 @@ model Quotation {
   request         DocumentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   version         Int             @default(1)
   
-  // Amounts stored in paise (integer) to avoid float rounding bugs (e.g., ₹1000 = 100000 paise)
+  // Amounts stored in cents (integer) to avoid float rounding bugs (e.g., $100 = 10000 cents)
   totalAmount     Int
-  advanceAmount   Int             // 50% in paise
-  remainingAmount Int             // 50% in paise
-  currency        String          @default("INR")
+  advanceAmount   Int             // 50% in cents
+  remainingAmount Int             // 50% in cents
+  currency        String          @default("USD")
   
   terms           String?         @db.Text
   estimatedDays   Int?
@@ -202,8 +202,8 @@ model Payment {
   quotation         Quotation        @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   
   milestone         PaymentMilestone
-  amount            Int              // Amount in paise
-  currency          String           @default("INR")
+  amount            Int              // Amount in cents
+  currency          String           @default("USD")
   status            PaymentStatus    @default(PENDING)
   
   razorpayOrderId   String           @unique
