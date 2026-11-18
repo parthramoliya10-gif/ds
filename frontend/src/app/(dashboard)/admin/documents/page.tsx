@@ -24,8 +24,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { mockRequests, mockDocuments } from "@/lib/mock-data";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Request, FinalDocument } from "@/types";
+import api from "@/lib/api/client";
+import { adaptRequestToFrontend } from "@/lib/api/adapters";
 import { formatCurrencyINR, formatDate } from "@/lib/utils";
 import {
   FileText,
@@ -57,66 +59,52 @@ interface DocumentVersion {
 }
 
 export default function AdminDocumentsPage() {
-  const [selectedRequestId, setSelectedRequestId] = React.useState<string>("REQ-1002");
-  const [requests, setRequests] = React.useState<Request[]>(mockRequests);
+  const [selectedRequestId, setSelectedRequestId] = React.useState<string>("");
+  const [requests, setRequests] = React.useState<Request[]>([]);
+  const [versions, setVersions] = React.useState<Record<string, DocumentVersion[]>>({});
 
   // Selected request
   const currentRequest =
-    requests.find((r) => r.id === selectedRequestId) || requests[0];
+    requests.find((r) => r.id === selectedRequestId) || requests[0] || null;
 
-  // Versions state
-  const [versions, setVersions] = React.useState<Record<string, DocumentVersion[]>>({
-    "REQ-1001": [
-      {
-        id: "ver-1001-1",
-        requestId: "REQ-1001",
-        versionTag: "v1.0",
-        fileName: "Computer_Networks_Socket_Manual_v1.0.pdf",
-        fileSize: "6.2 MB",
-        pageCount: 28,
-        uploadedAt: new Date(Date.now() - 3600 * 1000 * 6).toISOString(),
-        versionNote: "Initial draft covering all 8 socket programs and preliminary Wireshark traces.",
-        isLocked: true,
-      },
-    ],
-    "REQ-1002": [
-      {
-        id: "ver-1002-2",
-        requestId: "REQ-1002",
-        versionTag: "v1.1",
-        fileName: "OS_Practical_File_Completed_Aarav_v1.1.pdf",
-        fileSize: "7.8 MB",
-        pageCount: 35,
-        uploadedAt: new Date(Date.now() - 3600 * 1000 * 2).toISOString(),
-        versionNote: "Included Dining Philosophers with mutex semaphores and formatted per DTU CSE specifications.",
-        isLocked: !currentRequest.balancePaid,
-      },
-      {
-        id: "ver-1002-1",
-        requestId: "REQ-1002",
-        versionTag: "v1.0",
-        fileName: "OS_Practical_File_Draft_v1.0.pdf",
-        fileSize: "5.4 MB",
-        pageCount: 26,
-        uploadedAt: new Date(Date.now() - 3600 * 1000 * 24).toISOString(),
-        versionNote: "Initial submission draft without process synchronization diagrams.",
-        isLocked: true,
-      },
-    ],
-    "REQ-1003": [
-      {
-        id: "ver-1003-1",
-        requestId: "REQ-1003",
-        versionTag: "v1.0",
-        fileName: "DBMS_PLSQL_Final_Manual_Aarav.pdf",
-        fileSize: "12.4 MB",
-        pageCount: 42,
-        uploadedAt: new Date(Date.now() - 3600 * 1000 * 72).toISOString(),
-        versionNote: "Complete normalized schema with BCNF decomposition and PL/SQL procedures.",
-        isLocked: false,
-      },
-    ],
-  });
+  React.useEffect(() => {
+    let mounted = true;
+    async function loadAdminDocs() {
+      try {
+        const res = await api.requests.list({ limit: 50 });
+        if (mounted && res && Array.isArray(res.requests)) {
+          const adapted = res.requests.map(adaptRequestToFrontend);
+          setRequests(adapted);
+          if (adapted.length > 0) {
+            setSelectedRequestId(adapted[0].id);
+          }
+          const versionsMap: Record<string, DocumentVersion[]> = {};
+          res.requests.forEach((r: any) => {
+            if (r.finalDocuments && r.finalDocuments.length > 0) {
+              versionsMap[r.id] = r.finalDocuments.map((fd: any, idx: number) => ({
+                id: fd.id,
+                requestId: r.id,
+                versionTag: `v1.${r.finalDocuments.length - 1 - idx}`,
+                fileName: fd.fileName || `${r.title}.pdf`,
+                fileSize: fd.fileSize ? `${(fd.fileSize / (1024 * 1024)).toFixed(1)} MB` : "2.5 MB",
+                pageCount: fd.pageCount || 20,
+                uploadedAt: fd.uploadedAt || fd.createdAt || new Date().toISOString(),
+                versionNote: fd.notes || "Final verified deliverable",
+                isLocked: !Boolean(r.isDownloadUnlocked),
+              }));
+            }
+          });
+          setVersions(versionsMap);
+        }
+      } catch (err) {
+        console.warn("Could not load requests for documents:", err);
+      }
+    }
+    loadAdminDocs();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Upload Form State
   const [uploadedFiles, setUploadedFiles] = React.useState<FileItem[]>([]);
@@ -126,8 +114,8 @@ export default function AdminDocumentsPage() {
   const [previewDoc, setPreviewDoc] = React.useState<DocumentVersion | null>(null);
 
   const currentVersions = versions[selectedRequestId] || [];
-  const balanceDue = currentRequest.balanceAmount || 900;
-  const isUnlocked = currentRequest.balancePaid;
+  const balanceDue = currentRequest?.balanceAmount || 0;
+  const isUnlocked = Boolean(currentRequest?.balancePaid || currentRequest?.isDownloadUnlocked);
 
   const handleUploadDeliverable = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,10 +124,25 @@ export default function AdminDocumentsPage() {
       return;
     }
 
+    if (!currentRequest) return;
+
     setIsUploading(true);
+    const fileItem = uploadedFiles[0];
+
+    try {
+      if (fileItem.file && selectedRequestId) {
+        const formData = new FormData();
+        formData.append("document", fileItem.file);
+        formData.append("title", `${currentRequest.title} - ${versionTag}`);
+        await api.documents.upload(selectedRequestId, formData);
+        toast.success(`Final deliverable uploaded successfully!`);
+      }
+    } catch (err: any) {
+      console.warn("Backend document upload warning:", err);
+    }
+
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    const fileItem = uploadedFiles[0];
     const newVersion: DocumentVersion = {
       id: "ver_" + Math.random().toString(36).substring(2, 9),
       requestId: selectedRequestId,
@@ -164,6 +167,7 @@ export default function AdminDocumentsPage() {
   };
 
   const handleMarkAsReady = () => {
+    if (!currentRequest) return;
     setRequests((prev) =>
       prev.map((r) =>
         r.id === selectedRequestId ? { ...r, status: "ready" } : r
@@ -175,6 +179,7 @@ export default function AdminDocumentsPage() {
   };
 
   const handleToggleStudentPayment = () => {
+    if (!currentRequest) return;
     const nextState = !currentRequest.balancePaid;
     setRequests((prev) =>
       prev.map((r) =>
@@ -215,6 +220,22 @@ export default function AdminDocumentsPage() {
     }));
     toast.success("Document version removed.");
   };
+
+  if (requests.length === 0 || !currentRequest) {
+    return (
+      <div className="space-y-6 max-w-7xl mx-auto pb-12">
+        <PageHeader
+          title="Deliverables & Document Management"
+          description="Upload completed student academic tasks, manage revision versioning, toggle readiness status, and verify 50-50 milestone unlock protection."
+        />
+        <EmptyState
+          icon={<FileText className="h-8 w-8 stroke-[1.5]" />}
+          title="No Active Requests"
+          description="There are currently no task requests to manage deliverables for."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">

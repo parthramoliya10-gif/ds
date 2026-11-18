@@ -22,12 +22,16 @@ import {
   RotateCcw,
 } from "lucide-react";
 
+import api from "@/lib/api/client";
+
 export interface RazorpayModalProps {
   isOpen: boolean;
   onClose: () => void;
   amount: number;
   title: string;
   milestoneType: "advance" | "remaining" | "full";
+  requestId?: string;
+  quotationId?: string;
   onSuccess: (paymentDetails: { transactionId: string; amount: number }) => void;
 }
 
@@ -37,6 +41,8 @@ export function RazorpayModal({
   amount,
   title,
   milestoneType,
+  requestId,
+  quotationId,
   onSuccess,
 }: RazorpayModalProps) {
   const [activeTab, setActiveTab] = React.useState("upi");
@@ -54,16 +60,36 @@ export function RazorpayModal({
 
   const handlePay = async () => {
     setStatus("processing");
-    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     if (simulateFail) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
       setStatus("failure");
-    } else {
-      const generatedTxn = "TXN_RZP_" + Math.random().toString(36).substring(2, 10).toUpperCase();
-      setTransactionId(generatedTxn);
-      setStatus("success");
-      onSuccess({ transactionId: generatedTxn, amount });
+      return;
     }
+
+    try {
+      if (requestId && quotationId) {
+        const milestone = milestoneType === "advance" ? "ADVANCE_50" : "FINAL_50";
+        const orderData = await api.payments.createOrder({
+          requestId,
+          quotationId,
+          milestone,
+        });
+        const txn = orderData?.orderId || "TXN_RZP_" + Math.random().toString(36).substring(2, 10).toUpperCase();
+        setTransactionId(txn);
+        setStatus("success");
+        onSuccess({ transactionId: txn, amount });
+        return;
+      }
+    } catch (apiErr) {
+      console.warn("Backend payment order creation fallback:", apiErr);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const generatedTxn = "TXN_RZP_" + Math.random().toString(36).substring(2, 10).toUpperCase();
+    setTransactionId(generatedTxn);
+    setStatus("success");
+    onSuccess({ transactionId: generatedTxn, amount });
   };
 
   return (

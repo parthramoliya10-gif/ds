@@ -19,8 +19,9 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Stepper } from "@/components/shared/Stepper";
 import { DataTable, Column } from "@/components/shared/DataTable";
 import { useAuth } from "@/context/AuthContext";
-import { mockRequests, mockNotifications, mockDocuments } from "@/lib/mock-data";
 import { Request } from "@/types";
+import api from "@/lib/api/client";
+import { adaptRequestToFrontend } from "@/lib/api/adapters";
 import { formatCurrencyINR, formatDate, isDeadlineUrgent } from "@/lib/utils";
 import {
   Clock,
@@ -57,40 +58,65 @@ export default function UserDashboardPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [activeTab, setActiveTab] = React.useState("all");
   const [viewMode, setViewMode] = React.useState<"cards" | "table">("cards");
+  const [requests, setRequests] = React.useState<Request[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let mounted = true;
+    async function loadDashboardRequests() {
+      try {
+        const res = await api.requests.list({ limit: 50 });
+        if (mounted && res && Array.isArray(res.requests)) {
+          const adapted = res.requests.map(adaptRequestToFrontend);
+          setRequests(adapted);
+        }
+      } catch (err) {
+        console.warn("Could not load backend requests:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    loadDashboardRequests();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Find nearest deadline request that is currently in progress
   const activeRequest =
-    mockRequests.find((r) => r.status === "in_progress") ||
-    mockRequests.find((r) => r.status === "ready") ||
-    mockRequests[0];
+    requests.find((r) => r.status === "in_progress") ||
+    requests.find((r) => r.status === "ready" || r.status === "document_uploaded") ||
+    requests[0];
 
   // Find requests that are ready for final payment & download unlock
-  const readyRequests = mockRequests.filter((r) => r.status === "ready");
+  const readyRequests = requests.filter(
+    (r) => r.status === "ready" || r.status === "document_uploaded"
+  );
 
   // Calculate user stats
-  const inProgressCount = mockRequests.filter(
+  const inProgressCount = requests.filter(
     (r) => r.status === "in_progress" || r.status === "advance_paid"
   ).length;
 
   const readyCount = readyRequests.length;
 
-  const completedCount = mockRequests.filter(
+  const completedCount = requests.filter(
     (r) => r.status === "completed" || r.status === "delivered"
   ).length;
 
-  const totalBalanceDue = mockRequests
+  const totalBalanceDue = requests
     .filter((r) => r.balanceAmount && !r.balancePaid)
     .reduce((acc, curr) => acc + (curr.balanceAmount || 0), 0);
 
   // Filter requests based on tab and search
   const filteredRequests = React.useMemo(() => {
-    return mockRequests.filter((req) => {
+    return requests.filter((req) => {
       // Tab filter
       let matchesTab = true;
       if (activeTab === "in_progress") {
         matchesTab = req.status === "in_progress" || req.status === "advance_paid";
       } else if (activeTab === "ready") {
-        matchesTab = req.status === "ready";
+        matchesTab = req.status === "ready" || req.status === "document_uploaded";
       } else if (activeTab === "quoted") {
         matchesTab = req.status === "quoted" || req.status === "pending";
       } else if (activeTab === "completed") {
@@ -106,7 +132,7 @@ export default function UserDashboardPage() {
 
       return matchesTab && matchesSearch;
     });
-  }, [activeTab, searchQuery]);
+  }, [requests, activeTab, searchQuery]);
 
   // Table columns for Table View
   const requestColumns: Column<Request>[] = [
@@ -329,119 +355,138 @@ export default function UserDashboardPage() {
       )}
 
       {/* 3. Featured Active Task Spotlight (Hero Card) */}
-      <Card className="border border-border bg-background rounded-[10px] p-6 relative overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-          <div className="space-y-4 max-w-3xl">
-            {/* Header badges */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-                Nearest Active Task • {activeRequest.id}
-              </span>
-              <StatusBadge status={activeRequest.status} />
-              {activeRequest.urgent && (
-                <StatusBadge status="urgent" label="Due in < 24 hrs" />
-              )}
-              <span className="text-[11px] font-medium px-2 py-0.5 rounded border border-border bg-surface text-foreground">
-                {activeRequest.subject}
-              </span>
-              <span className="text-[11px] text-muted-foreground">
-                {activeRequest.pages} pages • {activeRequest.format}
-              </span>
+      {activeRequest ? (
+        <Card className="border border-border bg-background rounded-[10px] p-6 relative overflow-hidden">
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+            <div className="space-y-4 max-w-3xl">
+              {/* Header badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                  Nearest Active Task • {activeRequest.id}
+                </span>
+                <StatusBadge status={activeRequest.status} />
+                {activeRequest.urgent && (
+                  <StatusBadge status="urgent" label="Due in < 24 hrs" />
+                )}
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded border border-border bg-surface text-foreground">
+                  {activeRequest.subject}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {activeRequest.pages} pages • {activeRequest.format}
+                </span>
+              </div>
+
+              {/* Task Title */}
+              <h2 className="text-[22px] sm:text-[26px] font-bold tracking-tight text-foreground leading-snug">
+                {activeRequest.title}
+              </h2>
+
+              {/* Specialist Status Box */}
+              <div className="rounded-[8px] border border-border bg-surface p-3.5 flex items-start space-x-3 text-[13px]">
+                <div className="h-6 w-6 rounded-full bg-foreground text-background flex items-center justify-center shrink-0 font-bold text-[10px] mt-0.5">
+                  WR
+                </div>
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">
+                    Specialist Drafting in Progress
+                  </p>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Active specialist is currently documenting Wireshark packet capture analysis, program screenshots, and verification code.
+                  </p>
+                </div>
+              </div>
+
+              {/* Escrow Milestone Strip */}
+              <div className="grid grid-cols-3 gap-3 pt-1 text-[12px]">
+                <div className="p-2.5 rounded-[6px] border border-border bg-surface/50">
+                  <span className="text-muted-foreground block text-[11px]">Total Price</span>
+                  <span className="font-semibold text-foreground text-[14px]">
+                    {formatCurrencyINR(activeRequest.totalAmount || 0)}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-[6px] border border-border bg-surface/50">
+                  <span className="text-muted-foreground block text-[11px]">50% Advance Paid</span>
+                  <span className="font-semibold text-foreground text-[14px]">
+                    {formatCurrencyINR(activeRequest.advanceAmount || 0)} {activeRequest.advancePaid ? "✓" : ""}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-[6px] border border-border bg-surface/50">
+                  <span className="text-muted-foreground block text-[11px]">Remaining Milestone</span>
+                  <span className="font-semibold text-foreground text-[14px]">
+                    {formatCurrencyINR(activeRequest.balanceAmount || 0)}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            {/* Task Title */}
-            <h2 className="text-[22px] sm:text-[26px] font-bold tracking-tight text-foreground leading-snug">
-              {activeRequest.title}
-            </h2>
+            {/* Action column */}
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0 lg:items-end lg:min-w-[200px]">
+              <div className="text-left lg:text-right">
+                <span className="text-[11px] uppercase font-mono tracking-wider text-muted-foreground block">
+                  Target Deadline
+                </span>
+                <span className="text-[18px] font-bold text-foreground">
+                  {formatDate(activeRequest.deadline)}
+                </span>
+                <span className="text-[12px] text-muted-foreground block mt-0.5">
+                  Turnaround: Under 24h
+                </span>
+              </div>
 
-            {/* Specialist Status Box */}
-            <div className="rounded-[8px] border border-border bg-surface p-3.5 flex items-start space-x-3 text-[13px]">
-              <div className="h-6 w-6 rounded-full bg-foreground text-background flex items-center justify-center shrink-0 font-bold text-[10px] mt-0.5">
-                WR
-              </div>
-              <div className="space-y-1">
-                <p className="font-medium text-foreground">
-                  Specialist Drafting in Progress
-                </p>
-                <p className="text-muted-foreground leading-relaxed">
-                  Active specialist is currently documenting Wireshark packet capture analysis, program screenshots, and verification code.
-                </p>
-              </div>
-            </div>
+              <Button
+                size="lg"
+                className="h-11 px-6 font-semibold rounded-[8px] w-full sm:w-auto"
+                onClick={() => router.push(`/user/chat/${activeRequest.id}`)}
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Open Task Discussion
+              </Button>
 
-            {/* Escrow Milestone Strip */}
-            <div className="grid grid-cols-3 gap-3 pt-1 text-[12px]">
-              <div className="p-2.5 rounded-[6px] border border-border bg-surface/50">
-                <span className="text-muted-foreground block text-[11px]">Total Price</span>
-                <span className="font-semibold text-foreground text-[14px]">
-                  {formatCurrencyINR(activeRequest.totalAmount || 1400)}
-                </span>
-              </div>
-              <div className="p-2.5 rounded-[6px] border border-border bg-surface/50">
-                <span className="text-muted-foreground block text-[11px]">50% Advance Paid</span>
-                <span className="font-semibold text-foreground text-[14px]">
-                  {formatCurrencyINR(activeRequest.advanceAmount || 700)} ✓
-                </span>
-              </div>
-              <div className="p-2.5 rounded-[6px] border border-border bg-surface/50">
-                <span className="text-muted-foreground block text-[11px]">Remaining Milestone</span>
-                <span className="font-semibold text-foreground text-[14px]">
-                  {formatCurrencyINR(activeRequest.balanceAmount || 700)}
-                </span>
-              </div>
+              <Link href={`/user/requests/${activeRequest.id}`} className="w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 w-full border-border text-foreground hover:bg-surface rounded-[8px] text-[12px]"
+                >
+                  View Request Details
+                  <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                </Button>
+              </Link>
             </div>
           </div>
 
-          {/* Action column */}
-          <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0 lg:items-end lg:min-w-[200px]">
-            <div className="text-left lg:text-right">
-              <span className="text-[11px] uppercase font-mono tracking-wider text-muted-foreground block">
-                Target Deadline
+          {/* Milestone Stepper */}
+          <div className="mt-8 pt-6 border-t border-border">
+            <div className="mb-3 flex items-center justify-between text-[12px] font-medium text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span>Milestone Progress Timeline</span>
+                <span className="text-[11px] px-1.5 py-0.2 rounded bg-surface border border-border text-foreground">
+                  Active Lifecycle
+                </span>
               </span>
-              <span className="text-[18px] font-bold text-foreground">
-                {formatDate(activeRequest.deadline)}
-              </span>
-              <span className="text-[12px] text-muted-foreground block mt-0.5">
-                Turnaround: Under 24h
-              </span>
+              <span className="font-mono text-foreground font-semibold">{activeRequest.id}</span>
             </div>
-
-            <Button
-              size="lg"
-              className="h-11 px-6 font-semibold rounded-[8px] w-full sm:w-auto"
-              onClick={() => router.push(`/user/chat/${activeRequest.id}`)}
-            >
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Open Task Discussion
-            </Button>
-
-            <Link href={`/user/requests/${activeRequest.id}`} className="w-full sm:w-auto">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 w-full border-border text-foreground hover:bg-surface rounded-[8px] text-[12px]"
-              >
-                View Request Details
-                <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+            <Stepper currentStatus={activeRequest.status} />
+          </div>
+        </Card>
+      ) : (
+        <Card className="border border-border bg-background rounded-[10px] p-6 relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1 max-w-xl">
+              <h2 className="text-[20px] font-bold text-foreground">Welcome to DSMS Academic Portal</h2>
+              <p className="text-[13px] text-muted-foreground">
+                Get started by creating your first document request. Receive guaranteed milestone protection and rapid turnaround.
+              </p>
+            </div>
+            <Link href="/user/requests/new">
+              <Button className="h-10 px-5 font-semibold shrink-0">
+                <Plus className="h-4 w-4 mr-1.5" />
+                Submit New Task
               </Button>
             </Link>
           </div>
-        </div>
-
-        {/* Milestone Stepper */}
-        <div className="mt-8 pt-6 border-t border-border">
-          <div className="mb-3 flex items-center justify-between text-[12px] font-medium text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <span>Milestone Progress Timeline</span>
-              <span className="text-[11px] px-1.5 py-0.2 rounded bg-surface border border-border text-foreground">
-                Phase 4 of 6 • Active Drafting
-              </span>
-            </span>
-            <span className="font-mono text-foreground font-semibold">{activeRequest.id}</span>
-          </div>
-          <Stepper currentStatus={activeRequest.status} />
-        </div>
-      </Card>
+        </Card>
+      )}
 
       {/* 4. Executive Key Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -569,7 +614,7 @@ export default function UserDashboardPage() {
 
             <Link href="/user/requests">
               <Button variant="outline" size="sm" className="h-8 text-[12px] border-border text-foreground hover:bg-surface">
-                View All ({mockRequests.length})
+                View All ({requests.length})
                 <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
               </Button>
             </Link>
@@ -581,7 +626,7 @@ export default function UserDashboardPage() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
             <TabsList className="h-9 border border-border bg-surface p-1">
               <TabsTrigger value="all" className="text-[12px] px-3">
-                All ({mockRequests.length})
+                All ({requests.length})
               </TabsTrigger>
               <TabsTrigger value="in_progress" className="text-[12px] px-3">
                 In Progress ({inProgressCount})
@@ -758,30 +803,34 @@ export default function UserDashboardPage() {
           </div>
 
           <div className="space-y-3">
-            {mockNotifications.map((notif) => (
-              <Link
-                key={notif.id}
-                href={notif.link || "/user/requests"}
-                className="flex items-start space-x-3 p-3 rounded-[8px] border border-border bg-surface/40 hover:bg-surface transition-colors"
-              >
-                <div className="h-7 w-7 rounded-full bg-foreground text-background flex items-center justify-center shrink-0 mt-0.5">
-                  <Check className="h-3.5 w-3.5 stroke-[3]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[13px] font-semibold text-foreground">
-                      {notif.title}
-                    </p>
-                    <span className="text-[11px] text-muted-foreground">
-                      {formatDate(notif.createdAt)}
-                    </span>
+            {requests.length === 0 ? (
+              <p className="text-[13px] text-muted-foreground p-3">No recent order updates.</p>
+            ) : (
+              requests.slice(0, 3).map((r) => (
+                <Link
+                  key={r.id}
+                  href={`/user/requests/${r.id}`}
+                  className="flex items-start space-x-3 p-3 rounded-[8px] border border-border bg-surface/40 hover:bg-surface transition-colors"
+                >
+                  <div className="h-7 w-7 rounded-full bg-foreground text-background flex items-center justify-center shrink-0 mt-0.5">
+                    <Check className="h-3.5 w-3.5 stroke-[3]" />
                   </div>
-                  <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-1">
-                    {notif.message}
-                  </p>
-                </div>
-              </Link>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[13px] font-semibold text-foreground truncate">
+                        {r.title}
+                      </p>
+                      <span className="text-[11px] text-muted-foreground ml-2 shrink-0">
+                        {formatDate(r.updatedAt || r.createdAt)}
+                      </span>
+                    </div>
+                    <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-1">
+                      Status: {r.status.toUpperCase()} • {r.format} ({r.pages} pages)
+                    </p>
+                  </div>
+                </Link>
+              ))
+            )}
           </div>
         </Card>
 

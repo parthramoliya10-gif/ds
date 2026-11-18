@@ -10,8 +10,9 @@ import { RazorpayModal } from "@/components/payments/RazorpayModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { mockPayments, mockRequests } from "@/lib/mock-data";
-import { Payment } from "@/types";
+import { Payment, Request } from "@/types";
+import api from "@/lib/api/client";
+import { adaptPaymentToFrontend, adaptRequestToFrontend } from "@/lib/api/adapters";
 import { formatCurrencyINR, formatDate } from "@/lib/utils";
 import {
   CreditCard,
@@ -25,15 +26,43 @@ import {
 import { toast } from "sonner";
 
 export default function UserPaymentsPage() {
-  const [payments, setPayments] = React.useState<Payment[]>(mockPayments);
+  const [payments, setPayments] = React.useState<Payment[]>([]);
+  const [requests, setRequests] = React.useState<Request[]>([]);
   const [isRazorpayOpen, setIsRazorpayOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    let mounted = true;
+    async function loadPayments() {
+      try {
+        const [payRes, reqRes] = await Promise.allSettled([
+          api.payments.myHistory(),
+          api.requests.list({ limit: 50 }),
+        ]);
+
+        if (mounted) {
+          if (payRes.status === "fulfilled" && Array.isArray(payRes.value)) {
+            setPayments(payRes.value.map(adaptPaymentToFrontend));
+          }
+          if (reqRes.status === "fulfilled" && Array.isArray(reqRes.value?.requests)) {
+            setRequests(reqRes.value.requests.map(adaptRequestToFrontend));
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load backend payments:", err);
+      }
+    }
+    loadPayments();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Financial calculations
   const totalPaid = payments
     .filter((p) => p.status === "completed")
     .reduce((acc, curr) => acc + curr.amount, 0);
 
-  const totalOutstanding = mockRequests
+  const totalOutstanding = requests
     .filter((r) => r.balanceAmount && !r.balancePaid)
     .reduce((acc, curr) => acc + (curr.balanceAmount || 0), 0);
 

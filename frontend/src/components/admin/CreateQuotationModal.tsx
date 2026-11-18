@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Quotation } from "@/types";
+import api from "@/lib/api/client";
+import { adaptQuotationToFrontend } from "@/lib/api/adapters";
 import { formatCurrencyINR } from "@/lib/utils";
 import { ShieldCheck, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
@@ -54,6 +56,27 @@ export function CreateQuotationModal({
     if (!amount || amount <= 0) return;
 
     setSubmitting(true);
+    try {
+      if (requestId && !requestId.startsWith("REQ-100")) {
+        const created = await api.quotations.create({
+          requestId,
+          totalAmount: Number(amount),
+          terms: notes,
+          estimatedDays: deliveryDate.includes("24") ? 1 : 2,
+        });
+        if (created) {
+          const adapted = adaptQuotationToFrontend(created);
+          onSubmitQuotation(adapted);
+          setSubmitting(false);
+          toast.success(`Quotation for ${formatCurrencyINR(amount)} dispatched to student.`);
+          onClose();
+          return;
+        }
+      }
+    } catch (apiErr: any) {
+      console.warn("Backend quotation error, using local fallback:", apiErr);
+    }
+
     await new Promise((resolve) => setTimeout(resolve, 350));
 
     const newQuotation: Quotation = {

@@ -17,8 +17,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { mockRequests } from "@/lib/mock-data";
 import { Request } from "@/types";
+import api from "@/lib/api/client";
 import { formatDate, isDeadlineUrgent } from "@/lib/utils";
 import { CalendarIcon, ArrowLeft, ArrowRight, AlertCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -53,13 +53,13 @@ export default function NewRequestPage() {
   } = useForm<NewRequestFormValues>({
     resolver: zodResolver(newRequestSchema),
     defaultValues: {
-      title: "Distributed Systems - Raft Consensus Lab Manual",
-      subject: "Distributed Systems",
-      college: "Delhi Technological University",
-      semester: "6",
-      pages: 24,
+      title: "",
+      subject: "",
+      college: "",
+      semester: "1",
+      pages: 10,
       format: "typed",
-      description: "Need full state machine implementation, leader election diagrams, and Wireshark trace analysis.",
+      description: "",
     },
   });
 
@@ -72,39 +72,39 @@ export default function NewRequestPage() {
 
   const onSubmit = async (data: NewRequestFormValues) => {
     setSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    try {
+      const formData = new FormData();
+      formData.append("title", data.title);
+      
+      const fullDescription = [
+        data.description || "Task specification details.",
+        `\n\n[Academic Details] Subject: ${data.subject} | Format: ${data.format} | Target Pages: ${data.pages} | College: ${data.college} | Semester: ${data.semester}`
+      ].join(" ");
+      formData.append("description", fullDescription);
+      formData.append("category", data.subject);
+      formData.append("priority", isUrgent ? "URGENT" : "NORMAL");
 
-    const newId = "REQ-" + (1000 + mockRequests.length + 1);
-    const newRequest: Request = {
-      id: newId,
-      title: data.title,
-      subject: data.subject,
-      college: data.college,
-      semester: data.semester,
-      pages: data.pages,
-      format: data.format,
-      deadline: selectedDate.toISOString(),
-      status: "pending",
-      urgent: isUrgent,
-      advancePaid: false,
-      balancePaid: false,
-      studentId: "usr_aarav_01",
-      studentName: "Aarav Sharma",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      files: uploadedFiles.map((f) => ({
-        id: f.id,
-        name: f.name,
-        size: f.size,
-      })),
-    };
+      uploadedFiles.forEach((f) => {
+        if (f.file) {
+          formData.append("referenceFiles", f.file);
+        }
+      });
 
-    // Prepend to mock data array
-    mockRequests.unshift(newRequest);
+      const result: any = await api.requests.create(formData);
+      const newId = result?.id;
 
-    toast.success("Task request submitted! Admin will issue a 50-50 quotation in chat.");
-    setSubmitting(false);
-    router.push(`/user/chat/${newId}`);
+      toast.success("Task request submitted! Admin will issue a 50-50 quotation in chat.");
+      if (newId) {
+        router.push(`/user/chat/${newId}`);
+      } else {
+        router.push(`/user/requests`);
+      }
+    } catch (err: any) {
+      console.error("Backend request creation error:", err);
+      toast.error(err.message || "Failed to submit request. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

@@ -18,8 +18,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { mockRequests, mockQuotations, mockPayments } from "@/lib/mock-data";
 import { Payment, Quotation, Request } from "@/types";
+import api from "@/lib/api/client";
+import { adaptPaymentToFrontend, adaptRequestToFrontend, adaptQuotationToFrontend } from "@/lib/api/adapters";
 import { formatCurrencyINR, formatDate, formatDateTime } from "@/lib/utils";
 import {
   DollarSign,
@@ -42,77 +43,55 @@ export default function AdminPaymentsPage() {
   const [activeTab, setActiveTab] = React.useState("history");
   const [search, setSearch] = React.useState("");
 
-  // Comprehensive payment transaction records
-  const allTransactions = [
-    ...mockPayments,
-    {
-      id: "PAY-3005",
-      requestId: "REQ-1004",
-      requestTitle: "Software Engineering SRS Document",
-      studentId: "usr_aarav_01",
-      amount: 1250,
-      milestone: "advance" as const,
-      status: "completed" as const,
-      transactionId: "TXN_RZP_SE_ADV_3389",
-      paidAt: new Date(Date.now() - 3600 * 1000 * 120).toISOString(),
-    },
-    {
-      id: "PAY-3006",
-      requestId: "REQ-1004",
-      requestTitle: "Software Engineering SRS Document",
-      studentId: "usr_aarav_01",
-      amount: 1250,
-      milestone: "remaining" as const,
-      status: "completed" as const,
-      transactionId: "TXN_RZP_SE_FIN_4490",
-      paidAt: new Date(Date.now() - 3600 * 1000 * 84).toISOString(),
-    },
-    {
-      id: "PAY-3007",
-      requestId: "REQ-1005",
-      requestTitle: "Machine Learning Classification Report",
-      studentId: "usr_aarav_01",
-      amount: 1500,
-      milestone: "advance" as const,
-      status: "completed" as const,
-      transactionId: "TXN_RZP_ML_ADV_5511",
-      paidAt: new Date(Date.now() - 3600 * 1000 * 18).toISOString(),
-    },
-  ];
+  const [payments, setPayments] = React.useState<Payment[]>([]);
+  const [requests, setRequests] = React.useState<Request[]>([]);
+  const [quotations, setQuotations] = React.useState<Quotation[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
-  // Quotations records
-  const allQuotations: Quotation[] = [
-    ...mockQuotations,
-    {
-      id: "QT-1004",
-      requestId: "REQ-1004",
-      amount: 2500,
-      advanceAmount: 1250,
-      remainingAmount: 1250,
-      estimatedDelivery: "3 Days",
-      status: "accepted",
-      createdAt: new Date(Date.now() - 3600 * 1000 * 140).toISOString(),
-      notes: "SRS template according to IEEE 830 standard with UML diagrams.",
-    },
-    {
-      id: "QT-1006",
-      requestId: "REQ-1006",
-      amount: 1600,
-      advanceAmount: 800,
-      remainingAmount: 800,
-      estimatedDelivery: "2 Days",
-      status: "pending",
-      createdAt: new Date(Date.now() - 3600 * 1000 * 8).toISOString(),
-      notes: "Cloud architecture VPC lab setup with screenshots and cost analysis.",
-    },
-  ];
+  React.useEffect(() => {
+    let mounted = true;
+    async function loadAdminPayments() {
+      try {
+        setLoading(true);
+        const [paymentsRes, requestsRes] = await Promise.allSettled([
+          api.payments.adminList(),
+          api.requests.list({ limit: 100 }),
+        ]);
+
+        if (mounted) {
+          if (paymentsRes.status === "fulfilled" && Array.isArray(paymentsRes.value)) {
+            setPayments(paymentsRes.value.map(adaptPaymentToFrontend));
+          }
+          if (requestsRes.status === "fulfilled" && Array.isArray(requestsRes.value?.requests)) {
+            const adapted = requestsRes.value.requests.map(adaptRequestToFrontend);
+            setRequests(adapted);
+            const quotes: Quotation[] = [];
+            requestsRes.value.requests.forEach((r: any) => {
+              if (r.quotations && r.quotations.length > 0) {
+                quotes.push(...r.quotations.map(adaptQuotationToFrontend));
+              }
+            });
+            setQuotations(quotes);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load backend admin payments:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    loadAdminPayments();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Request milestone summaries
-  const requestMilestones = mockRequests.map((req) => {
-    const quote = allQuotations.find((q) => q.requestId === req.id);
-    const totalAmount = quote ? quote.amount : (req.advanceAmount || 700) + (req.balanceAmount || 700);
-    const advanceAmount = quote ? quote.advanceAmount : req.advanceAmount || Math.round(totalAmount / 2);
-    const balanceAmount = quote ? quote.remainingAmount : req.balanceAmount || totalAmount - advanceAmount;
+  const requestMilestones = requests.map((req) => {
+    const quote = quotations.find((q) => q.requestId === req.id);
+    const totalAmount = quote ? quote.amount : (req.totalAmount || 0);
+    const advanceAmount = quote ? quote.advanceAmount : (req.advanceAmount || Math.round(totalAmount / 2));
+    const balanceAmount = quote ? quote.remainingAmount : (req.balanceAmount || totalAmount - advanceAmount);
 
     return {
       id: req.id,
@@ -129,7 +108,7 @@ export default function AdminPaymentsPage() {
   });
 
   // Calculate totals
-  const totalRevenueCollected = allTransactions
+  const totalRevenueCollected = payments
     .filter((t) => t.status === "completed")
     .reduce((acc, t) => acc + t.amount, 0);
 
@@ -137,17 +116,20 @@ export default function AdminPaymentsPage() {
     .filter((r) => r.advancePaid && !r.balancePaid)
     .reduce((acc, r) => acc + r.balanceAmount, 0);
 
-  const totalQuotationsValue = allQuotations.reduce((acc, q) => acc + q.amount, 0);
+  const totalQuotationsValue = quotations.reduce((acc, q) => acc + q.amount, 0);
+  const realizationRate = requests.length > 0
+    ? `${Math.min(100, Math.round((payments.filter((p) => p.status === "completed").length / (requests.length * 2 || 1)) * 100))}%`
+    : "100%";
 
   // Filtered lists
-  const filteredTransactions = allTransactions.filter(
+  const filteredTransactions = payments.filter(
     (t) =>
       (t.transactionId || "").toLowerCase().includes(search.toLowerCase()) ||
       t.requestId.toLowerCase().includes(search.toLowerCase()) ||
       (t.requestTitle || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const filteredQuotations = allQuotations.filter(
+  const filteredQuotations = quotations.filter(
     (q) =>
       q.id.toLowerCase().includes(search.toLowerCase()) ||
       q.requestId.toLowerCase().includes(search.toLowerCase()) ||
@@ -163,10 +145,10 @@ export default function AdminPaymentsPage() {
 
   const handleExportCSV = () => {
     const csvHeader = "Transaction ID,Request ID,Task Title,Student,Milestone,Amount (INR),Status,Date\n";
-    const csvRows = allTransactions
+    const csvRows = payments
       .map(
         (t) =>
-          `"${t.transactionId || t.id}","${t.requestId}","${t.requestTitle || t.requestId}","Aarav Sharma","${t.milestone} 50%",${t.amount},"${t.status}","${t.paidAt || new Date().toISOString()}"`
+          `"${t.transactionId || t.id}","${t.requestId}","${t.requestTitle || t.requestId}","${t.studentId || "Student"}","${t.milestone} 50%",${t.amount},"${t.status}","${t.paidAt || new Date().toISOString()}"`
       )
       .join("\n");
 
@@ -221,12 +203,12 @@ export default function AdminPaymentsPage() {
         <StatCard
           label="Total Quotations Dispatched"
           value={formatCurrencyINR(totalQuotationsValue)}
-          helperText={`${allQuotations.length} milestone quotes issued`}
+          helperText={`${quotations.length} milestone quotes issued`}
           icon={<ShieldCheck className="h-4 w-4 stroke-[1.75]" />}
         />
         <StatCard
           label="Milestone Realization"
-          value="94.2%"
+          value={realizationRate}
           helperText="Completion-to-payment rate"
           icon={<TrendingUp className="h-4 w-4 stroke-[1.75]" />}
         />
@@ -238,10 +220,10 @@ export default function AdminPaymentsPage() {
           <div className="p-4 sm:p-5 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
             <TabsList className="bg-surface border border-border h-9">
               <TabsTrigger value="history" className="text-[13px]">
-                Transaction History ({allTransactions.length})
+                Transaction History ({payments.length})
               </TabsTrigger>
               <TabsTrigger value="quotations" className="text-[13px]">
-                Quotations Table ({allQuotations.length})
+                Quotations Table ({quotations.length})
               </TabsTrigger>
               <TabsTrigger value="milestones" className="text-[13px]">
                 Milestone Status Per Request

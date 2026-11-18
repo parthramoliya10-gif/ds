@@ -13,8 +13,13 @@ import { MilestoneProgressBar } from "@/components/payments/MilestoneProgressBar
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { mockRequests, mockQuotations, mockDocuments } from "@/lib/mock-data";
 import { Request, Quotation, FinalDocument } from "@/types";
+import api from "@/lib/api/client";
+import {
+  adaptRequestToFrontend,
+  adaptQuotationToFrontend,
+  adaptFinalDocumentToFrontend,
+} from "@/lib/api/adapters";
 import { formatCurrencyINR, formatDate, isDeadlineUrgent } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -35,50 +40,98 @@ export default function UserRequestDetailPage() {
   const router = useRouter();
   const requestId = params?.id as string;
 
-  // Find request in mock data
-  const baseRequest = mockRequests.find((r) => r.id === requestId) || mockRequests[1]; // default to REQ-1002
-  const [request, setRequest] = React.useState<Request>(baseRequest);
-
-  // Associated quotation
-  const quotation = mockQuotations.find((q) => q.requestId === request.id) || mockQuotations[1];
-
-  // Associated final document
-  const initialDoc = mockDocuments.find((d) => d.requestId === request.id) || {
-    id: "DOC-" + request.id,
-    requestId: request.id,
-    fileName: `${request.title.replace(/[^a-zA-Z0-9]/g, "_")}_Final.pdf`,
-    fileSize: "6.4 MB",
-    pageCount: request.pages,
-    fileUrl: "#",
-    isLocked: !request.balancePaid,
-    uploadedAt: new Date().toISOString(),
-  };
-
-  const [finalDoc, setFinalDoc] = React.useState<FinalDocument>(initialDoc);
+  const [request, setRequest] = React.useState<Request | null>(null);
+  const [quotation, setQuotation] = React.useState<Quotation | null>(null);
+  const [finalDoc, setFinalDoc] = React.useState<FinalDocument | null>(null);
   const [isRazorpayOpen, setIsRazorpayOpen] = React.useState(false);
   const [isRevisionOpen, setIsRevisionOpen] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
 
-  const balanceAmount = request.balanceAmount || 900;
+  React.useEffect(() => {
+    let mounted = true;
+    async function fetchDetail() {
+      if (!requestId) return;
+      try {
+        const backendReq = await api.requests.getById(requestId);
+        if (mounted && backendReq) {
+          const adapted = adaptRequestToFrontend(backendReq);
+          setRequest(adapted);
+
+          if (backendReq.quotations && backendReq.quotations.length > 0) {
+            setQuotation(adaptQuotationToFrontend(backendReq.quotations[0]));
+          }
+
+          if (backendReq.finalDocuments && backendReq.finalDocuments.length > 0) {
+            setFinalDoc(adaptFinalDocumentToFrontend(backendReq.finalDocuments[0]));
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch backend request by id:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    fetchDetail();
+    return () => {
+      mounted = false;
+    };
+  }, [requestId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="h-6 w-6 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!request) {
+    return (
+      <div className="space-y-4 max-w-md mx-auto text-center py-16">
+        <h2 className="text-[20px] font-semibold text-foreground">Request Not Found</h2>
+        <p className="text-[13px] text-muted-foreground">
+          The requested task could not be found or has been removed.
+        </p>
+        <Link href="/user/requests">
+          <Button variant="outline" size="sm">Back to Requests</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  const balanceAmount = request.balanceAmount || 0;
   const isDocLocked = !request.balancePaid;
 
   const handlePaymentSuccess = ({ transactionId }: { transactionId: string }) => {
-    // Update local state: balance is paid, document is unlocked!
-    setRequest((prev) => ({
-      ...prev,
-      balancePaid: true,
-      status: "delivered",
-    }));
+    setRequest((prev) =>
+      prev
+        ? {
+            ...prev,
+            balancePaid: true,
+            status: "delivered",
+          }
+        : null
+    );
 
-    setFinalDoc((prev) => ({
-      ...prev,
-      isLocked: false,
-    }));
+    setFinalDoc((prev) =>
+      prev
+        ? {
+            ...prev,
+            isLocked: false,
+          }
+        : null
+    );
 
     toast.success("Payment verified! Document is now unlocked for download.");
   };
 
   const handleDownload = () => {
-    toast.success(`Downloading ${finalDoc.fileName}...`);
+    if (finalDoc?.id) {
+      window.open(api.documents.getDownloadUrl(finalDoc.id), "_blank");
+      toast.success(`Downloading ${finalDoc.fileName}...`);
+    } else {
+      toast.info("Download not ready.");
+    }
   };
 
   return (
@@ -134,14 +187,26 @@ export default function UserRequestDetailPage() {
         {/* Left Column: Details & Deliverable */}
         <div className="lg:col-span-2 space-y-6">
           {/* Final Document Card with Lock/Unlock Flow */}
-          <FinalDocumentCard
-            document={finalDoc}
-            remainingAmount={balanceAmount}
-            isLocked={isDocLocked}
-            onPayToUnlock={() => setIsRazorpayOpen(true)}
-            onDownload={handleDownload}
-            onRequestRevision={() => setIsRevisionOpen(true)}
-          />
+          {finalDoc ? (
+            <FinalDocumentCard
+              document={finalDoc}
+              remainingAmount={balanceAmount}
+              isLocked={isDocLocked}
+              onPayToUnlock={() => setIsRazorpayOpen(true)}
+              onDownload={handleDownload}
+              onRequestRevision={() => setIsRevisionOpen(true)}
+            />
+          ) : (
+            <Card className="border border-border bg-background rounded-[8px] p-5 shadow-none space-y-2">
+              <div className="flex items-center space-x-2 text-foreground font-semibold text-[14px]">
+                <Clock className="h-4 w-4" />
+                <span>Deliverable Pending</span>
+              </div>
+              <p className="text-[12px] text-muted-foreground leading-relaxed">
+                Your final completed deliverable will appear here once uploaded by the specialist.
+              </p>
+            </Card>
+          )}
 
           {/* Task Specifications */}
           <Card className="border border-border bg-background rounded-[8px] p-5 shadow-none space-y-3">
@@ -259,7 +324,7 @@ export default function UserRequestDetailPage() {
         requestId={request.id}
         requestTitle={request.title}
         onSubmitRevision={(notes) => {
-          setRequest((prev) => ({ ...prev, status: "in_progress" }));
+          setRequest((prev) => (prev ? { ...prev, status: "in_progress" } : null));
         }}
       />
     </div>

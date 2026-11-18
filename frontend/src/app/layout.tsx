@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import "@/styles/globals.css";
 import { ThemeProvider } from "@/context/ThemeProvider";
 import { AuthProvider } from "@/context/AuthContext";
+import { SocketProvider } from "@/context/SocketContext";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
@@ -26,13 +27,15 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            {children}
-            <Toaster
-              position="bottom-right"
-              toastOptions={{
-                className: "border border-border bg-background text-foreground rounded-[8px] shadow-none",
-              }}
-            />
+            <SocketProvider>
+              {children}
+              <Toaster
+                position="bottom-right"
+                toastOptions={{
+                  className: "border border-border bg-background text-foreground rounded-[8px] shadow-none",
+                }}
+              />
+            </SocketProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

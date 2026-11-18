@@ -15,6 +15,8 @@ import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrengthMeter } from "@/components/auth/PasswordStrengthMeter";
 import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { ArrowRight } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 const registerSchema = z.object({
   name: z.string().min(2, "Full name must be at least 2 characters"),
@@ -34,6 +36,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { registerUser } = useAuth();
   const [submitting, setSubmitting] = React.useState(false);
 
   const {
@@ -57,9 +60,18 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterFormValues) => {
     setSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    setSubmitting(false);
-    router.push("/verify-otp");
+    try {
+      await registerUser({
+        email: data.email,
+        password: data.password,
+        fullName: data.name,
+      });
+      toast.success("Account created successfully!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create account");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
