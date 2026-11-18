@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
-import { ArrowRight, User, ShieldCheck } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 const loginSchema = z.object({
@@ -42,9 +42,9 @@ export default function LoginPage() {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "aarav.sharma@dtu.ac.in",
-      password: "password123",
-      rememberMe: true,
+      email: "",
+      password: "",
+      rememberMe: false,
     },
   });
 
@@ -165,43 +165,6 @@ export default function LoginPage() {
             )}
           </Button>
         </form>
-
-        {/* Quick Demo Switchers for Evaluator */}
-        <div className="pt-4 border-t border-border space-y-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block text-center">
-            Quick Demo Accounts
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-[12px] h-9 border-border justify-center"
-              onClick={() => {
-                setValue("email", "aarav.sharma@dtu.ac.in");
-                setValue("password", "password123");
-                login("aarav.sharma@dtu.ac.in");
-              }}
-            >
-              <User className="h-3.5 w-3.5 mr-1.5" />
-              Student (Aarav)
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-[12px] h-9 border-border justify-center"
-              onClick={() => {
-                setValue("email", "admin@dsms.internal");
-                setValue("password", "password123");
-                login("admin@dsms.internal");
-              }}
-            >
-              <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
-              Admin Portal
-            </Button>
-          </div>
-        </div>
 
         {/* Register Link */}
         <div className="text-center text-[13px] text-muted-foreground pt-2">
