@@ -86,6 +86,7 @@ export class DocumentService {
             conversationId: request.conversation.id,
             senderId: adminId,
             senderRole: Role.ADMIN,
+            adminSenderId: adminId,
             messageType: MessageType.SYSTEM,
             content: `📄 Admin has uploaded the completed document "${data.title}" (v${version})! Please pay the remaining 50% milestone balance to unlock your download.`,
             metadata: {
@@ -103,6 +104,8 @@ export class DocumentService {
       await tx.auditLog.create({
         data: {
           actorId: adminId,
+          actorRole: Role.ADMIN,
+          adminActorId: adminId,
           requestId,
           action: 'FINAL_DOCUMENT_UPLOADED',
           metadata: {
@@ -233,6 +236,10 @@ export class DocumentService {
       prisma.auditLog.create({
         data: {
           actorId: user.id,
+          actorRole: user.role,
+          ...(user.role === Role.ADMIN
+            ? { adminActorId: user.id }
+            : { userActorId: user.id }),
           requestId: document.requestId,
           action: 'FINAL_DOCUMENT_DOWNLOADED',
           ipAddress: meta.ipAddress,

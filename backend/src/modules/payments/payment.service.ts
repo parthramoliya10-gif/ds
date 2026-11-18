@@ -214,6 +214,7 @@ export class PaymentService {
             conversationId: payment.request.conversation.id,
             senderId: userId,
             senderRole: Role.USER,
+            userSenderId: userId,
             messageType: MessageType.SYSTEM,
             content: chatContent,
             metadata: {
@@ -229,6 +230,8 @@ export class PaymentService {
       await tx.auditLog.create({
         data: {
           actorId: userId,
+          actorRole: Role.USER,
+          userActorId: userId,
           requestId: payment.requestId,
           action: `PAYMENT_${payment.milestone}_VERIFIED`,
           metadata: {

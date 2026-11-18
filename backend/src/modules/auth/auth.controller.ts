@@ -247,7 +247,7 @@ export class AuthController {
       if (!req.user) {
         throw new ApiError(401, 'Unauthorized');
       }
-      const profile = await authService.getProfile(req.user.id);
+      const profile = await authService.getProfile(req.user.id, req.user.role);
       sendResponse({
         res,
         statusCode: 200,
@@ -264,7 +264,7 @@ export class AuthController {
       if (!req.user) {
         throw new ApiError(401, 'Unauthorized');
       }
-      const updated = await authService.updateProfile(req.user.id, req.body);
+      const updated = await authService.updateProfile(req.user.id, req.user.role, req.body);
       sendResponse({
         res,
         statusCode: 200,

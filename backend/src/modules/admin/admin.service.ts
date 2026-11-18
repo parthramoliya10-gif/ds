@@ -38,10 +38,10 @@ export class AdminService {
       prisma.documentRequest.count({ where: { status: RequestStatus.COMPLETED } }),
       prisma.documentRequest.count({ where: { status: RequestStatus.CANCELLED } }),
 
-      // 2. User counts
-      prisma.profile.count({ where: { role: Role.USER } }),
-      prisma.profile.count({ where: { role: Role.ADMIN } }),
-      prisma.profile.count({ where: { isBlocked: true } }),
+      // 2. User & Admin counts from separate tables
+      prisma.user.count(),
+      prisma.admin.count(),
+      prisma.user.count({ where: { isBlocked: true } }),
 
       // 3. Financial aggregates
       prisma.payment.aggregate({
@@ -163,12 +163,18 @@ export class AdminService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          actor: {
+          userActor: {
             select: {
               id: true,
               email: true,
               fullName: true,
-              role: true,
+            },
+          },
+          adminActor: {
+            select: {
+              id: true,
+              email: true,
+              fullName: true,
             },
           },
           request: {
@@ -181,8 +187,25 @@ export class AdminService {
       }),
     ]);
 
+    const formattedLogs = logs.map((log) => {
+      const { userActor, adminActor, ...rest } = log;
+      const actor =
+        log.actorRole === Role.ADMIN || adminActor
+          ? adminActor
+            ? { ...adminActor, role: Role.ADMIN }
+            : null
+          : userActor
+          ? { ...userActor, role: Role.USER }
+          : null;
+
+      return {
+        ...rest,
+        actor,
+      };
+    });
+
     return {
-      logs,
+      logs: formattedLogs,
       pagination: {
         total,
         page,

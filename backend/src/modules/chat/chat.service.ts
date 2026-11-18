@@ -15,6 +15,23 @@ export interface PostMessageInput {
   metadata?: any;
 }
 
+const formatMessageSender = (msg: any) => {
+  const { userSender, adminSender, ...rest } = msg;
+  const sender =
+    msg.senderRole === Role.ADMIN
+      ? adminSender
+        ? { ...adminSender, role: Role.ADMIN }
+        : null
+      : userSender
+      ? { ...userSender, role: Role.USER }
+      : null;
+
+  return {
+    ...rest,
+    sender,
+  };
+};
+
 export class ChatService {
   /**
    * Fetch conversation messages for a request with strict authorization
@@ -57,12 +74,18 @@ export class ChatService {
       ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
       orderBy: { createdAt: 'desc' },
       include: {
-        sender: {
+        userSender: {
           select: {
             id: true,
             fullName: true,
             avatarUrl: true,
-            role: true,
+          },
+        },
+        adminSender: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
           },
         },
       },
@@ -73,7 +96,7 @@ export class ChatService {
 
     return {
       conversationId: conversation.id,
-      messages: items.reverse(), // chronologically ordered (oldest to newest)
+      messages: items.reverse().map(formatMessageSender), // chronologically ordered (oldest to newest)
       nextCursor: hasMore ? items[items.length - 1].id : null,
     };
   }
@@ -133,24 +156,33 @@ export class ChatService {
         conversationId: conversation.id,
         senderId: user.id,
         senderRole: user.role,
+        ...(user.role === Role.ADMIN
+          ? { adminSenderId: user.id }
+          : { userSenderId: user.id }),
         messageType,
         content: data.content || (file ? `Shared a file: ${file.originalname}` : ''),
         metadata,
         status: MessageStatus.SENT,
       },
       include: {
-        sender: {
+        userSender: {
           select: {
             id: true,
             fullName: true,
             avatarUrl: true,
-            role: true,
+          },
+        },
+        adminSender: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
           },
         },
       },
     });
 
-    return message;
+    return formatMessageSender(message);
   }
 
   /**

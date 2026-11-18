@@ -96,6 +96,8 @@ export class RequestService {
       await tx.auditLog.create({
         data: {
           actorId: userId,
+          actorRole: Role.USER,
+          userActorId: userId,
           requestId: docRequest.id,
           action: 'DOCUMENT_REQUEST_CREATED',
           metadata: {
@@ -317,6 +319,8 @@ export class RequestService {
     await prisma.auditLog.create({
       data: {
         actorId: adminId,
+        actorRole: Role.ADMIN,
+        adminActorId: adminId,
         requestId,
         action: 'REQUEST_STATUS_UPDATED',
         metadata: {
@@ -360,6 +364,8 @@ export class RequestService {
     await prisma.auditLog.create({
       data: {
         actorId: userId,
+        actorRole: Role.USER,
+        userActorId: userId,
         requestId,
         action: 'REQUEST_CANCELLED_BY_USER',
       },

@@ -79,21 +79,47 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
         return next(new Error('Invalid token payload.'));
       }
 
-      // 2. Fetch User Profile
-      const profile = await prisma.profile.findUnique({
+      // 2. Check separate Admins table first, then Users table
+      const admin = await prisma.admin.findUnique({
         where: { id: userId },
       });
 
-      if (!profile) {
+      if (admin) {
+        if (!admin.isActive) {
+          return next(new Error('Admin account deactivated. Access denied.'));
+        }
+        socket.data.user = {
+          id: admin.id,
+          email: admin.email,
+          fullName: admin.fullName,
+          avatarUrl: admin.avatarUrl,
+          role: Role.ADMIN,
+          isBlocked: !admin.isActive,
+        };
+        return next();
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user) {
         return next(new Error('User profile not found.'));
       }
 
-      if (profile.isBlocked) {
+      if (user.isBlocked) {
         return next(new Error('Account suspended. Access denied.'));
       }
 
-      // Attach authenticated profile to socket session
-      socket.data.user = profile;
+      // Attach authenticated user to socket session
+      socket.data.user = {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        avatarUrl: user.avatarUrl,
+        role: Role.USER,
+        isBlocked: user.isBlocked,
+      };
       next();
     } catch (err: any) {
       logger.error('Socket authentication handshake error:', err);

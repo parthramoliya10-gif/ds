@@ -7,59 +7,57 @@ import documentService from '../src/modules/documents/document.service.js';
 import adminService from '../src/modules/admin/admin.service.js';
 import razorpay from '../src/config/razorpay.js';
 import env from '../src/config/env.js';
-import { Role, RequestStatus, PaymentMilestone, PaymentStatus, MessageStatus } from '@prisma/client';
+import { Role, PaymentMilestone } from '@prisma/client';
 import crypto from 'crypto';
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function runEndToEndVerification() {
   console.log('\n=============================================================');
   console.log('🚀 STARTING COMPREHENSIVE END-TO-END SYSTEM VERIFICATION');
   console.log('=============================================================\n');
 
-  // Test User UUIDs (RFC4122 v4)
+  // Test User & Admin UUIDs (RFC4122 v4)
   const testUserId = '00000000-0000-4000-8000-000000000001';
   const testAdminId = '00000000-0000-4000-8000-000000000002';
   const userAId = '00000000-0000-4000-8000-000000000003';
 
   try {
     // -------------------------------------------------------------
-    // STEP 1: Setup Test Profiles in PostgreSQL Database
+    // STEP 1: Setup Separate User & Admin Records in PostgreSQL
     // -------------------------------------------------------------
-    console.log('🔹 STEP 1: Initializing Test Profiles...');
-    await prisma.profile.upsert({
+    console.log('🔹 STEP 1: Initializing Test Users (users table) & Admin (admins table)...');
+    await prisma.user.upsert({
       where: { id: testUserId },
       update: {},
       create: {
         id: testUserId,
         email: 'e2e_user@example.com',
         fullName: 'Test Customer',
-        role: Role.USER,
       },
     });
 
-    await prisma.profile.upsert({
+    await prisma.admin.upsert({
       where: { id: testAdminId },
       update: {},
       create: {
         id: testAdminId,
         email: 'e2e_admin@example.com',
         fullName: 'Test Admin Manager',
-        role: Role.ADMIN,
+        department: 'Legal Operations',
+        isSuperAdmin: true,
+        isActive: true,
       },
     });
 
-    await prisma.profile.upsert({
+    await prisma.user.upsert({
       where: { id: userAId },
       update: {},
       create: {
         id: userAId,
         email: 'intruder_user_a@example.com',
         fullName: 'Intruder User A',
-        role: Role.USER,
       },
     });
-    console.log('✅ Test profiles initialized in Supabase PostgreSQL.\n');
+    console.log('✅ Test users (users table) & admin (admins table) initialized in Supabase PostgreSQL.\n');
 
     // Clean up previous test requests if any
     await prisma.documentRequest.deleteMany({

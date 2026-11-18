@@ -53,6 +53,7 @@ export class QuotationService {
       const quotation = await tx.quotation.create({
         data: {
           requestId: data.requestId,
+          createdByAdminId: adminId,
           version,
           totalAmount: totalAmountCents,
           advanceAmount: advanceAmountCents,
@@ -77,6 +78,7 @@ export class QuotationService {
             conversationId: request.conversation.id,
             senderId: adminId,
             senderRole: Role.ADMIN,
+            adminSenderId: adminId,
             messageType: MessageType.QUOTATION_CARD,
             content: `Quotation (v${version}): $${(totalAmountCents / 100).toFixed(2)} (50% Advance: $${(advanceAmountCents / 100).toFixed(2)}, 50% Final: $${(remainingAmountCents / 100).toFixed(2)})`,
             metadata: {
@@ -97,6 +99,8 @@ export class QuotationService {
       await tx.auditLog.create({
         data: {
           actorId: adminId,
+          actorRole: Role.ADMIN,
+          adminActorId: adminId,
           requestId: data.requestId,
           action: 'QUOTATION_SENT',
           metadata: {
@@ -212,6 +216,7 @@ export class QuotationService {
           conversationId: quotation.request.conversation.id,
           senderId: userId,
           senderRole: Role.USER,
+          userSenderId: userId,
           messageType: MessageType.SYSTEM,
           content: `Quotation (v${quotation.version}) accepted by user. 50% Advance payment initiated ($${(quotation.advanceAmount / 100).toFixed(2)}).`,
         },
@@ -222,6 +227,8 @@ export class QuotationService {
     await prisma.auditLog.create({
       data: {
         actorId: userId,
+        actorRole: Role.USER,
+        userActorId: userId,
         requestId: quotation.requestId,
         action: 'QUOTATION_ACCEPTED',
         metadata: {
@@ -281,6 +288,7 @@ export class QuotationService {
           conversationId: quotation.request.conversation.id,
           senderId: userId,
           senderRole: Role.USER,
+          userSenderId: userId,
           messageType: MessageType.SYSTEM,
           content: `Quotation (v${quotation.version}) rejected by user.${reason ? ` Reason: ${reason}` : ''}`,
         },
@@ -290,6 +298,8 @@ export class QuotationService {
     await prisma.auditLog.create({
       data: {
         actorId: userId,
+        actorRole: Role.USER,
+        userActorId: userId,
         requestId: quotation.requestId,
         action: 'QUOTATION_REJECTED',
         metadata: { quotationId: quotation.id, reason },

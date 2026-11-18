@@ -6,7 +6,7 @@ import { ApiError } from '../../utils/apiError.js';
 
 export class AuthService {
   /**
-   * Internal helper: Ensure Supabase Auth user is synced with public.profiles
+   * Internal helper: Sync Supabase Auth user with separate admins / users tables
    */
   private async ensureProfileSynced(authUser: {
     id: string;
@@ -14,7 +14,33 @@ export class AuthService {
     user_metadata?: Record<string, any>;
   }) {
     const meta = authUser.user_metadata || {};
-    const profile = await prisma.profile.upsert({
+
+    // 1. Check Admins table first
+    const existingAdmin = await prisma.admin.findUnique({
+      where: { id: authUser.id },
+    });
+
+    if (existingAdmin) {
+      if (!existingAdmin.isActive) {
+        throw new ApiError(403, 'Admin account has been deactivated. Contact super admin.');
+      }
+      const updatedAdmin = await prisma.admin.update({
+        where: { id: authUser.id },
+        data: {
+          email: authUser.email || existingAdmin.email,
+          fullName: meta.full_name || meta.name || existingAdmin.fullName,
+          avatarUrl: meta.avatar_url || meta.picture || existingAdmin.avatarUrl,
+        },
+      });
+      return {
+        ...updatedAdmin,
+        role: Role.ADMIN as Role,
+        isBlocked: !updatedAdmin.isActive,
+      };
+    }
+
+    // 2. Otherwise upsert into Users table
+    const user = await prisma.user.upsert({
       where: { id: authUser.id },
       update: {
         email: authUser.email || undefined,
@@ -26,16 +52,18 @@ export class AuthService {
         email: authUser.email || '',
         fullName: meta.full_name || meta.name || null,
         avatarUrl: meta.avatar_url || meta.picture || null,
-        role: Role.USER,
         isBlocked: false,
       },
     });
 
-    if (profile.isBlocked) {
+    if (user.isBlocked) {
       throw new ApiError(403, 'Your account has been suspended. Please contact support.');
     }
 
-    return profile;
+    return {
+      ...user,
+      role: Role.USER as Role,
+    };
   }
 
   /**
@@ -102,6 +130,10 @@ export class AuthService {
     await prisma.auditLog.create({
       data: {
         actorId: profile.id,
+        actorRole: profile.role,
+        ...(profile.role === Role.ADMIN
+          ? { adminActorId: profile.id }
+          : { userActorId: profile.id }),
         action: 'USER_OAUTH_LOGIN',
         metadata: { provider: authUser.app_metadata?.provider || 'google' },
       },
@@ -157,6 +189,10 @@ export class AuthService {
     await prisma.auditLog.create({
       data: {
         actorId: profile.id,
+        actorRole: profile.role,
+        ...(profile.role === Role.ADMIN
+          ? { adminActorId: profile.id }
+          : { userActorId: profile.id }),
         action: 'USER_OTP_VERIFIED',
       },
     });
@@ -222,6 +258,10 @@ export class AuthService {
     await prisma.auditLog.create({
       data: {
         actorId: profile.id,
+        actorRole: profile.role,
+        ...(profile.role === Role.ADMIN
+          ? { adminActorId: profile.id }
+          : { userActorId: profile.id }),
         action: 'USER_EMAIL_LOGIN',
       },
     });
@@ -277,10 +317,28 @@ export class AuthService {
   }
 
   /**
-   * Fetch current authenticated user's profile
+   * Fetch current authenticated user or admin profile from its dedicated table
    */
-  async getProfile(userId: string) {
-    const profile = await prisma.profile.findUnique({
+  async getProfile(userId: string, role: Role) {
+    if (role === Role.ADMIN) {
+      const admin = await prisma.admin.findUnique({
+        where: { id: userId },
+        include: {
+          _count: {
+            select: {
+              quotations: true,
+              uploadedDocuments: true,
+            },
+          },
+        },
+      });
+      if (!admin) {
+        throw new ApiError(404, 'Admin profile not found.');
+      }
+      return { ...admin, role: Role.ADMIN };
+    }
+
+    const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
         _count: {
@@ -292,72 +350,135 @@ export class AuthService {
       },
     });
 
-    if (!profile) {
+    if (!user) {
       throw new ApiError(404, 'User profile not found.');
     }
 
-    return profile;
+    return { ...user, role: Role.USER };
   }
 
   /**
-   * Update profile fields (Full name, phone, avatar)
+   * Update profile fields (Full name, phone, avatar) in dedicated Admin or User table
    */
   async updateProfile(
     userId: string,
+    role: Role,
     data: {
       fullName?: string;
       phone?: string;
       avatarUrl?: string;
     }
   ) {
-    const updated = await prisma.profile.update({
-      where: { id: userId },
-      data: {
-        ...(data.fullName !== undefined && { fullName: data.fullName }),
-        ...(data.phone !== undefined && { phone: data.phone }),
-        ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
-      },
-    });
+    const updatePayload = {
+      ...(data.fullName !== undefined && { fullName: data.fullName }),
+      ...(data.phone !== undefined && { phone: data.phone }),
+      ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
+    };
 
-    return updated;
+    if (role === Role.ADMIN) {
+      const updated = await prisma.admin.update({
+        where: { id: userId },
+        data: updatePayload,
+      });
+      return { ...updated, role: Role.ADMIN };
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: updatePayload,
+    });
+    return { ...updated, role: Role.USER };
   }
 
   /**
-   * Admin-only: Change user role (USER <-> ADMIN)
+   * Admin-only: Promote User into Admins table OR Demote Admin into Users table
    */
   async updateUserRole(adminId: string, targetUserId: string, newRole: Role) {
     if (adminId === targetUserId) {
       throw new ApiError(400, 'Admins cannot change their own role.');
     }
 
-    const updated = await prisma.profile.update({
-      where: { id: targetUserId },
-      data: { role: newRole },
-    });
+    if (newRole === Role.ADMIN) {
+      const existingUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+      if (!existingUser) {
+        throw new ApiError(404, 'Target user not found in users table.');
+      }
 
-    await prisma.auditLog.create({
-      data: {
-        actorId: adminId,
-        action: 'ADMIN_ROLE_CHANGE',
-        metadata: {
-          targetUserId,
-          newRole,
+      const promotedAdmin = await prisma.admin.upsert({
+        where: { id: targetUserId },
+        update: {
+          isActive: true,
+          email: existingUser.email,
+          fullName: existingUser.fullName,
+          phone: existingUser.phone,
+          avatarUrl: existingUser.avatarUrl,
         },
-      },
-    });
+        create: {
+          id: existingUser.id,
+          email: existingUser.email,
+          fullName: existingUser.fullName,
+          phone: existingUser.phone,
+          avatarUrl: existingUser.avatarUrl,
+          isActive: true,
+        },
+      });
 
-    return updated;
+      await prisma.auditLog.create({
+        data: {
+          actorId: adminId,
+          actorRole: Role.ADMIN,
+          adminActorId: adminId,
+          action: 'ADMIN_ROLE_PROMOTED',
+          metadata: { targetUserId, newRole },
+        },
+      });
+
+      return { ...promotedAdmin, role: Role.ADMIN };
+    } else {
+      const existingAdmin = await prisma.admin.findUnique({ where: { id: targetUserId } });
+      if (!existingAdmin) {
+        throw new ApiError(404, 'Target admin not found in admins table.');
+      }
+
+      const demotedUser = await prisma.$transaction(async (tx) => {
+        await tx.admin.delete({ where: { id: targetUserId } });
+        return tx.user.upsert({
+          where: { id: targetUserId },
+          update: { email: existingAdmin.email },
+          create: {
+            id: existingAdmin.id,
+            email: existingAdmin.email,
+            fullName: existingAdmin.fullName,
+            phone: existingAdmin.phone,
+            avatarUrl: existingAdmin.avatarUrl,
+            isBlocked: false,
+          },
+        });
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          actorId: adminId,
+          actorRole: Role.ADMIN,
+          adminActorId: adminId,
+          action: 'ADMIN_ROLE_DEMOTED',
+          metadata: { targetUserId, newRole },
+        },
+      });
+
+      return { ...demotedUser, role: Role.USER };
+    }
   }
 
   /**
-   * Admin-only: Block or unblock a user
+   * Admin-only: Block or unblock a user in the Users table
    */
   async updateUserStatus(adminId: string, targetUserId: string, isBlocked: boolean) {
     if (adminId === targetUserId) {
       throw new ApiError(400, 'Admins cannot block themselves.');
     }
 
-    const updated = await prisma.profile.update({
+    const updated = await prisma.user.update({
       where: { id: targetUserId },
       data: { isBlocked },
     });
@@ -365,6 +486,8 @@ export class AuthService {
     await prisma.auditLog.create({
       data: {
         actorId: adminId,
+        actorRole: Role.ADMIN,
+        adminActorId: adminId,
         action: isBlocked ? 'ADMIN_USER_BLOCKED' : 'ADMIN_USER_UNBLOCKED',
         metadata: {
           targetUserId,
@@ -373,7 +496,7 @@ export class AuthService {
       },
     });
 
-    return updated;
+    return { ...updated, role: Role.USER };
   }
 }
 
