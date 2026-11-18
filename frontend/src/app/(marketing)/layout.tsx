@@ -28,7 +28,7 @@ export default function MarketingLayout({
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between">
       {/* Top Navbar */}
-      <header className="h-16 border-b border-border sticky top-0 bg-background/95 backdrop-blur-none z-50">
+      <header className="h-16 border-b border-border sticky top-0 bg-background z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-full flex items-center justify-between">
           {/* Brand Logo */}
           <Link href="/" className="flex items-center space-x-2.5 group">
