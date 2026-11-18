@@ -48,3 +48,30 @@ export const uploadSingleFinalDocument = multer({
   },
   fileFilter,
 }).single('document');
+
+const allowedAvatarMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+
+const avatarFileFilter = (
+  _req: Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
+  if (allowedAvatarMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(
+      new ApiError(
+        400,
+        `Unsupported avatar image type: ${file.mimetype}. Allowed types: JPEG, PNG, WEBP`
+      )
+    );
+  }
+};
+
+export const uploadProfileAvatar = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max for profile avatars
+  },
+  fileFilter: avatarFileFilter,
+}).single('avatar');

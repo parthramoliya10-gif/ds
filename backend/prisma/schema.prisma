@@ -64,14 +64,23 @@ enum MessageStatus {
 
 /// Customer / Regular User table (synced with Supabase auth.users)
 model User {
-  id         String   @id // Matches Supabase auth.users uuid
-  email      String   @unique
-  fullName   String?
-  phone      String?
-  avatarUrl  String?
-  isBlocked  Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                      String   @id // Matches Supabase auth.users uuid
+  email                   String   @unique
+  fullName                String?
+  phone                   String?
+  avatarUrl               String?
+  avatarPublicId          String?
+  bio                     String?  @db.Text
+  organization            String?
+  country                 String?
+  city                    String?
+  address                 String?  @db.Text
+  timezone                String?  @default("UTC")
+  notificationPreferences Json?
+  metadata                Json?
+  isBlocked               Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   // Relationships
   requests   DocumentRequest[]
@@ -84,16 +93,25 @@ model User {
 
 /// Separate Admin table (strictly isolated from regular users)
 model Admin {
-  id           String   @id // Matches Supabase auth.users uuid
-  email        String   @unique
-  fullName     String?
-  phone        String?
-  avatarUrl    String?
-  department   String?  @default("Operations")
-  isSuperAdmin Boolean  @default(false)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                      String   @id // Matches Supabase auth.users uuid
+  email                   String   @unique
+  fullName                String?
+  phone                   String?
+  avatarUrl               String?
+  avatarPublicId          String?
+  department              String?  @default("Operations")
+  designation             String?
+  bio                     String?  @db.Text
+  specializations         String[] @default([])
+  country                 String?
+  city                    String?
+  timezone                String?  @default("UTC")
+  notificationPreferences Json?
+  metadata                Json?
+  isSuperAdmin            Boolean  @default(false)
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   // Relationships
   quotations        Quotation[]     @relation("AdminCreatedQuotations")

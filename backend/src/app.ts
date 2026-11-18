@@ -14,6 +14,7 @@ import paymentRoutes from './modules/payments/payment.routes.js';
 import chatRoutes from './modules/chat/chat.routes.js';
 import documentRoutes from './modules/documents/document.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
+import profileRoutes from './modules/profile/profile.routes.js';
 
 export const createApp = (): Application => {
   const app = express();
@@ -81,6 +82,7 @@ export const createApp = (): Application => {
 
   // 7. Mount Module Routes
   app.use(`${env.API_PREFIX}/auth`, authRoutes);
+  app.use(`${env.API_PREFIX}/profile`, profileRoutes);
   app.use(`${env.API_PREFIX}/requests`, requestRoutes);
   app.use(`${env.API_PREFIX}/quotations`, quotationRoutes);
   app.use(`${env.API_PREFIX}/payments`, paymentRoutes);
