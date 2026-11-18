@@ -272,26 +272,37 @@ async function runEndToEndVerification() {
 
     const finalOrderId = finalOrder.orderId;
     const finalPaymentId = `pay_fin_${Date.now()}`;
-    const finalSignature = crypto
-      .createHmac('sha256', env.RAZORPAY_KEY_SECRET)
-      .update(`${finalOrderId}|${finalPaymentId}`)
+
+    // Verify Milestone 2 via Server-to-Server Razorpay Webhook (plus duplicate replay idempotency)
+    const webhookBody = JSON.stringify({
+      event: 'payment.captured',
+      payload: {
+        payment: {
+          entity: {
+            id: finalPaymentId,
+            order_id: finalOrderId,
+            amount: quotation.remainingAmount,
+            status: 'captured',
+          },
+        },
+      },
+    });
+    const webhookSig = crypto
+      .createHmac('sha256', env.RAZORPAY_WEBHOOK_SECRET)
+      .update(webhookBody)
       .digest('hex');
 
-    razorpay.payments.fetch = (async (id: string) => ({
-      id,
-      amount: quotation.remainingAmount,
-      status: 'captured',
-    })) as any;
+    await paymentService.processWebhook(webhookBody, webhookSig);
+    // Replay exact same webhook event to verify duplicate-event idempotency
+    const replayRes = await paymentService.processWebhook(webhookBody, webhookSig);
+    console.log(`✅ Webhook Replay Idempotency Check: ${JSON.stringify(replayRes)}`);
 
-    const finalVerification = await paymentService.verifyPayment(testUserId, {
-      razorpayOrderId: finalOrderId,
-      razorpayPaymentId: finalPaymentId,
-      razorpaySignature: finalSignature,
-    });
-
-    console.log(`✅ Milestone 2 Payment Status: ${finalVerification.payment.status} (SUCCESS)`);
-    console.log(`✅ Request Status transitioned to: ${finalVerification.requestStatus} (COMPLETED)`);
-    console.log(`✅ Is Download Unlocked: ${finalVerification.isDownloadUnlocked} (TRUE - 100% PAID!)\n`);
+    const reqAfterFinal = await prisma.documentRequest.findUnique({ where: { id: newRequest.id } });
+    if (!reqAfterFinal?.isDownloadUnlocked) {
+      throw new Error('Expected download to be unlocked after Milestone 2 webhook!');
+    }
+    console.log(`✅ Request Status transitioned to: ${reqAfterFinal.status} (COMPLETED)`);
+    console.log(`✅ Is Download Unlocked: ${reqAfterFinal.isDownloadUnlocked} (TRUE - 100% PAID!)\n`);
 
     // -------------------------------------------------------------
     // STEP 11: Download Gatekeeper AFTER 100% Payment (Download Enabled!)
@@ -302,7 +313,12 @@ async function runEndToEndVerification() {
       { id: testUserId, email: 'e2e_user@example.com', role: Role.USER, isBlocked: false }
     );
 
-    console.log(`✅ Download Granted!`);
+    const downloadRes = await fetch(downloadPayload.downloadUrl);
+    if (downloadRes.status !== 200) {
+      throw new Error(`Signed Cloudinary download URL failed with HTTP ${downloadRes.status}!`);
+    }
+
+    console.log(`✅ Download Granted & Verified Live HTTP ${downloadRes.status} OK!`);
     console.log(`✅ Signed Download URL generated (valid for ${downloadPayload.expiresInSeconds}s):`);
     console.log(`   ${downloadPayload.downloadUrl.slice(0, 80)}...`);
     console.log(`✅ File Name: ${downloadPayload.fileName}`);

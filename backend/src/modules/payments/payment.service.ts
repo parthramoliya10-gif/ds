@@ -4,6 +4,8 @@ import { ApiError } from '../../utils/apiError.js';
 import razorpay from '../../config/razorpay.js';
 import env from '../../config/env.js';
 import { verifyRazorpaySignature, verifyRazorpayWebhookSignature } from '../../utils/payment.js';
+import { emitToRequestRoom } from '../../sockets/socket.server.js';
+import SOCKET_EVENTS from '../../constants/socketEvents.js';
 import logger from '../../utils/logger.js';
 
 export class PaymentService {
@@ -11,7 +13,7 @@ export class PaymentService {
    * Create Razorpay order for Milestone 1 (50% Advance) or Milestone 2 (50% Final)
    */
   async createPaymentOrder(userId: string, requestId: string, milestone: PaymentMilestone) {
-    // 1. Fetch Request with accepted quotation and existing payments
+    // 1. Fetch Request with accepted quotation, existing payments, and final documents
     const request = await prisma.documentRequest.findUnique({
       where: { id: requestId },
       include: {
@@ -20,7 +22,7 @@ export class PaymentService {
           take: 1,
         },
         payments: true,
-        finalDocuments: true,
+        finalDocuments: { select: { id: true } },
       },
     });
 
@@ -41,7 +43,6 @@ export class PaymentService {
     let payableAmountCents: number;
 
     if (milestone === PaymentMilestone.ADVANCE_50) {
-      // Check if advance already paid
       const advanceAlreadyPaid = request.payments.some(
         (p) => p.milestone === PaymentMilestone.ADVANCE_50 && p.status === PaymentStatus.SUCCESS
       );
@@ -56,6 +57,13 @@ export class PaymentService {
       );
       if (!advancePaid) {
         throw new ApiError(400, 'Cannot pay final balance: 50% Advance must be paid first.');
+      }
+
+      if (request.finalDocuments.length === 0) {
+        throw new ApiError(
+          400,
+          'Cannot pay final balance yet: Admin has not uploaded the completed document.'
+        );
       }
 
       const finalAlreadyPaid = request.payments.some(
@@ -111,7 +119,115 @@ export class PaymentService {
   }
 
   /**
-   * Verify Razorpay Payment Signature and Trigger Milestone State Transition
+   * Internal shared transaction: Finalize a cryptographically verified payment
+   * (Used by both client /verify and server-to-server /webhook)
+   */
+  private async finalizeVerifiedPayment(
+    payment: any,
+    userId: string,
+    razorpayPaymentId: string,
+    razorpaySignature: string
+  ) {
+    const updatedState = await prisma.$transaction(async (tx) => {
+      // Mark Payment as SUCCESS
+      const successPayment = await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.SUCCESS,
+          razorpayPaymentId,
+          razorpaySignature,
+          paidAt: new Date(),
+        },
+      });
+
+      let newRequestStatus = payment.request.status;
+      let isDownloadUnlocked = payment.request.isDownloadUnlocked;
+      let chatContent = '';
+
+      if (payment.milestone === PaymentMilestone.ADVANCE_50) {
+        newRequestStatus = RequestStatus.IN_PROGRESS;
+        chatContent = `🎉 50% Advance Payment ($${(payment.amount / 100).toFixed(2)}) verified successfully! Admin has started working on your document.`;
+      } else if (payment.milestone === PaymentMilestone.FINAL_50) {
+        newRequestStatus = RequestStatus.COMPLETED;
+        isDownloadUnlocked = true;
+        chatContent = `🎉 Final 50% Payment ($${(payment.amount / 100).toFixed(2)}) verified! All milestones paid. Your final completed document download is now UNLOCKED!`;
+      }
+
+      const updatedRequest = await tx.documentRequest.update({
+        where: { id: payment.requestId },
+        data: {
+          status: newRequestStatus,
+          isDownloadUnlocked,
+        },
+      });
+
+      let systemMessage = null;
+      if (payment.request.conversation) {
+        systemMessage = await tx.message.create({
+          data: {
+            conversationId: payment.request.conversation.id,
+            senderId: userId,
+            senderRole: Role.USER,
+            userSenderId: userId,
+            messageType: MessageType.SYSTEM,
+            content: chatContent,
+            metadata: {
+              paymentId: successPayment.id,
+              milestone: payment.milestone,
+              amount: payment.amount,
+              currency: payment.currency,
+            },
+          },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          actorRole: Role.USER,
+          userActorId: userId,
+          requestId: payment.requestId,
+          action: `PAYMENT_${payment.milestone}_VERIFIED`,
+          metadata: {
+            paymentId: successPayment.id,
+            razorpayPaymentId,
+            amount: payment.amount,
+            currency: payment.currency,
+          },
+        },
+      });
+
+      return {
+        payment: successPayment,
+        isDownloadUnlocked: updatedRequest.isDownloadUnlocked,
+        requestStatus: updatedRequest.status,
+        systemMessage,
+      };
+    }, {
+      maxWait: 15000,
+      timeout: 20000,
+    });
+
+    // Real-time Socket.IO notification to active chat room
+    if (updatedState.systemMessage) {
+      emitToRequestRoom(payment.requestId, SOCKET_EVENTS.NEW_MESSAGE, updatedState.systemMessage);
+    }
+    emitToRequestRoom(payment.requestId, SOCKET_EVENTS.PAYMENT_CONFIRMED, {
+      requestId: payment.requestId,
+      milestone: payment.milestone,
+      requestStatus: updatedState.requestStatus,
+      isDownloadUnlocked: updatedState.isDownloadUnlocked,
+    });
+
+    return {
+      payment: updatedState.payment,
+      isDownloadUnlocked: updatedState.isDownloadUnlocked,
+      requestStatus: updatedState.requestStatus,
+    };
+  }
+
+  /**
+   * Verify Razorpay Client Checkout Signature and Trigger Milestone State Transition
    */
   async verifyPayment(
     userId: string,
@@ -133,7 +249,7 @@ export class PaymentService {
       throw new ApiError(400, 'Invalid payment signature. Payment verification failed.');
     }
 
-    // 2. Fetch payment record
+    // 2. Fetch payment record & enforce ownership
     const payment = await prisma.payment.findUnique({
       where: { razorpayOrderId: params.razorpayOrderId },
       include: {
@@ -145,6 +261,10 @@ export class PaymentService {
 
     if (!payment) {
       throw new ApiError(404, 'Payment record not found.');
+    }
+
+    if (payment.userId !== userId) {
+      throw new ApiError(403, 'Forbidden: You are not authorized to verify this payment.');
     }
 
     // Idempotency: If already marked SUCCESS, return existing record
@@ -170,93 +290,16 @@ export class PaymentService {
       throw new ApiError(400, 'Payment amount mismatch.');
     }
 
-    // 4. Atomic Transaction: Update payment status, update request state, inject chat message, audit log
-    const updatedState = await prisma.$transaction(async (tx) => {
-      // Mark Payment as SUCCESS
-      const successPayment = await tx.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: PaymentStatus.SUCCESS,
-          razorpayPaymentId: params.razorpayPaymentId,
-          razorpaySignature: params.razorpaySignature,
-          paidAt: new Date(),
-        },
-      });
-
-      let newRequestStatus = payment.request.status;
-      let isDownloadUnlocked = payment.request.isDownloadUnlocked;
-      let chatContent = '';
-
-      if (payment.milestone === PaymentMilestone.ADVANCE_50) {
-        // Milestone 1 complete: Admin starts work
-        newRequestStatus = RequestStatus.IN_PROGRESS;
-        chatContent = `🎉 50% Advance Payment ($${(payment.amount / 100).toFixed(2)}) verified successfully! Admin has started working on your document.`;
-      } else if (payment.milestone === PaymentMilestone.FINAL_50) {
-        // Milestone 2 complete: Document download is UNLOCKED!
-        newRequestStatus = RequestStatus.COMPLETED;
-        isDownloadUnlocked = true;
-        chatContent = `🎉 Final 50% Payment ($${(payment.amount / 100).toFixed(2)}) verified! All milestones paid. Your final completed document download is now UNLOCKED!`;
-      }
-
-      // Update Document Request
-      const updatedRequest = await tx.documentRequest.update({
-        where: { id: payment.requestId },
-        data: {
-          status: newRequestStatus,
-          isDownloadUnlocked,
-        },
-      });
-
-      // Post notification in Chat
-      if (payment.request.conversation) {
-        await tx.message.create({
-          data: {
-            conversationId: payment.request.conversation.id,
-            senderId: userId,
-            senderRole: Role.USER,
-            userSenderId: userId,
-            messageType: MessageType.SYSTEM,
-            content: chatContent,
-            metadata: {
-              paymentId: successPayment.id,
-              milestone: payment.milestone,
-              amount: payment.amount,
-            },
-          },
-        });
-      }
-
-      // Record Audit Log
-      await tx.auditLog.create({
-        data: {
-          actorId: userId,
-          actorRole: Role.USER,
-          userActorId: userId,
-          requestId: payment.requestId,
-          action: `PAYMENT_${payment.milestone}_VERIFIED`,
-          metadata: {
-            paymentId: successPayment.id,
-            razorpayPaymentId: params.razorpayPaymentId,
-            amount: payment.amount,
-          },
-        },
-      });
-
-      return {
-        payment: successPayment,
-        isDownloadUnlocked: updatedRequest.isDownloadUnlocked,
-        requestStatus: updatedRequest.status,
-      };
-    }, {
-      maxWait: 15000,
-      timeout: 20000,
-    });
-
-    return updatedState;
+    return this.finalizeVerifiedPayment(
+      payment,
+      userId,
+      params.razorpayPaymentId,
+      params.razorpaySignature
+    );
   }
 
   /**
-   * Process Server-to-Server Razorpay Webhook Events
+   * Process Server-to-Server Razorpay Webhook Events (HMAC Webhook Secret verified)
    */
   async processWebhook(rawBody: string | Buffer, signatureHeader: string) {
     const isValid = verifyRazorpayWebhookSignature(rawBody, signatureHeader);
@@ -265,29 +308,49 @@ export class PaymentService {
       throw new ApiError(400, 'Invalid webhook signature.');
     }
 
-    const event = typeof rawBody === 'string' ? JSON.parse(rawBody) : JSON.parse(rawBody.toString('utf-8'));
+    const event =
+      typeof rawBody === 'string'
+        ? JSON.parse(rawBody)
+        : JSON.parse(rawBody.toString('utf-8'));
+
     logger.info(`Razorpay Webhook Event: ${event.event}`);
 
     if (event.event === 'payment.captured' || event.event === 'order.paid') {
-      const entity = event.payload.payment?.entity || event.payload.order?.entity;
-      const orderId = entity.order_id || entity.id;
+      const paymentEntity = event.payload?.payment?.entity;
+      const orderEntity = event.payload?.order?.entity;
+
+      const orderId = paymentEntity?.order_id || orderEntity?.id;
+      const paymentId = paymentEntity?.id || `webhook_${orderId}`;
+      const entityAmount = paymentEntity?.amount ?? orderEntity?.amount_paid ?? orderEntity?.amount;
+
+      if (!orderId) {
+        return { received: true, message: 'No order_id found in webhook payload' };
+      }
 
       const payment = await prisma.payment.findUnique({
         where: { razorpayOrderId: orderId },
-        include: { request: true },
+        include: {
+          request: {
+            include: { conversation: true },
+          },
+        },
       });
 
       if (!payment || payment.status === PaymentStatus.SUCCESS) {
-        return { message: 'Already handled or not found' };
+        return { received: true, message: 'Already handled or payment not found' };
       }
 
-      // Perform state transition
-      const paymentId = entity.id;
-      await this.verifyPayment(payment.userId, {
-        razorpayOrderId: orderId,
-        razorpayPaymentId: paymentId,
-        razorpaySignature: 'WEBHOOK_VERIFIED',
-      });
+      // Server-side amount verification on webhook payload
+      if (entityAmount !== undefined && Number(entityAmount) !== payment.amount) {
+        logger.error('Webhook amount mismatch detected!', {
+          orderId,
+          expected: payment.amount,
+          received: entityAmount,
+        });
+        throw new ApiError(400, 'Webhook payment amount mismatch.');
+      }
+
+      await this.finalizeVerifiedPayment(payment, payment.userId, paymentId, 'WEBHOOK_VERIFIED');
     }
 
     return { received: true };

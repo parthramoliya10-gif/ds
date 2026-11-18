@@ -54,16 +54,22 @@ export const uploadBufferToCloudinary = async (
 
 /**
  * Generate a short-lived signed URL for downloading authenticated/private assets
- * Expire time default: 5 minutes (300 seconds)
+ * Expire time default: 2 minutes (120 seconds)
  */
 export const generateSignedDownloadUrl = (
   publicId: string,
   format: string = 'pdf',
-  expiresInSeconds: number = 300
+  expiresInSeconds: number = 120,
+  options: {
+    resourceType?: 'image' | 'raw' | 'video';
+    type?: 'authenticated' | 'private' | 'upload';
+  } = {}
 ): string => {
   const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
 
   const signedUrl = cloudinary.utils.private_download_url(publicId, format, {
+    resource_type: options.resourceType || 'image',
+    type: options.type || 'authenticated',
     expires_at: expiresAt,
     attachment: true,
   });

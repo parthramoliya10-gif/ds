@@ -93,11 +93,13 @@ export class ChatService {
 
     const hasMore = messages.length > limit;
     const items = hasMore ? messages.slice(0, limit) : messages;
+    // Capture cursor of the oldest message in this batch BEFORE reversing!
+    const nextCursor = hasMore ? items[items.length - 1].id : null;
 
     return {
       conversationId: conversation.id,
-      messages: items.reverse().map(formatMessageSender), // chronologically ordered (oldest to newest)
-      nextCursor: hasMore ? items[items.length - 1].id : null,
+      messages: [...items].reverse().map(formatMessageSender), // chronologically ordered (oldest to newest)
+      nextCursor,
     };
   }
 
@@ -187,21 +189,30 @@ export class ChatService {
 
   /**
    * Mark all unread messages in conversation as READ (WhatsApp blue ticks)
+   * Enforces strict ownership / admin authorization
    */
-  async markMessagesAsRead(userId: string, requestId: string) {
-    const conversation = await prisma.conversation.findUnique({
-      where: { requestId },
-      select: { id: true },
+  async markMessagesAsRead(userId: string, requestId: string, userRole?: Role) {
+    const request = await prisma.documentRequest.findUnique({
+      where: { id: requestId },
+      select: { userId: true, conversation: { select: { id: true } } },
     });
 
-    if (!conversation) {
+    if (!request || !request.conversation) {
       return { count: 0 };
+    }
+
+    const isAdmin =
+      userRole === Role.ADMIN ||
+      (userRole === undefined && Boolean(await prisma.admin.findUnique({ where: { id: userId } })));
+
+    if (!isAdmin && request.userId !== userId) {
+      throw new ApiError(403, 'Forbidden: You cannot modify read status for this conversation.');
     }
 
     // Mark messages as READ if sender is NOT the current user
     const result = await prisma.message.updateMany({
       where: {
-        conversationId: conversation.id,
+        conversationId: request.conversation.id,
         senderId: { not: userId },
         status: { in: [MessageStatus.SENT, MessageStatus.DELIVERED] },
       },

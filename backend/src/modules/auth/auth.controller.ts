@@ -27,9 +27,15 @@ const setAuthCookies = (res: Response, accessToken: string, refreshToken?: strin
 };
 
 const clearAuthCookies = (res: Response) => {
-  res.clearCookie('sb-access-token', { path: '/' });
-  res.clearCookie('sb-refresh-token', { path: '/' });
-  res.clearCookie('access_token', { path: '/' });
+  const cookieOpts = {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: (isProd ? 'strict' : 'lax') as 'strict' | 'lax',
+    path: '/',
+  };
+  res.clearCookie('sb-access-token', cookieOpts);
+  res.clearCookie('sb-refresh-token', cookieOpts);
+  res.clearCookie('access_token', cookieOpts);
 };
 
 export class AuthController {

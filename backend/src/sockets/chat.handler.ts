@@ -23,26 +23,27 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       callback?: (response: any) => void
     ) => {
       try {
-        const { requestId, content, messageType, metadata } = payload;
-        const roomName = `request:${requestId}`;
+        const { requestId, content, messageType, metadata } = payload || {};
+        if (!requestId || !content?.trim()) {
+          if (callback) callback({ success: false, error: 'requestId and non-empty content are required.' });
+          return;
+        }
 
+        const roomName = `request:${requestId}`;
         if (!socket.rooms.has(roomName)) {
           const errorMsg = 'Cannot send message: You have not joined this request room.';
           if (callback) callback({ success: false, error: errorMsg });
           return;
         }
 
-        // Save message to database
         const savedMessage = await chatService.postMessage(currentUser, requestId, {
-          content,
+          content: content.trim(),
           messageType,
           metadata,
         });
 
-        // Broadcast to all clients in the request room (including Admin & User)
         io.to(roomName).emit(SOCKET_EVENTS.NEW_MESSAGE, savedMessage);
 
-        // Acknowledge sender
         if (callback) {
           callback({ success: true, message: savedMessage });
         }
@@ -57,24 +58,39 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
 
   /**
    * 2. MESSAGE_DELIVERED: Recipient acknowledges delivery (2 ticks)
+   * Enforces room membership, prevents sender from self-marking, and prevents downgrading READ -> DELIVERED
    */
   socket.on(
     SOCKET_EVENTS.MESSAGE_DELIVERED,
     async (payload: { messageId: string; requestId: string }) => {
       try {
-        const { messageId, requestId } = payload;
-        const roomName = `request:${requestId}`;
+        const { messageId, requestId } = payload || {};
+        if (!messageId || !requestId) return;
 
-        const updated = await prisma.message.update({
-          where: { id: messageId },
+        const roomName = `request:${requestId}`;
+        if (!socket.rooms.has(roomName)) return;
+
+        const deliveredAt = new Date();
+        const result = await prisma.message.updateMany({
+          where: {
+            id: messageId,
+            senderId: { not: currentUser.id },
+            status: MessageStatus.SENT,
+            conversation: { requestId },
+          },
           data: {
             status: MessageStatus.DELIVERED,
-            deliveredAt: new Date(),
+            deliveredAt,
           },
-          select: { id: true, status: true, deliveredAt: true },
         });
 
-        io.to(roomName).emit(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, updated);
+        if (result.count > 0) {
+          io.to(roomName).emit(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, {
+            id: messageId,
+            status: MessageStatus.DELIVERED,
+            deliveredAt,
+          });
+        }
       } catch (error) {
         logger.error('Error handling message_delivered event:', error);
       }
@@ -83,20 +99,25 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
 
   /**
    * 3. MARK_READ: Recipient opens chat / reads messages (2 blue ticks)
+   * Enforces room membership before marking messages read
    */
   socket.on(SOCKET_EVENTS.MARK_READ, async (payload: { requestId: string }) => {
     try {
-      const { requestId } = payload;
+      const { requestId } = payload || {};
+      if (!requestId) return;
+
       const roomName = `request:${requestId}`;
+      if (!socket.rooms.has(roomName)) return;
 
-      await chatService.markMessagesAsRead(currentUser.id, requestId);
+      const result = await chatService.markMessagesAsRead(currentUser.id, requestId);
 
-      // Broadcast blue ticks update to the room
-      io.to(roomName).emit(SOCKET_EVENTS.MESSAGES_READ, {
-        requestId,
-        readerId: currentUser.id,
-        readAt: new Date(),
-      });
+      if (result.count > 0) {
+        io.to(roomName).emit(SOCKET_EVENTS.MESSAGES_READ, {
+          requestId,
+          readerId: currentUser.id,
+          readAt: new Date(),
+        });
+      }
     } catch (error) {
       logger.error('Error handling mark_read event:', error);
     }
@@ -106,7 +127,10 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
    * 4. TYPING_START: "Admin is typing..." or "User is typing..."
    */
   socket.on(SOCKET_EVENTS.TYPING_START, (payload: { requestId: string }) => {
+    if (!payload?.requestId) return;
     const roomName = `request:${payload.requestId}`;
+    if (!socket.rooms.has(roomName)) return;
+
     socket.to(roomName).emit(SOCKET_EVENTS.USER_TYPING, {
       requestId: payload.requestId,
       userId: currentUser.id,
@@ -120,7 +144,10 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
    * 5. TYPING_STOP: Stop typing indicator
    */
   socket.on(SOCKET_EVENTS.TYPING_STOP, (payload: { requestId: string }) => {
+    if (!payload?.requestId) return;
     const roomName = `request:${payload.requestId}`;
+    if (!socket.rooms.has(roomName)) return;
+
     socket.to(roomName).emit(SOCKET_EVENTS.USER_TYPING, {
       requestId: payload.requestId,
       userId: currentUser.id,

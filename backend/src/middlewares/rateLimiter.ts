@@ -65,6 +65,15 @@ export const rateLimiter = async (
   const windowMs = 60 * 1000;
   const maxRequests = 100;
 
+  // Prevent memory leak by pruning expired entries periodically
+  if (memoryLimitMap.size > 500) {
+    for (const [key, entry] of memoryLimitMap.entries()) {
+      if (now > entry.expiresAt) {
+        memoryLimitMap.delete(key);
+      }
+    }
+  }
+
   const current = memoryLimitMap.get(clientIp);
   if (!current || now > current.expiresAt) {
     memoryLimitMap.set(clientIp, { count: 1, expiresAt: now + windowMs });

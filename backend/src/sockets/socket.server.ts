@@ -227,4 +227,13 @@ export const getSocketIO = (): Server => {
   return io;
 };
 
+/**
+ * Safely broadcast a real-time event to a specific request room.
+ * No-ops gracefully when Socket.IO is not initialized (e.g. unit/E2E scripts).
+ */
+export const emitToRequestRoom = (requestId: string, event: string, payload: unknown): void => {
+  if (!io) return;
+  io.to(`request:${requestId}`).emit(event, payload);
+};
+
 export default initSocketServer;

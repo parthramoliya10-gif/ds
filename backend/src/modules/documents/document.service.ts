@@ -6,6 +6,8 @@ import {
   uploadBufferToCloudinary,
   generateSignedDownloadUrl,
 } from '../../utils/cloudinary.js';
+import { emitToRequestRoom } from '../../sockets/socket.server.js';
+import SOCKET_EVENTS from '../../constants/socketEvents.js';
 import logger from '../../utils/logger.js';
 
 export interface UploadDocumentInput {
@@ -80,8 +82,9 @@ export class DocumentService {
       });
 
       // Inject system message in chat
+      let systemMessage = null;
       if (request.conversation) {
-        await tx.message.create({
+        systemMessage = await tx.message.create({
           data: {
             conversationId: request.conversation.id,
             senderId: adminId,
@@ -116,13 +119,17 @@ export class DocumentService {
         },
       });
 
-      return document;
+      return { document, systemMessage };
     }, {
       maxWait: 15000,
       timeout: 20000,
     });
 
-    return finalDoc;
+    if (finalDoc.systemMessage) {
+      emitToRequestRoom(requestId, SOCKET_EVENTS.NEW_MESSAGE, finalDoc.systemMessage);
+    }
+
+    return finalDoc.document;
   }
 
   /**
@@ -219,12 +226,17 @@ export class DocumentService {
     }
 
     // 4. Generate Short-Lived Signed Download URL (Expires in 120 seconds / 2 minutes)
-    // Extract format from extension or fallback
-    const fileExtension = document.fileName.split('.').pop() || 'pdf';
+    const fileExtension = document.fileName.split('.').pop()?.toLowerCase() || 'pdf';
+    const isImageOrPdf =
+      document.mimeType.startsWith('image/') || document.mimeType === 'application/pdf';
     const signedDownloadUrl = generateSignedDownloadUrl(
       document.cloudinaryPublicId,
       fileExtension,
-      120 // 2 minutes validity
+      120,
+      {
+        resourceType: isImageOrPdf ? 'image' : 'raw',
+        type: 'authenticated',
+      }
     );
 
     // 5. Increment download counter & record audit log

@@ -4,6 +4,8 @@ import { ApiError } from '../../utils/apiError.js';
 import { AuthenticatedUser } from '../../types/express.js';
 import razorpay from '../../config/razorpay.js';
 import env from '../../config/env.js';
+import { emitToRequestRoom } from '../../sockets/socket.server.js';
+import SOCKET_EVENTS from '../../constants/socketEvents.js';
 
 export interface CreateQuotationInput {
   requestId: string;
@@ -25,6 +27,18 @@ export class QuotationService {
 
     if (!request) {
       throw new ApiError(404, 'Document request not found.');
+    }
+
+    if (
+      request.status === RequestStatus.IN_PROGRESS ||
+      request.status === RequestStatus.DOCUMENT_UPLOADED ||
+      request.status === RequestStatus.COMPLETED ||
+      request.status === RequestStatus.CANCELLED
+    ) {
+      throw new ApiError(
+        400,
+        `Cannot create a new quotation while request is in '${request.status}' status.`
+      );
     }
 
     // 2. Strict integer math in cents (zero floating-point precision error)
@@ -72,8 +86,9 @@ export class QuotationService {
       });
 
       // Automatically post Interactive Quotation Card in the real-time chat
+      let quotationCardMessage = null;
       if (request.conversation) {
-        await tx.message.create({
+        quotationCardMessage = await tx.message.create({
           data: {
             conversationId: request.conversation.id,
             senderId: adminId,
@@ -112,13 +127,18 @@ export class QuotationService {
         },
       });
 
-      return quotation;
+      return { quotation, quotationCardMessage };
     }, {
       maxWait: 15000,
       timeout: 20000,
     });
 
-    return newQuotation;
+    if (newQuotation.quotationCardMessage) {
+      emitToRequestRoom(data.requestId, SOCKET_EVENTS.NEW_MESSAGE, newQuotation.quotationCardMessage);
+    }
+    emitToRequestRoom(data.requestId, SOCKET_EVENTS.QUOTATION_RECEIVED, newQuotation.quotation);
+
+    return newQuotation.quotation;
   }
 
   /**
@@ -174,13 +194,7 @@ export class QuotationService {
       throw new ApiError(400, `Cannot accept quotation in '${quotation.status}' status.`);
     }
 
-    // 1. Mark quotation as ACCEPTED
-    const acceptedQuotation = await prisma.quotation.update({
-      where: { id: quotationId },
-      data: { status: QuotationStatus.ACCEPTED },
-    });
-
-    // 2. Generate Razorpay Order for Milestone 1 (50% Advance)
+    // 1. Generate Razorpay Order for Milestone 1 (50% Advance) FIRST so DB isn't mutated on gateway error
     const currency = quotation.currency || 'USD';
     const receipt = `rcpt_adv_${quotation.id.slice(0, 8)}_${Date.now()}`.slice(0, 40);
     const razorpayOrder = await razorpay.orders.create({
@@ -195,48 +209,63 @@ export class QuotationService {
       },
     });
 
-    // 3. Save pending payment record in DB
-    const payment = await prisma.payment.create({
-      data: {
-        userId,
-        requestId: quotation.requestId,
-        quotationId: quotation.id,
-        milestone: 'ADVANCE_50',
-        amount: quotation.advanceAmount,
-        currency,
-        status: 'PENDING',
-        razorpayOrderId: razorpayOrder.id,
-      },
-    });
+    // 2. Atomically mark quotation ACCEPTED, save Payment record, post Chat message & Audit Log
+    const { acceptedQuotation, payment, systemMessage } = await prisma.$transaction(
+      async (tx) => {
+        const accepted = await tx.quotation.update({
+          where: { id: quotationId },
+          data: { status: QuotationStatus.ACCEPTED },
+        });
 
-    // 4. Inject System Message into Chat
-    if (quotation.request.conversation) {
-      await prisma.message.create({
-        data: {
-          conversationId: quotation.request.conversation.id,
-          senderId: userId,
-          senderRole: Role.USER,
-          userSenderId: userId,
-          messageType: MessageType.SYSTEM,
-          content: `Quotation (v${quotation.version}) accepted by user. 50% Advance payment initiated ($${(quotation.advanceAmount / 100).toFixed(2)}).`,
-        },
-      });
+        const pay = await tx.payment.create({
+          data: {
+            userId,
+            requestId: quotation.requestId,
+            quotationId: quotation.id,
+            milestone: 'ADVANCE_50',
+            amount: quotation.advanceAmount,
+            currency,
+            status: 'PENDING',
+            razorpayOrderId: razorpayOrder.id,
+          },
+        });
+
+        let msg = null;
+        if (quotation.request.conversation) {
+          msg = await tx.message.create({
+            data: {
+              conversationId: quotation.request.conversation.id,
+              senderId: userId,
+              senderRole: Role.USER,
+              userSenderId: userId,
+              messageType: MessageType.SYSTEM,
+              content: `Quotation (v${quotation.version}) accepted by user. 50% Advance payment initiated ($${(quotation.advanceAmount / 100).toFixed(2)}).`,
+            },
+          });
+        }
+
+        await tx.auditLog.create({
+          data: {
+            actorId: userId,
+            actorRole: Role.USER,
+            userActorId: userId,
+            requestId: quotation.requestId,
+            action: 'QUOTATION_ACCEPTED',
+            metadata: {
+              quotationId: quotation.id,
+              advanceOrderId: razorpayOrder.id,
+            },
+          },
+        });
+
+        return { acceptedQuotation: accepted, payment: pay, systemMessage: msg };
+      },
+      { maxWait: 15000, timeout: 20000 }
+    );
+
+    if (systemMessage) {
+      emitToRequestRoom(quotation.requestId, SOCKET_EVENTS.NEW_MESSAGE, systemMessage);
     }
-
-    // 5. Record Audit Log
-    await prisma.auditLog.create({
-      data: {
-        actorId: userId,
-        actorRole: Role.USER,
-        userActorId: userId,
-        requestId: quotation.requestId,
-        action: 'QUOTATION_ACCEPTED',
-        metadata: {
-          quotationId: quotation.id,
-          advanceOrderId: razorpayOrder.id,
-        },
-      },
-    });
 
     return {
       quotation: acceptedQuotation,
