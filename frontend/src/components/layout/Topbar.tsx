@@ -10,7 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { mockNotifications } from "@/lib/mock-data";
+import { Notification } from "@/types";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -21,7 +21,7 @@ interface TopbarProps {
 
 export function Topbar({ title, role = "student" }: TopbarProps) {
   const pathname = usePathname();
-  const [notifications, setNotifications] = React.useState(mockNotifications);
+  const [notifications, setNotifications] = React.useState<Notification[]>([]);
 
   // Compute a smart page title if not explicitly provided
   const derivedTitle = React.useMemo(() => {

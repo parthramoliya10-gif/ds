@@ -1,4 +1,4 @@
-export type Role = "student" | "admin";
+export type Role = "student" | "admin" | "USER" | "ADMIN";
 
 export interface User {
   id: string;
@@ -8,6 +8,8 @@ export interface User {
   avatar?: string;
   college?: string;
   semester?: number;
+  phone?: string;
+  isBlocked?: boolean;
 }
 
 export type RequestStatus =
@@ -16,14 +18,23 @@ export type RequestStatus =
   | "advance_paid"
   | "in_progress"
   | "ready"
+  | "document_uploaded"
   | "delivered"
-  | "completed";
+  | "completed"
+  | "cancelled"
+  | "PENDING"
+  | "QUOTED"
+  | "IN_PROGRESS"
+  | "DOCUMENT_UPLOADED"
+  | "COMPLETED"
+  | "CANCELLED";
 
 export interface UploadedFile {
   id: string;
   name: string;
   size: string;
   url?: string;
+  mimeType?: string;
 }
 
 export interface Request {
@@ -42,11 +53,14 @@ export interface Request {
   createdAt: string;
   updatedAt: string;
   description?: string;
+  category?: string;
+  priority?: string;
   totalAmount?: number;
   advanceAmount?: number;
   balanceAmount?: number;
   advancePaid: boolean;
   balancePaid: boolean;
+  isDownloadUnlocked?: boolean;
   finalDocumentId?: string;
   urgent?: boolean;
 }
@@ -54,32 +68,40 @@ export interface Request {
 export interface Quotation {
   id: string;
   requestId: string;
+  version?: number;
   amount: number;
   advanceAmount: number;
   remainingAmount: number;
-  estimatedDelivery: string;
-  status: "pending" | "accepted" | "rejected";
+  currency?: string;
+  estimatedDelivery?: string;
+  estimatedDays?: number;
+  status: "pending" | "accepted" | "rejected" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "DRAFT";
   createdAt: string;
   notes?: string;
+  terms?: string;
 }
 
 export interface MessageAttachment {
   name: string;
   size: string;
   url: string;
+  mimeType?: string;
 }
 
 export interface Message {
   id: string;
   requestId: string;
   senderId: string;
-  senderRole: "student" | "admin" | "system";
+  senderRole: "student" | "admin" | "system" | "USER" | "ADMIN";
+  senderName?: string;
+  senderAvatar?: string;
   content: string;
   timestamp: string;
-  type: "text" | "quotation" | "file" | "system";
-  status: "sent" | "delivered" | "read";
+  type: "text" | "quotation" | "file" | "system" | "TEXT" | "QUOTATION_CARD" | "FILE" | "SYSTEM";
+  status: "sent" | "delivered" | "read" | "SENT" | "DELIVERED" | "READ";
   quotation?: Quotation;
   attachment?: MessageAttachment;
+  metadata?: any;
 }
 
 export interface Payment {
@@ -88,10 +110,15 @@ export interface Payment {
   requestTitle?: string;
   studentId: string;
   amount: number;
-  milestone: "advance" | "remaining" | "full";
-  status: "pending" | "completed" | "failed";
+  currency?: string;
+  milestone: "advance" | "remaining" | "full" | "ADVANCE_50" | "FINAL_50";
+  status: "pending" | "completed" | "failed" | "PENDING" | "SUCCESS" | "FAILED";
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
   transactionId?: string;
+  receiptUrl?: string;
   paidAt?: string;
+  createdAt?: string;
 }
 
 export interface FinalDocument {
@@ -99,10 +126,14 @@ export interface FinalDocument {
   requestId: string;
   fileName: string;
   fileSize: string;
-  pageCount: number;
+  pageCount?: number;
   fileUrl: string;
+  secureUrl?: string;
   isLocked: boolean;
+  version?: number;
+  downloadCount?: number;
   uploadedAt: string;
+  createdAt?: string;
 }
 
 export interface Notification {

@@ -11,17 +11,11 @@ import {
   CartesianGrid,
 } from "recharts";
 
-const weeklyRequestsData = [
-  { day: "Mon", requests: 4 },
-  { day: "Tue", requests: 7 },
-  { day: "Wed", requests: 5 },
-  { day: "Thu", requests: 9 },
-  { day: "Fri", requests: 6 },
-  { day: "Sat", requests: 8 },
-  { day: "Sun", requests: 3 },
-];
+interface WeeklyRequestsBarChartProps {
+  data?: { day: string; requests: number }[];
+}
 
-export function WeeklyRequestsBarChart() {
+export function WeeklyRequestsBarChart({ data }: WeeklyRequestsBarChartProps) {
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -32,10 +26,20 @@ export function WeeklyRequestsBarChart() {
     return <div className="h-64 w-full bg-surface animate-pulse rounded-[8px]" />;
   }
 
+  const chartData = data && data.length > 0 ? data : [
+    { day: "Mon", requests: 0 },
+    { day: "Tue", requests: 0 },
+    { day: "Wed", requests: 0 },
+    { day: "Thu", requests: 0 },
+    { day: "Fri", requests: 0 },
+    { day: "Sat", requests: 0 },
+    { day: "Sun", requests: 0 },
+  ];
+
   return (
     <div className="w-full h-64 pt-2">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={weeklyRequestsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
           <XAxis
             dataKey="day"

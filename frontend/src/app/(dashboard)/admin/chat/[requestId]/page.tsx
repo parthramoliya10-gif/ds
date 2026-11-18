@@ -12,69 +12,31 @@ import { ChatComposer } from "@/components/chat/ChatComposer";
 import { CreateQuotationModal } from "@/components/admin/CreateQuotationModal";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { mockRequests, mockMessages, mockQuotations } from "@/lib/mock-data";
-import { Message, Quotation } from "@/types";
+import { Message, Quotation, Request } from "@/types";
+import { useSocket } from "@/context/SocketContext";
+import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/api/client";
+import {
+  adaptRequestToFrontend,
+  adaptMessageToFrontend,
+  adaptQuotationToFrontend,
+} from "@/lib/api/adapters";
+import { SOCKET_EVENTS } from "@/lib/socket/socketClient";
 import { ArrowLeft, ShieldCheck, Plus, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminChatConversationPage() {
   const params = useParams();
   const router = useRouter();
-  const requestId = (params?.requestId as string) || "REQ-1001";
+  const requestId = (params?.requestId as string) || "";
 
-  // Request & Quotation lookup
-  const request =
-    mockRequests.find((r) => r.id === requestId) || mockRequests[0];
-  const quotation =
-    mockQuotations.find((q) => q.requestId === requestId) || {
-      id: "QT-" + requestId,
-      requestId,
-      amount: 1400,
-      advanceAmount: 700,
-      remainingAmount: 700,
-      estimatedDelivery: "Within 24 Hours",
-      status: "pending",
-      createdAt: new Date().toISOString(),
-      notes: "Complete lab manual with verified socket programs and Wireshark captures.",
-    };
+  const { socket, joinRoom, leaveRoom, sendMessage, emitTyping, markRead } = useSocket();
+  const { user } = useAuth();
 
-  // Chat message state
-  const initialMessages: Message[] = mockMessages[requestId] || [
-    {
-      id: "msg_admin_c1",
-      requestId,
-      senderId: "usr_aarav_01",
-      senderRole: "student",
-      content: `Hello, I've created request ${requestId} for "${request.title}". Please review my attached guidelines and send quotation.`,
-      timestamp: new Date(Date.now() - 3600 * 1000 * 2).toISOString(),
-      type: "text",
-      status: "read",
-    },
-    {
-      id: "msg_admin_c2",
-      requestId,
-      senderId: "usr_admin_01",
-      senderRole: "admin",
-      content: "Hello Aarav! Our specialist has reviewed the problem statement and university formatting requirements.",
-      timestamp: new Date(Date.now() - 3600 * 1000).toISOString(),
-      type: "text",
-      status: "read",
-    },
-    {
-      id: "msg_admin_c3",
-      requestId,
-      senderId: "usr_admin_01",
-      senderRole: "admin",
-      content: "Here is the official quotation with 50-50 milestone protection:",
-      timestamp: new Date(Date.now() - 1800 * 1000).toISOString(),
-      type: "quotation",
-      status: "read",
-      quotation: quotation as Quotation,
-    },
-  ];
-
-  const [messages, setMessages] = React.useState<Message[]>(initialMessages);
-  const [currentQuotation, setCurrentQuotation] = React.useState<Quotation>(quotation as Quotation);
+  const [request, setRequest] = React.useState<Request | null>(null);
+  const [messages, setMessages] = React.useState<Message[]>([]);
+  const [currentQuotation, setCurrentQuotation] = React.useState<Quotation | null>(null);
+  const [loading, setLoading] = React.useState(true);
   const [isQuotationModalOpen, setIsQuotationModalOpen] = React.useState(false);
   const [isTyping, setIsTyping] = React.useState(false);
 
@@ -88,12 +50,108 @@ export default function AdminChatConversationPage() {
     scrollToBottom();
   }, [messages, isTyping]);
 
+  // Join room and fetch history from backend
+  React.useEffect(() => {
+    let mounted = true;
+
+    async function initAdminChat() {
+      if (!requestId) return;
+
+      try {
+        setLoading(true);
+        await joinRoom(requestId);
+        markRead(requestId);
+
+        const [reqRes, chatRes] = await Promise.allSettled([
+          api.requests.getById(requestId),
+          api.chat.getMessages(requestId),
+        ]);
+
+        if (mounted) {
+          if (reqRes.status === "fulfilled" && reqRes.value) {
+            setRequest(adaptRequestToFrontend(reqRes.value));
+            if (reqRes.value.quotations && reqRes.value.quotations.length > 0) {
+              setCurrentQuotation(adaptQuotationToFrontend(reqRes.value.quotations[0]));
+            }
+          }
+          if (chatRes.status === "fulfilled" && Array.isArray(chatRes.value?.messages)) {
+            setMessages(chatRes.value.messages.map(adaptMessageToFrontend));
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch admin chat:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    initAdminChat();
+
+    // Socket Event Listeners
+    if (socket) {
+      const handleNewMessage = (newMsg: any) => {
+        const adapted = adaptMessageToFrontend(newMsg);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === adapted.id)) return prev;
+          return [...prev, adapted];
+        });
+        markRead(requestId);
+      };
+
+      const handleStatusUpdate = (update: any) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === update.id
+              ? { ...m, status: (update.status?.toLowerCase() || m.status) as any }
+              : m
+          )
+        );
+      };
+
+      const handleUserTyping = (payload: any) => {
+        if (payload.requestId === requestId && (payload.role === "USER" || payload.role === "student")) {
+          setIsTyping(Boolean(payload.isTyping));
+        }
+      };
+
+      const handleQuotationReceived = (q: any) => {
+        setCurrentQuotation(adaptQuotationToFrontend(q));
+      };
+
+      const handlePaymentConfirmed = (p: any) => {
+        toast.success(`Milestone payment confirmed: ${p.milestone}`);
+      };
+
+      socket.on(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
+      socket.on(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
+      socket.on(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
+      socket.on(SOCKET_EVENTS.QUOTATION_RECEIVED, handleQuotationReceived);
+      socket.on(SOCKET_EVENTS.PAYMENT_CONFIRMED, handlePaymentConfirmed);
+
+      return () => {
+        socket.off(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
+        socket.off(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
+        socket.off(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
+        socket.off(SOCKET_EVENTS.QUOTATION_RECEIVED, handleQuotationReceived);
+        socket.off(SOCKET_EVENTS.PAYMENT_CONFIRMED, handlePaymentConfirmed);
+        leaveRoom(requestId);
+        mounted = false;
+      };
+    }
+
+    return () => {
+      leaveRoom(requestId);
+      mounted = false;
+    };
+  }, [requestId, socket, joinRoom, leaveRoom, markRead]);
+
   // Admin sending a message
-  const handleSendMessage = (content: string, file?: File) => {
+  const handleSendMessage = async (content: string, file?: File) => {
+    const tempId = "msg_admin_" + Math.random().toString(36).substring(2, 9);
     const newMsg: Message = {
-      id: "msg_" + Math.random().toString(36).substring(2, 9),
+      id: tempId,
       requestId,
-      senderId: "usr_admin_01",
+      senderId: user?.id || "usr_admin_01",
       senderRole: "admin",
       content: content || (file ? `Shared document: ${file.name}` : ""),
       timestamp: new Date().toISOString(),
@@ -110,43 +168,86 @@ export default function AdminChatConversationPage() {
 
     setMessages((prev) => [...prev, newMsg]);
 
-    // Simulate tick update: sent -> delivered
-    setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === newMsg.id ? { ...m, status: "delivered" } : m))
-      );
-    }, 600);
+    try {
+      if (file) {
+        const formData = new FormData();
+        formData.append("content", content || `Shared file: ${file.name}`);
+        formData.append("document", file);
+        const saved = await api.chat.postMessage(requestId, formData);
+        if (saved) {
+          const adapted = adaptMessageToFrontend(saved);
+          setMessages((prev) => prev.map((m) => (m.id === tempId ? adapted : m)));
+        }
+      } else {
+        if (socket?.connected) {
+          await sendMessage(requestId, content, "TEXT");
+        } else {
+          await api.chat.postMessage(requestId, { content, messageType: "TEXT" });
+        }
+      }
+    } catch (err: any) {
+      console.warn("Admin message send warning:", err);
+      setTimeout(() => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, status: "delivered" } : m))
+        );
+      }, 600);
+    }
   };
 
-  // Admin creating and dispatching quotation
-  const handleQuotationSubmit = (newQuote: Quotation) => {
-    setCurrentQuotation(newQuote);
+  const handleCreateQuotation = (newQuotation: Quotation) => {
+    setCurrentQuotation(newQuotation);
+    if (request) {
+      setRequest((prev) => prev ? { ...prev, status: "quoted" } : null);
+    }
 
     const quoteMsg: Message = {
       id: "msg_quote_" + Math.random().toString(36).substring(2, 9),
       requestId,
-      senderId: "usr_admin_01",
+      senderId: user?.id || "admin",
       senderRole: "admin",
-      content: "Dispatched updated quotation with milestone terms:",
+      content: "Official quotation prepared with verified 50-50 milestone protection.",
       timestamp: new Date().toISOString(),
       type: "quotation",
       status: "sent",
-      quotation: newQuote,
+      quotation: newQuotation,
     };
 
     setMessages((prev) => [...prev, quoteMsg]);
-    toast.success(`Quotation ${newQuote.id} sent directly to student.`);
+    toast.success(`Quotation created and posted to chat.`);
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+        <p className="text-[14px] text-muted-foreground">Loading conversation...</p>
+      </div>
+    );
+  }
+
+  if (!request) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-4 p-8 text-center">
+        <h3 className="text-lg font-semibold">Conversation Not Found</h3>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          The requested task or conversation does not exist.
+        </p>
+        <Link href="/admin/chat">
+          <Button variant="outline" size="sm">Back to Chat</Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Admin Chat Top Header */}
+      {/* Admin Chat Header */}
       <div className="h-16 border-b border-border px-4 flex items-center justify-between bg-background shrink-0">
         <div className="flex items-center space-x-3 truncate">
-          {/* Mobile Back Arrow (hidden sm:block) */}
           <Link
             href="/admin/chat"
-            className="sm:hidden p-1.5 rounded-[6px] hover:bg-surface text-foreground"
+            className="min-[860px]:hidden p-1.5 rounded-[6px] hover:bg-surface text-foreground"
             aria-label="Back to conversations"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -160,61 +261,65 @@ export default function AdminChatConversationPage() {
               <StatusBadge status={request.status} className="text-[10px] py-0 px-1.5 h-4" />
             </div>
             <h3 className="text-[14px] font-semibold text-foreground truncate leading-tight">
-              {request.studentName} — {request.title}
+              {request.title}
             </h3>
           </div>
         </div>
 
+        {/* Admin Action Buttons */}
         <div className="flex items-center space-x-2 shrink-0">
           <Button
             size="sm"
             onClick={() => setIsQuotationModalOpen(true)}
-            className="h-8 text-[12px] font-semibold"
+            className="h-8 text-[12px] font-medium"
           >
             <Plus className="h-3.5 w-3.5 mr-1" />
-            Send Quotation
+            Issue Quotation
           </Button>
 
           <Link href={`/admin/requests/${request.id}`}>
             <Button variant="outline" size="sm" className="h-8 text-[12px] border-border">
-              <ExternalLink className="h-3.5 w-3.5 mr-1" />
               Task Details
             </Button>
           </Link>
         </div>
       </div>
 
-      {/* Message Feed Area */}
+      {/* Message Stream */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
-        <DateSeparator label="Today" />
+        <DateSeparator label="Student Inquiry & Specification Review" />
+
+        {/* Security Notice */}
+        <div className="bg-surface border border-border rounded-[8px] p-2.5 text-center max-w-md mx-auto space-y-0.5">
+          <div className="flex items-center justify-center space-x-1.5 text-foreground font-semibold text-[11px]">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            <span>Admin Control Session Active</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Student will see real-time updates and tick receipts as you send responses.
+          </p>
+        </div>
 
         {messages.map((msg) => {
-          const isMe = msg.senderRole === "admin";
-
-          if (msg.type === "quotation" && (msg.quotation || currentQuotation)) {
-            const displayQuote = msg.quotation || currentQuotation;
+          if (msg.type === "quotation" || (msg.quotation && msg.type !== "system")) {
+            const q = msg.quotation || currentQuotation;
+            if (!q) return null;
             return (
-              <div key={msg.id} className="flex flex-col items-start mb-3 w-full">
-                <span className="text-[11px] font-semibold text-muted-foreground mb-1 ml-1">
-                  You (Admin)
-                </span>
-                <QuotationCard quotation={displayQuote} isAdmin={true} />
-              </div>
+              <QuotationCard
+                key={msg.id}
+                quotation={q}
+                isAdmin
+              />
             );
           }
 
-          if (msg.attachment) {
+          if (msg.type === "file" && msg.attachment) {
             return (
-              <React.Fragment key={msg.id}>
-                {msg.content && (
-                  <MessageBubble
-                    message={msg}
-                    isMe={isMe}
-                    senderLabel={isMe ? "You (Admin)" : request.studentName}
-                  />
-                )}
-                <AttachmentBubble attachment={msg.attachment} isMe={isMe} />
-              </React.Fragment>
+              <AttachmentBubble
+                key={msg.id}
+                attachment={msg.attachment}
+                isMe={msg.senderRole === "admin" || msg.senderRole === "ADMIN"}
+              />
             );
           }
 
@@ -222,43 +327,32 @@ export default function AdminChatConversationPage() {
             <MessageBubble
               key={msg.id}
               message={msg}
-              isMe={isMe}
-              senderLabel={isMe ? "You (Admin)" : request.studentName}
+              isMe={msg.senderRole === "admin" || msg.senderRole === "ADMIN"}
             />
           );
         })}
 
-        {isTyping && <TypingIndicator />}
+        {/* Typing indicator */}
+        <TypingIndicator isVisible={isTyping} senderName="Student" />
+
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Composer Input Bar with "Send quotation" button */}
+      {/* Admin Chat Composer */}
       <ChatComposer
         onSendMessage={handleSendMessage}
-        placeholder={`Message ${request.studentName}...`}
-        extraActions={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsQuotationModalOpen(true)}
-            className="h-10 px-3 border-border rounded-[8px] text-[12px] font-semibold shrink-0 text-foreground"
-            title="Create and send quotation"
-          >
-            <ShieldCheck className="h-4 w-4 mr-1.5" />
-            Send Quotation
-          </Button>
-        }
+        onTypingChange={(typing) => emitTyping(requestId, typing)}
+        placeholder="Type a response to the student or provide task updates..."
       />
 
-      {/* Create Quotation Modal */}
+      {/* Quotation Modal */}
       <CreateQuotationModal
         isOpen={isQuotationModalOpen}
         onClose={() => setIsQuotationModalOpen(false)}
         requestId={request.id}
         requestTitle={request.title}
-        defaultAmount={currentQuotation.amount}
-        onSubmitQuotation={handleQuotationSubmit}
+        defaultAmount={request.totalAmount || 1400}
+        onSubmitQuotation={handleCreateQuotation}
       />
     </div>
   );

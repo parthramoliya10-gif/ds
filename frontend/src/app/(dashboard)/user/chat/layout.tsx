@@ -3,7 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { mockRequests, mockMessages } from "@/lib/mock-data";
+import { Request } from "@/types";
+import api from "@/lib/api/client";
+import { adaptRequestToFrontend } from "@/lib/api/adapters";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -19,11 +21,30 @@ export default function UserChatLayout({
   const pathname = usePathname();
   const activeRequestId = params?.requestId as string | undefined;
   const [search, setSearch] = React.useState("");
+  const [requests, setRequests] = React.useState<Request[]>([]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    async function loadList() {
+      try {
+        const res = await api.requests.list({ limit: 50 });
+        if (mounted && res && Array.isArray(res.requests)) {
+          setRequests(res.requests.map(adaptRequestToFrontend));
+        }
+      } catch (err) {
+        console.warn("Could not load chat requests:", err);
+      }
+    }
+    loadList();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Determine if active detail view is shown
   const isDetailView = Boolean(activeRequestId);
 
-  const filteredRequests = mockRequests.filter(
+  const filteredRequests = requests.filter(
     (r) =>
       r.title.toLowerCase().includes(search.toLowerCase()) ||
       r.id.toLowerCase().includes(search.toLowerCase()) ||
@@ -70,12 +91,6 @@ export default function UserChatLayout({
           ) : (
             filteredRequests.map((req, idx) => {
               const isActive = activeRequestId === req.id;
-              const messages = mockMessages[req.id] || [];
-              const lastMessage = messages[messages.length - 1];
-
-              // Mock unread counter for active tasks
-              const unreadCount = req.id === "REQ-1001" ? 1 : req.id === "REQ-1005" ? 2 : 0;
-              const isOnline = idx % 2 === 0;
 
               return (
                 <Link
@@ -90,21 +105,14 @@ export default function UserChatLayout({
                 >
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center space-x-1.5 truncate">
-                      {/* Online dot indicator */}
-                      <span
-                        className={cn(
-                          "h-2 w-2 rounded-full shrink-0",
-                          isOnline ? "bg-foreground" : "bg-border"
-                        )}
-                        title={isOnline ? "Specialist Online" : "Offline"}
-                      />
+                      <span className="h-2 w-2 rounded-full shrink-0 bg-foreground" />
                       <span className="text-[12px] font-mono font-medium text-muted-foreground">
-                        {req.id}
+                        {req.id.substring(0, 8)}...
                       </span>
                     </div>
 
                     <span className="text-[10px] text-muted-foreground shrink-0">
-                      {lastMessage ? "2h ago" : "Yesterday"}
+                      {req.status.toUpperCase()}
                     </span>
                   </div>
 
@@ -114,18 +122,8 @@ export default function UserChatLayout({
 
                   <div className="flex items-center justify-between text-[12px]">
                     <p className="text-muted-foreground truncate max-w-[200px]">
-                      {lastMessage
-                        ? lastMessage.type === "quotation"
-                          ? "📋 Official milestone quotation sent"
-                          : lastMessage.content
-                        : "Specialist is reviewing requirements..."}
+                      {req.description || "Task discussion"}
                     </p>
-
-                    {unreadCount > 0 && (
-                      <span className="h-4 min-w-4 px-1 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center shrink-0">
-                        {unreadCount}
-                      </span>
-                    )}
                   </div>
                 </Link>
               );

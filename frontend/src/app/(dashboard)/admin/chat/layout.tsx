@@ -3,7 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { mockRequests } from "@/lib/mock-data";
+import { Request } from "@/types";
+import api from "@/lib/api/client";
+import { adaptRequestToFrontend } from "@/lib/api/adapters";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
 import { Search } from "lucide-react";
@@ -17,12 +19,31 @@ export default function AdminChatLayout({
   const params = useParams();
   const activeRequestId = params?.requestId as string | undefined;
   const [search, setSearch] = React.useState("");
+  const [requests, setRequests] = React.useState<Request[]>([]);
 
-  const filteredRequests = mockRequests.filter(
+  React.useEffect(() => {
+    let mounted = true;
+    async function loadAdminChatList() {
+      try {
+        const res = await api.requests.list({ limit: 50 });
+        if (mounted && res && Array.isArray(res.requests)) {
+          setRequests(res.requests.map(adaptRequestToFrontend));
+        }
+      } catch (err) {
+        console.warn("Could not load admin chat list:", err);
+      }
+    }
+    loadAdminChatList();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const filteredRequests = requests.filter(
     (r) =>
       r.title.toLowerCase().includes(search.toLowerCase()) ||
       r.id.toLowerCase().includes(search.toLowerCase()) ||
-      r.studentName.toLowerCase().includes(search.toLowerCase())
+      (r.studentName && r.studentName.toLowerCase().includes(search.toLowerCase()))
   );
 
   const isDetailView = Boolean(activeRequestId);

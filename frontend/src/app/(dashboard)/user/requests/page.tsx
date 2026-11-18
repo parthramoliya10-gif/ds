@@ -8,14 +8,37 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { mockRequests } from "@/lib/mock-data";
 import { Request } from "@/types";
+import api from "@/lib/api/client";
+import { adaptRequestToFrontend } from "@/lib/api/adapters";
 import { formatDate, isDeadlineUrgent } from "@/lib/utils";
 import { Plus, MessageSquare, Eye, FileText, Search } from "lucide-react";
 
 export default function UserRequestsListPage() {
   const [activeTab, setActiveTab] = React.useState("all");
-  const [requests] = React.useState<Request[]>(mockRequests);
+  const [requests, setRequests] = React.useState<Request[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let mounted = true;
+    async function loadRequests() {
+      try {
+        const res = await api.requests.list({ limit: 50 });
+        if (mounted && res && Array.isArray(res.requests)) {
+          const adapted = res.requests.map(adaptRequestToFrontend);
+          setRequests(adapted);
+        }
+      } catch (err) {
+        console.warn("Could not load backend requests:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    loadRequests();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Filter based on tab
   const filteredRequests = React.useMemo(() => {
@@ -29,7 +52,9 @@ export default function UserRequestsListPage() {
           (r) => r.status === "pending" || r.status === "quoted"
         );
       case "ready":
-        return requests.filter((r) => r.status === "ready");
+        return requests.filter(
+          (r) => r.status === "ready" || r.status === "document_uploaded"
+        );
       case "completed":
         return requests.filter(
           (r) => r.status === "completed" || r.status === "delivered"

@@ -5,13 +5,15 @@ import { cn } from "@/lib/utils";
 import { AlertCircle } from "lucide-react";
 
 export interface StatusBadgeProps {
-  status: RequestStatus | "payment_due" | "urgent";
+  status: RequestStatus | "payment_due" | "urgent" | string;
   className?: string;
   label?: string;
 }
 
 export function StatusBadge({ status, className, label }: StatusBadgeProps) {
-  switch (status) {
+  const normalized = status ? status.toLowerCase() : "pending";
+
+  switch (normalized) {
     case "pending":
       return (
         <Badge
@@ -34,7 +36,6 @@ export function StatusBadge({ status, className, label }: StatusBadgeProps) {
             className
           )}
         >
-          {/* Half-filled dot icon */}
           <svg
             className="h-2.5 w-2.5 shrink-0"
             viewBox="0 0 16 16"
@@ -43,13 +44,13 @@ export function StatusBadge({ status, className, label }: StatusBadgeProps) {
             <path d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z" />
             <path d="M8 1v14A7 7 0 0 0 8 1z" />
           </svg>
-          <span>{label || (status === "advance_paid" ? "Advance Paid" : "In Progress")}</span>
+          <span>{label || (normalized === "advance_paid" ? "Advance Paid" : "In Progress")}</span>
         </div>
       );
 
     case "ready":
+    case "document_uploaded":
     case "payment_due":
-      // Payment due = bold black-border badge
       return (
         <Badge
           variant="boldBorder"
@@ -58,13 +59,12 @@ export function StatusBadge({ status, className, label }: StatusBadgeProps) {
             className
           )}
         >
-          {label || (status === "ready" ? "Payment Due" : "Payment Due")}
+          {label || (normalized === "document_uploaded" ? "Final Doc Ready (Pay 50%)" : "Payment Due")}
         </Badge>
       );
 
     case "completed":
     case "delivered":
-      // Completed = solid black badge (in dark mode: solid white badge)
       return (
         <Badge
           variant="default"
@@ -73,12 +73,24 @@ export function StatusBadge({ status, className, label }: StatusBadgeProps) {
             className
           )}
         >
-          {label || (status === "delivered" ? "Delivered" : "Completed")}
+          {label || (normalized === "delivered" ? "Delivered" : "Completed")}
+        </Badge>
+      );
+
+    case "cancelled":
+      return (
+        <Badge
+          variant="outline"
+          className={cn(
+            "border-border text-muted-foreground line-through bg-surface px-2.5 py-0.5",
+            className
+          )}
+        >
+          {label || "Cancelled"}
         </Badge>
       );
 
     case "urgent":
-      // Urgent (under 24h to deadline) = outline badge
       return (
         <Badge
           variant="outline"
@@ -113,3 +125,4 @@ export function StatusBadge({ status, className, label }: StatusBadgeProps) {
       );
   }
 }
+export default StatusBadge;

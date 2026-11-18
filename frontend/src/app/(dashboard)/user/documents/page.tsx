@@ -8,21 +8,58 @@ import { RazorpayModal } from "@/components/payments/RazorpayModal";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { mockDocuments, mockRequests } from "@/lib/mock-data";
-import { FinalDocument } from "@/types";
+import { FinalDocument, Request } from "@/types";
+import api from "@/lib/api/client";
+import { adaptFinalDocumentToFrontend, adaptRequestToFrontend } from "@/lib/api/adapters";
 import { formatCurrencyINR } from "@/lib/utils";
 import { FolderDown, Lock, Download, CheckCircle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 export default function UserDocumentsPage() {
-  const [documents, setDocuments] = React.useState<FinalDocument[]>(mockDocuments);
+  const [documents, setDocuments] = React.useState<FinalDocument[]>([]);
+  const [requests, setRequests] = React.useState<Request[]>([]);
   const [filter, setFilter] = React.useState("all");
 
   const [selectedDocForPayment, setSelectedDocForPayment] = React.useState<{
     doc: FinalDocument;
     amount: number;
     title: string;
+    requestId?: string;
   } | null>(null);
+
+  React.useEffect(() => {
+    let mounted = true;
+    async function loadUserDocuments() {
+      try {
+        const res = await api.requests.list({ limit: 50 });
+        if (mounted && res && Array.isArray(res.requests)) {
+          const adaptedRequests = res.requests.map(adaptRequestToFrontend);
+          setRequests(adaptedRequests);
+
+          const docsFromRequests: FinalDocument[] = [];
+          res.requests.forEach((r: any) => {
+            if (r.finalDocuments && r.finalDocuments.length > 0) {
+              r.finalDocuments.forEach((fd: any) => {
+                docsFromRequests.push({
+                  ...adaptFinalDocumentToFrontend(fd),
+                  requestId: r.id,
+                  isLocked: !r.isDownloadUnlocked,
+                });
+              });
+            }
+          });
+
+          setDocuments(docsFromRequests);
+        }
+      } catch (err) {
+        console.warn("Could not load backend documents:", err);
+      }
+    }
+    loadUserDocuments();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const filteredDocs = React.useMemo(() => {
     if (filter === "locked") return documents.filter((d) => d.isLocked);
@@ -40,6 +77,15 @@ export default function UserDocumentsPage() {
 
     toast.success("Document unlocked! Download link is now active.");
     setSelectedDocForPayment(null);
+  };
+
+  const handleDownload = (doc: FinalDocument) => {
+    if (doc.id) {
+      window.open(api.documents.getDownloadUrl(doc.id), "_blank");
+      toast.success(`Downloading ${doc.fileName}...`);
+    } else {
+      toast.info("Download link not available.");
+    }
   };
 
   return (
@@ -69,8 +115,8 @@ export default function UserDocumentsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredDocs.map((doc) => {
-            const req = mockRequests.find((r) => r.id === doc.requestId);
-            const remainingAmount = req?.balanceAmount || 900;
+            const req = requests.find((r) => r.id === doc.requestId);
+            const remainingAmount = req?.balanceAmount || 0;
 
             return (
               <FinalDocumentCard
@@ -83,9 +129,10 @@ export default function UserDocumentsPage() {
                     doc,
                     amount: remainingAmount,
                     title: req?.title || doc.fileName,
+                    requestId: req?.id,
                   })
                 }
-                onDownload={() => toast.success(`Downloading ${doc.fileName}...`)}
+                onDownload={() => handleDownload(doc)}
               />
             );
           })}
@@ -100,6 +147,7 @@ export default function UserDocumentsPage() {
           amount={selectedDocForPayment.amount}
           title={selectedDocForPayment.title}
           milestoneType="remaining"
+          requestId={selectedDocForPayment.requestId}
           onSuccess={handlePaymentSuccess}
         />
       )}

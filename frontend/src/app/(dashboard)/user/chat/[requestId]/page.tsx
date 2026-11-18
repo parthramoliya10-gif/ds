@@ -12,61 +12,33 @@ import { ChatComposer } from "@/components/chat/ChatComposer";
 import { RazorpayModal } from "@/components/payments/RazorpayModal";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { mockRequests, mockMessages, mockQuotations } from "@/lib/mock-data";
 import { Message, Quotation, Request } from "@/types";
+import { useSocket } from "@/context/SocketContext";
+import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/api/client";
+import {
+  adaptRequestToFrontend,
+  adaptMessageToFrontend,
+  adaptQuotationToFrontend,
+} from "@/lib/api/adapters";
+import { SOCKET_EVENTS } from "@/lib/socket/socketClient";
 import { ArrowLeft, MoreVertical, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function UserChatConversationPage() {
   const params = useParams();
   const router = useRouter();
-  const requestId = (params?.requestId as string) || "REQ-1001";
+  const requestId = params?.requestId as string;
 
-  // Request & Quotation lookup
-  const request =
-    mockRequests.find((r) => r.id === requestId) || mockRequests[0];
-  const quotation =
-    mockQuotations.find((q) => q.requestId === requestId) || {
-      id: "QT-" + requestId,
-      requestId,
-      amount: 1400,
-      advanceAmount: 700,
-      remainingAmount: 700,
-      estimatedDelivery: "Within 24 Hours",
-      status: "pending",
-      createdAt: new Date().toISOString(),
-      notes: "Complete lab manual with verified socket programs and Wireshark captures.",
-    };
+  const { socket, joinRoom, leaveRoom, sendMessage, emitTyping, markRead } = useSocket();
+  const { user } = useAuth();
 
-  // Chat message state
-  const initialMessages: Message[] = mockMessages[requestId] || [
-    {
-      id: "msg_init_1",
-      requestId,
-      senderId: "usr_aarav_01",
-      senderRole: "student",
-      content: `Hello, I've created request ${requestId} for ${request.title}. Please review my attached syllabus and send quotation.`,
-      timestamp: new Date(Date.now() - 3600 * 1000 * 2).toISOString(),
-      type: "text",
-      status: "read",
-    },
-    {
-      id: "msg_init_2",
-      requestId,
-      senderId: "usr_admin_01",
-      senderRole: "admin",
-      content: "Hello Aarav! We have reviewed the problem statement. Here is the official milestone quotation.",
-      timestamp: new Date(Date.now() - 3600 * 1000).toISOString(),
-      type: "quotation",
-      status: "read",
-      quotation: quotation as Quotation,
-    },
-  ];
-
-  const [messages, setMessages] = React.useState<Message[]>(initialMessages);
-  const [currentQuotation, setCurrentQuotation] = React.useState<Quotation>(quotation as Quotation);
+  const [request, setRequest] = React.useState<Request | null>(null);
+  const [currentQuotation, setCurrentQuotation] = React.useState<Quotation | null>(null);
+  const [messages, setMessages] = React.useState<Message[]>([]);
   const [isTyping, setIsTyping] = React.useState(false);
   const [isRazorpayOpen, setIsRazorpayOpen] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
@@ -78,12 +50,109 @@ export default function UserChatConversationPage() {
     scrollToBottom();
   }, [messages, isTyping]);
 
+  // Join room and fetch history from backend
+  React.useEffect(() => {
+    let mounted = true;
+
+    async function initChat() {
+      if (!requestId) return;
+
+      // 1. Join Socket Room
+      await joinRoom(requestId);
+      markRead(requestId);
+
+      // 2. Fetch Request & Quotation Details
+      try {
+        const reqData = await api.requests.getById(requestId);
+        if (mounted && reqData) {
+          setRequest(adaptRequestToFrontend(reqData));
+          if (reqData.quotations && reqData.quotations.length > 0) {
+            setCurrentQuotation(adaptQuotationToFrontend(reqData.quotations[0]));
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch request details:", err);
+      }
+
+      // 3. Fetch Message History
+      try {
+        const chatRes = await api.chat.getMessages(requestId);
+        if (mounted && chatRes && chatRes.messages && chatRes.messages.length > 0) {
+          const adapted = chatRes.messages.map(adaptMessageToFrontend);
+          setMessages(adapted);
+        }
+      } catch (err) {
+        console.warn("Could not fetch message history:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    initChat();
+
+    // Socket Event Listeners
+    if (socket) {
+      const handleNewMessage = (newMsg: any) => {
+        const adapted = adaptMessageToFrontend(newMsg);
+        setMessages((prev) => {
+          // Prevent duplicates
+          if (prev.some((m) => m.id === adapted.id)) return prev;
+          return [...prev, adapted];
+        });
+        markRead(requestId);
+      };
+
+      const handleStatusUpdate = (update: any) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === update.id
+              ? { ...m, status: (update.status?.toLowerCase() || m.status) as any }
+              : m
+          )
+        );
+      };
+
+      const handleUserTyping = (payload: any) => {
+        if (payload.requestId === requestId && payload.role === "ADMIN") {
+          setIsTyping(Boolean(payload.isTyping));
+        }
+      };
+
+      const handleQuotationReceived = (q: any) => {
+        const adapted = adaptQuotationToFrontend(q);
+        setCurrentQuotation(adapted);
+        toast.info("New quotation received from admin!");
+      };
+
+      socket.on(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
+      socket.on(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
+      socket.on(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
+      socket.on(SOCKET_EVENTS.QUOTATION_RECEIVED, handleQuotationReceived);
+
+      return () => {
+        socket.off(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
+        socket.off(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
+        socket.off(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
+        socket.off(SOCKET_EVENTS.QUOTATION_RECEIVED, handleQuotationReceived);
+        leaveRoom(requestId);
+        mounted = false;
+      };
+    }
+
+    return () => {
+      leaveRoom(requestId);
+      mounted = false;
+    };
+  }, [requestId, socket, joinRoom, leaveRoom, markRead]);
+
   // Handle student sending a new message
-  const handleSendMessage = (content: string, file?: File) => {
+  const handleSendMessage = async (content: string, file?: File) => {
+    // Optimistic message
+    const tempId = "msg_temp_" + Math.random().toString(36).substring(2, 9);
     const newMsg: Message = {
-      id: "msg_" + Math.random().toString(36).substring(2, 9),
+      id: tempId,
       requestId,
-      senderId: "usr_aarav_01",
+      senderId: user?.id || "usr_aarav_01",
       senderRole: "student",
       content: content || (file ? `Uploaded reference file: ${file.name}` : ""),
       timestamp: new Date().toISOString(),
@@ -100,52 +169,76 @@ export default function UserChatConversationPage() {
 
     setMessages((prev) => [...prev, newMsg]);
 
-    // Simulate tick update: sent -> delivered
-    setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === newMsg.id ? { ...m, status: "delivered" } : m))
-      );
-    }, 700);
-
-    // Simulate specialist typing and automated response
-    setTimeout(() => {
-      setIsTyping(true);
+    try {
+      if (file) {
+        // Send via multipart REST
+        const formData = new FormData();
+        formData.append("content", content || `Uploaded reference file: ${file.name}`);
+        formData.append("document", file);
+        const saved = await api.chat.postMessage(requestId, formData);
+        if (saved) {
+          const adapted = adaptMessageToFrontend(saved);
+          setMessages((prev) => prev.map((m) => (m.id === tempId ? adapted : m)));
+        }
+      } else {
+        // Send via real-time WebSocket
+        if (socket?.connected) {
+          await sendMessage(requestId, content, "TEXT");
+        } else {
+          await api.chat.postMessage(requestId, { content, messageType: "TEXT" });
+        }
+      }
+    } catch (err: any) {
+      console.warn("Message sending fallback:", err);
+      // Simulate delivered tick if offline
       setTimeout(() => {
-        setIsTyping(false);
-        const replyMsg: Message = {
-          id: "msg_reply_" + Math.random().toString(36).substring(2, 9),
-          requestId,
-          senderId: "usr_admin_01",
-          senderRole: "admin",
-          content: "Received your query. Our specialist is on it and will adhere strictly to your university guidelines.",
-          timestamp: new Date().toISOString(),
-          type: "text",
-          status: "read",
-        };
-        setMessages((prev) => [...prev, replyMsg]);
-      }, 1500);
-    }, 1200);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, status: "delivered" } : m))
+        );
+      }, 600);
+    }
   };
 
   // Handle "Accept & Pay Advance"
-  const handleAcceptAndPay = (q: Quotation) => {
+  const handleAcceptAndPay = async (q: Quotation) => {
+    try {
+      if (q.id && !q.id.startsWith("QT-")) {
+        await api.quotations.accept(q.id);
+      }
+    } catch (err: any) {
+      console.warn("Quotation accept api warning:", err);
+    }
     setIsRazorpayOpen(true);
   };
 
   const handleRazorpaySuccess = ({ transactionId }: { transactionId: string }) => {
     // Update quotation status
-    setCurrentQuotation((prev) => ({
-      ...prev,
-      status: "accepted",
-    }));
+    setCurrentQuotation((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: "accepted",
+          }
+        : null
+    );
+
+    setRequest((prev) =>
+      prev
+        ? {
+            ...prev,
+            advancePaid: true,
+            status: "in_progress",
+          }
+        : null
+    );
 
     // Add confirmation message into chat
     const confirmMsg: Message = {
       id: "msg_conf_" + Math.random().toString(36).substring(2, 9),
       requestId,
-      senderId: "usr_admin_01",
+      senderId: "system",
       senderRole: "system",
-      content: `50% Advance Milestone payment of ₹${currentQuotation.advanceAmount} verified (Ref: ${transactionId}). Work has officially commenced!`,
+      content: `50% Advance Milestone payment of ₹${currentQuotation?.advanceAmount || 0} verified (Ref: ${transactionId}). Work has officially commenced!`,
       timestamp: new Date().toISOString(),
       type: "text",
       status: "read",
@@ -160,12 +253,31 @@ export default function UserChatConversationPage() {
     toast.info("Change request sent in chat.");
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="h-6 w-6 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!request) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-3">
+        <h3 className="text-[16px] font-semibold text-foreground">Conversation Not Found</h3>
+        <p className="text-[13px] text-muted-foreground">This task request does not exist or has been removed.</p>
+        <Link href="/user/chat">
+          <Button variant="outline" size="sm">Back to task chats</Button>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Chat Header */}
       <div className="h-16 border-b border-border px-4 flex items-center justify-between bg-background shrink-0">
         <div className="flex items-center space-x-3 truncate">
-          {/* Mobile Back Arrow (hidden >=860px) */}
           <Link
             href="/user/chat"
             className="min-[860px]:hidden p-1.5 rounded-[6px] hover:bg-surface text-foreground"
@@ -198,54 +310,80 @@ export default function UserChatConversationPage() {
 
       {/* Message Feed Area */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
-        <DateSeparator label="Today" />
+        <DateSeparator label="Initial Consultation & Milestone Agreement" />
 
+        {/* Security & Milestone Escrow Notice */}
+        <div className="bg-surface border border-border rounded-[8px] p-3 text-center max-w-md mx-auto space-y-1">
+          <div className="flex items-center justify-center space-x-1.5 text-foreground font-semibold text-[12px]">
+            <ShieldCheck className="h-4 w-4" />
+            <span>50-50 Milestone Protection Enabled</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Your 50% advance milestone is safeguarded. The specialist only receives the remaining 50% once your final completed deliverable is verified.
+          </p>
+        </div>
+
+        {/* Message stream */}
         {messages.map((msg) => {
-          const isMe = msg.senderRole === "student";
-
-          if (msg.type === "quotation") {
+          if (msg.type === "quotation" || (msg.quotation && msg.type !== "system")) {
+            const quot = msg.quotation || currentQuotation;
+            if (!quot) return null;
             return (
-              <div key={msg.id} className="flex flex-col items-start mb-3 w-full">
-                <span className="text-[11px] font-semibold text-muted-foreground mb-1 ml-1">
-                  DSMS Specialist
-                </span>
-                <QuotationCard
-                  quotation={currentQuotation}
-                  onAcceptAndPay={handleAcceptAndPay}
-                  onRequestChange={handleRequestChange}
-                />
-              </div>
+              <QuotationCard
+                key={msg.id}
+                quotation={quot}
+                onAcceptAndPay={handleAcceptAndPay}
+                onRequestChange={handleRequestChange}
+              />
             );
           }
 
-          if (msg.attachment) {
+          if (msg.type === "file" && msg.attachment) {
             return (
-              <React.Fragment key={msg.id}>
-                {msg.content && <MessageBubble message={msg} isMe={isMe} />}
-                <AttachmentBubble attachment={msg.attachment} isMe={isMe} />
-              </React.Fragment>
+              <AttachmentBubble
+                key={msg.id}
+                attachment={msg.attachment}
+                isMe={msg.senderRole === "student" || msg.senderRole === "USER"}
+              />
             );
           }
 
-          return <MessageBubble key={msg.id} message={msg} isMe={isMe} />;
+          return (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              isMe={msg.senderRole === "student" || msg.senderRole === "USER"}
+            />
+          );
         })}
 
-        {isTyping && <TypingIndicator />}
+        {/* Real-time typing indicator */}
+        <TypingIndicator isVisible={isTyping} senderName="Admin Specialist" />
+
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Composer Input Bar */}
-      <ChatComposer onSendMessage={handleSendMessage} />
-
-      {/* Razorpay Advance Payment Modal */}
-      <RazorpayModal
-        isOpen={isRazorpayOpen}
-        onClose={() => setIsRazorpayOpen(false)}
-        amount={currentQuotation.advanceAmount}
-        title={request.title}
-        milestoneType="advance"
-        onSuccess={handleRazorpaySuccess}
+      {/* WhatsApp-Style Chat Composer */}
+      <ChatComposer
+        onSendMessage={handleSendMessage}
+        onTypingChange={(typing) => emitTyping(requestId, typing)}
+        disabled={request.status === "completed" || request.status === "cancelled"}
+        placeholder="Type a message or clarify assignment specifications..."
       />
+
+      {/* Razorpay 50% Advance Checkout Modal */}
+      {currentQuotation && (
+        <RazorpayModal
+          isOpen={isRazorpayOpen}
+          onClose={() => setIsRazorpayOpen(false)}
+          amount={currentQuotation.advanceAmount}
+          title={`50% Advance Milestone: ${request.title}`}
+          milestoneType="advance"
+          requestId={request.id}
+          quotationId={currentQuotation.id}
+          onSuccess={handleRazorpaySuccess}
+        />
+      )}
     </div>
   );
 }

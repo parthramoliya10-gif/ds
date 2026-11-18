@@ -22,8 +22,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { mockRequests, mockQuotations, mockMessages } from "@/lib/mock-data";
 import { Request, Quotation, Message } from "@/types";
+import api from "@/lib/api/client";
+import {
+  adaptRequestToFrontend,
+  adaptQuotationToFrontend,
+  adaptMessageToFrontend,
+} from "@/lib/api/adapters";
 import { formatCurrencyINR, formatDate, isDeadlineUrgent } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -49,67 +54,49 @@ import { toast } from "sonner";
 
 export default function AdminRequestDetailPage() {
   const params = useParams();
-  const requestId = (params?.id as string) || "REQ-1001";
+  const requestId = (params?.id as string) || "";
 
-  // Lookup request
-  const baseRequest = mockRequests.find((r) => r.id === requestId) || mockRequests[0];
-  const [request, setRequest] = React.useState<Request>(baseRequest);
-
-  // Associated quotations
-  const existingQuotation = mockQuotations.find((q) => q.requestId === request.id) || {
-    id: "QT-" + request.id,
-    requestId: request.id,
-    amount: 1400,
-    advanceAmount: 700,
-    remainingAmount: 700,
-    estimatedDelivery: "Within 24 Hours",
-    status: "pending",
-    createdAt: new Date().toISOString(),
-    notes: "Complete lab manual with verified socket programs, Wireshark captures, and DTU formatting standard.",
-  };
-
-  const [quotations, setQuotations] = React.useState<Quotation[]>([
-    existingQuotation as Quotation,
-  ]);
+  const [request, setRequest] = React.useState<Request | null>(null);
+  const [quotations, setQuotations] = React.useState<Quotation[]>([]);
+  const [messages, setMessages] = React.useState<Message[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [isQuotationModalOpen, setIsQuotationModalOpen] = React.useState(false);
   const [previewFile, setPreviewFile] = React.useState<{ name: string; size: string } | null>(null);
 
-  // Embedded chat messages state
-  const initialMessages: Message[] = mockMessages[request.id] || [
-    {
-      id: "msg_admin_1",
-      requestId: request.id,
-      senderId: "usr_aarav_01",
-      senderRole: "student",
-      content: `Hello! I have submitted this task for "${request.title}". Please review the syllabus PDF attached and share quotation.`,
-      timestamp: new Date(Date.now() - 3600 * 1000 * 3).toISOString(),
-      type: "text",
-      status: "read",
-    },
-    {
-      id: "msg_admin_2",
-      requestId: request.id,
-      senderId: "usr_admin_01",
-      senderRole: "admin",
-      content: "Hi Aarav, our academic specialist is inspecting your formatting guidelines. Quotation incoming.",
-      timestamp: new Date(Date.now() - 3600 * 1000 * 2).toISOString(),
-      type: "text",
-      status: "read",
-    },
-    {
-      id: "msg_admin_3",
-      requestId: request.id,
-      senderId: "usr_admin_01",
-      senderRole: "admin",
-      content: "Official quotation prepared with verified 50-50 milestone protection.",
-      timestamp: new Date(Date.now() - 3600 * 1000).toISOString(),
-      type: "quotation",
-      status: "read",
-      quotation: existingQuotation as Quotation,
-    },
-  ];
+  React.useEffect(() => {
+    let mounted = true;
+    async function loadAdminDetail() {
+      if (!requestId) return;
+      try {
+        setLoading(true);
+        const [res, chatRes] = await Promise.allSettled([
+          api.requests.getById(requestId),
+          api.chat.getMessages(requestId),
+        ]);
 
-  const [messages, setMessages] = React.useState<Message[]>(initialMessages);
+        if (mounted) {
+          if (res.status === "fulfilled" && res.value) {
+            setRequest(adaptRequestToFrontend(res.value));
+            if (res.value.quotations && res.value.quotations.length > 0) {
+              setQuotations(res.value.quotations.map(adaptQuotationToFrontend));
+            }
+          }
+          if (chatRes.status === "fulfilled" && Array.isArray(chatRes.value?.messages)) {
+            setMessages(chatRes.value.messages.map(adaptMessageToFrontend));
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load admin request detail:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    loadAdminDetail();
+    return () => {
+      mounted = false;
+    };
+  }, [requestId]);
+
   const chatBottomRef = React.useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -120,46 +107,48 @@ export default function AdminRequestDetailPage() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = (content: string, file?: File) => {
-    const newMsg: Message = {
-      id: "msg_" + Math.random().toString(36).substring(2, 9),
-      requestId: request.id,
-      senderId: "usr_admin_01",
-      senderRole: "admin",
-      content: content || (file ? `Attached file: ${file.name}` : ""),
-      timestamp: new Date().toISOString(),
-      type: file ? "file" : "text",
-      status: "sent",
-      attachment: file
-        ? {
-            name: file.name,
-            size: `${(file.size / 1024).toFixed(1)} KB`,
-            url: "#",
-          }
-        : undefined,
-    };
+  const handleSendMessage = async (content: string, file?: File) => {
+    if (!request) return;
 
-    setMessages((prev) => [...prev, newMsg]);
+    if (file) {
+      try {
+        const formData = new FormData();
+        formData.append("content", content || `Shared file: ${file.name}`);
+        formData.append("document", file);
+        const uploaded = await api.chat.postMessage(request.id, formData);
+        if (uploaded) {
+          setMessages((prev) => [...prev, adaptMessageToFrontend(uploaded)]);
+          toast.success("Attachment sent.");
+        }
+      } catch (err: any) {
+        toast.error(err.message || "Failed to send attachment");
+      }
+      return;
+    }
 
-    setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === newMsg.id ? { ...m, status: "delivered" } : m))
-      );
-    }, 600);
+    if (!content.trim()) return;
+
+    try {
+      const sent = await api.chat.postMessage(request.id, { content, messageType: "TEXT" });
+      if (sent) {
+        setMessages((prev) => [...prev, adaptMessageToFrontend(sent)]);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send message");
+    }
   };
 
   const handleCreateQuotation = (newQuotation: Quotation) => {
     setQuotations((prev) => [newQuotation, ...prev]);
-    setRequest((prev) => ({
-      ...prev,
-      status: "quoted",
-    }));
+    if (request) {
+      setRequest((prev) => prev ? { ...prev, status: "quoted" } : null);
+    }
 
     // Post quotation into the chat feed
     const quoteMessage: Message = {
       id: "msg_quote_" + Math.random().toString(36).substring(2, 9),
-      requestId: request.id,
-      senderId: "usr_admin_01",
+      requestId: requestId,
+      senderId: "admin",
       senderRole: "admin",
       content: "New quotation dispatched to student:",
       timestamp: new Date().toISOString(),
@@ -172,21 +161,46 @@ export default function AdminRequestDetailPage() {
     toast.success(`Quotation ${newQuotation.id} created and posted to chat.`);
   };
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <Clock className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-[14px] text-muted-foreground">Loading request details...</p>
+      </div>
+    );
+  }
+
+  if (!request) {
+    return (
+      <div className="space-y-6 max-w-4xl mx-auto py-12">
+        <Link
+          href="/admin/requests"
+          className="text-[13px] text-muted-foreground hover:text-foreground inline-flex items-center"
+        >
+          <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+          Back to all requests
+        </Link>
+        <Card className="p-8 text-center border border-border">
+          <h2 className="text-xl font-bold">Request Not Found</h2>
+          <p className="text-sm text-muted-foreground mt-2">
+            The request with ID &quot;{requestId}&quot; does not exist or you do not have permission to view it.
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
   const isUrgent = isDeadlineUrgent(request.deadline);
 
   // Reference files list
-  const referenceFiles = [
-    {
-      name: `${request.subject.replace(/[^a-zA-Z0-9]/g, "_")}_Syllabus_Prompt.pdf`,
-      size: "2.4 MB",
-      type: "Assignment Prompt & Lab Tasks",
-    },
-    {
-      name: `${request.college.replace(/[^a-zA-Z0-9]/g, "_")}_Manual_Template_Format.docx`,
-      size: "820 KB",
-      type: "College Format / Font Specification",
-    },
-  ];
+  const referenceFiles = (request.files && request.files.length > 0)
+    ? request.files.map((f) => ({
+        name: f.name,
+        size: f.size,
+        type: "Uploaded Reference Document",
+        url: f.url,
+      }))
+    : [];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
@@ -297,11 +311,11 @@ export default function AdminRequestDetailPage() {
 
                 <div className="space-y-1">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
-                    Official College Email
+                    Student ID
                   </span>
-                  <span className="font-mono text-muted-foreground flex items-center">
-                    <Mail className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-                    {request.studentName.toLowerCase().replace(" ", ".")}@dtu.ac.in
+                  <span className="font-mono text-muted-foreground flex items-center text-[12px]">
+                    <User className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
+                    {request.studentId || "Student"}
                   </span>
                 </div>
               </div>
@@ -371,45 +385,49 @@ export default function AdminRequestDetailPage() {
               </div>
             </CardHeader>
             <CardContent className="p-5 space-y-3">
-              {referenceFiles.map((file, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-3 rounded-[6px] border border-border bg-surface hover:bg-surface/80 transition-colors"
-                >
-                  <div className="flex items-center space-x-3 truncate">
-                    <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
-                    <div className="truncate">
-                      <p className="text-[13px] font-medium text-foreground truncate">
-                        {file.name}
-                      </p>
-                      <span className="text-[11px] text-muted-foreground">
-                        {file.size} • {file.type}
-                      </span>
+              {referenceFiles.length === 0 ? (
+                <p className="text-[13px] text-muted-foreground italic">No reference files uploaded for this task.</p>
+              ) : (
+                referenceFiles.map((file, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-3 rounded-[6px] border border-border bg-surface hover:bg-surface/80 transition-colors"
+                  >
+                    <div className="flex items-center space-x-3 truncate">
+                      <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                      <div className="truncate">
+                        <p className="text-[13px] font-medium text-foreground truncate">
+                          {file.name}
+                        </p>
+                        <span className="text-[11px] text-muted-foreground">
+                          {file.size} • {file.type}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPreviewFile(file)}
+                        className="h-8 text-[12px] border-border"
+                      >
+                        <Eye className="h-3.5 w-3.5 mr-1" />
+                        Preview
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => toast.success(`Downloaded reference file: ${file.name}`)}
+                        className="h-8 text-[12px] border-border"
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1" />
+                        Download
+                      </Button>
                     </div>
                   </div>
-
-                  <div className="flex items-center space-x-2 shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPreviewFile(file)}
-                      className="h-8 text-[12px] border-border"
-                    >
-                      <Eye className="h-3.5 w-3.5 mr-1" />
-                      Preview
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => toast.success(`Downloaded reference file: ${file.name}`)}
-                      className="h-8 text-[12px] border-border"
-                    >
-                      <Download className="h-3.5 w-3.5 mr-1" />
-                      Download
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -435,7 +453,12 @@ export default function AdminRequestDetailPage() {
               </div>
             </CardHeader>
             <CardContent className="p-5 space-y-4">
-              {quotations.map((quote) => (
+              {quotations.length === 0 ? (
+                <p className="text-[13px] text-muted-foreground italic">
+                  No quotation issued yet. Use &quot;New Quotation&quot; to issue the first milestone breakdown.
+                </p>
+              ) : (
+                quotations.map((quote) => (
                 <div
                   key={quote.id}
                   className="p-4 rounded-[8px] border border-border bg-background space-y-3"
@@ -486,7 +509,7 @@ export default function AdminRequestDetailPage() {
                     )}
                   </div>
                 </div>
-              ))}
+              )))}
             </CardContent>
           </Card>
         </div>

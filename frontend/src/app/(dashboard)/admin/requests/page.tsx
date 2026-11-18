@@ -16,8 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { mockRequests } from "@/lib/mock-data";
 import { Request } from "@/types";
+import api from "@/lib/api/client";
+import { adaptRequestToFrontend } from "@/lib/api/adapters";
 import { formatDate, isDeadlineUrgent } from "@/lib/utils";
 import { FileText, Eye, MessageSquare, Filter } from "lucide-react";
 
@@ -25,7 +26,25 @@ export default function AdminRequestsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState("all");
   const [formatFilter, setFormatFilter] = React.useState("all");
-  const [requests] = React.useState<Request[]>(mockRequests);
+  const [requests, setRequests] = React.useState<Request[]>([]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    async function loadRequests() {
+      try {
+        const res = await api.requests.list({ limit: 100 });
+        if (mounted && res && Array.isArray(res.requests)) {
+          setRequests(res.requests.map(adaptRequestToFrontend));
+        }
+      } catch (err) {
+        console.warn("Could not load admin requests:", err);
+      }
+    }
+    loadRequests();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Filter logic
   const filteredRequests = React.useMemo(() => {

@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { ArrowRight, User, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 
 const loginSchema = z.object({
   email: z
@@ -52,7 +53,9 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormValues) => {
     setSubmitting(true);
     try {
-      await login(data.email);
+      await login(data.email, data.password);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to sign in. Please check your credentials.");
     } finally {
       setSubmitting(false);
     }
