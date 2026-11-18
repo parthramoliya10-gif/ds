@@ -4,12 +4,67 @@ import { authenticate } from '../../middlewares/auth.middleware.js';
 import { requireAdmin } from '../../middlewares/rbac.middleware.js';
 import { validateRequest } from '../../middlewares/validate.middleware.js';
 import {
+  sendOtpSchema,
+  verifyOtpSchema,
+  registerSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  establishSessionSchema,
   updateProfileSchema,
   updateRoleSchema,
   updateStatusSchema,
 } from './auth.validation.js';
 
 const router = Router();
+
+// ==========================================
+// Public Authentication Routes (Supabase Auth)
+// ==========================================
+
+// Google OAuth URL / Redirect
+router.get('/google', authController.googleLogin);
+
+// Establish HttpOnly Cookie Session (after OAuth callback)
+router.post(
+  '/session',
+  validateRequest({ body: establishSessionSchema }),
+  authController.establishSession
+);
+
+// Email OTP Login / Registration
+router.post(
+  '/otp/send',
+  validateRequest({ body: sendOtpSchema }),
+  authController.sendOtp
+);
+router.post(
+  '/otp/verify',
+  validateRequest({ body: verifyOtpSchema }),
+  authController.verifyOtp
+);
+
+// Email & Password Registration / Login
+router.post(
+  '/register',
+  validateRequest({ body: registerSchema }),
+  authController.register
+);
+router.post(
+  '/login',
+  validateRequest({ body: loginSchema }),
+  authController.login
+);
+
+// Forgot Password (Email Link)
+router.post(
+  '/forgot-password',
+  validateRequest({ body: forgotPasswordSchema }),
+  authController.forgotPassword
+);
+
+// Refresh Session & Logout
+router.post('/refresh', authController.refresh);
+router.post('/logout', authController.logout);
 
 // ==========================================
 // User Profile Routes (Authenticated)
