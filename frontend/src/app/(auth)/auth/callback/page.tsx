@@ -4,17 +4,70 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { ShieldCheck } from "lucide-react";
+import supabase from "@/lib/supabase/client";
+import api from "@/lib/api/client";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
 
   React.useEffect(() => {
-    // Simulate OAuth handshake then redirect to user dashboard
-    const timer = setTimeout(() => {
-      router.push("/user/dashboard");
-    }, 700);
+    let mounted = true;
 
-    return () => clearTimeout(timer);
+    async function handleAuthCallback() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get("code");
+
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error("Code exchange error:", error);
+          }
+        }
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session?.user) {
+          if (mounted) router.replace("/login");
+          return;
+        }
+
+        // Determine destination by fetching profile or checking metadata
+        let role = "student";
+        try {
+          const profile = await api.auth.getMe();
+          if (profile?.role?.toUpperCase() === "ADMIN") {
+            role = "admin";
+          }
+        } catch {
+          const metaRole = (
+            session.user.user_metadata?.role ||
+            session.user.app_metadata?.role ||
+            ""
+          ).toLowerCase();
+          if (metaRole === "admin") role = "admin";
+        }
+
+        if (mounted) {
+          if (role === "admin") {
+            router.replace("/admin/dashboard");
+          } else {
+            router.replace("/user/dashboard");
+          }
+        }
+      } catch (err) {
+        console.error("Auth callback error:", err);
+        if (mounted) router.replace("/login");
+      }
+    }
+
+    handleAuthCallback();
+
+    return () => {
+      mounted = false;
+    };
   }, [router]);
 
   return (
