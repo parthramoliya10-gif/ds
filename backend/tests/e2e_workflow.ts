@@ -7,59 +7,57 @@ import documentService from '../src/modules/documents/document.service.js';
 import adminService from '../src/modules/admin/admin.service.js';
 import razorpay from '../src/config/razorpay.js';
 import env from '../src/config/env.js';
-import { Role, RequestStatus, PaymentMilestone, PaymentStatus, MessageStatus } from '@prisma/client';
+import { Role, PaymentMilestone } from '@prisma/client';
 import crypto from 'crypto';
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function runEndToEndVerification() {
   console.log('\n=============================================================');
   console.log('🚀 STARTING COMPREHENSIVE END-TO-END SYSTEM VERIFICATION');
   console.log('=============================================================\n');
 
-  // Test User UUIDs (RFC4122 v4)
+  // Test User & Admin UUIDs (RFC4122 v4)
   const testUserId = '00000000-0000-4000-8000-000000000001';
   const testAdminId = '00000000-0000-4000-8000-000000000002';
   const userAId = '00000000-0000-4000-8000-000000000003';
 
   try {
     // -------------------------------------------------------------
-    // STEP 1: Setup Test Profiles in PostgreSQL Database
+    // STEP 1: Setup Separate User & Admin Records in PostgreSQL
     // -------------------------------------------------------------
-    console.log('🔹 STEP 1: Initializing Test Profiles...');
-    await prisma.profile.upsert({
+    console.log('🔹 STEP 1: Initializing Test Users (users table) & Admin (admins table)...');
+    await prisma.user.upsert({
       where: { id: testUserId },
       update: {},
       create: {
         id: testUserId,
         email: 'e2e_user@example.com',
         fullName: 'Test Customer',
-        role: Role.USER,
       },
     });
 
-    await prisma.profile.upsert({
+    await prisma.admin.upsert({
       where: { id: testAdminId },
       update: {},
       create: {
         id: testAdminId,
         email: 'e2e_admin@example.com',
         fullName: 'Test Admin Manager',
-        role: Role.ADMIN,
+        department: 'Legal Operations',
+        isSuperAdmin: true,
+        isActive: true,
       },
     });
 
-    await prisma.profile.upsert({
+    await prisma.user.upsert({
       where: { id: userAId },
       update: {},
       create: {
         id: userAId,
         email: 'intruder_user_a@example.com',
         fullName: 'Intruder User A',
-        role: Role.USER,
       },
     });
-    console.log('✅ Test profiles initialized in Supabase PostgreSQL.\n');
+    console.log('✅ Test users (users table) & admin (admins table) initialized in Supabase PostgreSQL.\n');
 
     // Clean up previous test requests if any
     await prisma.documentRequest.deleteMany({
@@ -274,26 +272,37 @@ async function runEndToEndVerification() {
 
     const finalOrderId = finalOrder.orderId;
     const finalPaymentId = `pay_fin_${Date.now()}`;
-    const finalSignature = crypto
-      .createHmac('sha256', env.RAZORPAY_KEY_SECRET)
-      .update(`${finalOrderId}|${finalPaymentId}`)
+
+    // Verify Milestone 2 via Server-to-Server Razorpay Webhook (plus duplicate replay idempotency)
+    const webhookBody = JSON.stringify({
+      event: 'payment.captured',
+      payload: {
+        payment: {
+          entity: {
+            id: finalPaymentId,
+            order_id: finalOrderId,
+            amount: quotation.remainingAmount,
+            status: 'captured',
+          },
+        },
+      },
+    });
+    const webhookSig = crypto
+      .createHmac('sha256', env.RAZORPAY_WEBHOOK_SECRET)
+      .update(webhookBody)
       .digest('hex');
 
-    razorpay.payments.fetch = (async (id: string) => ({
-      id,
-      amount: quotation.remainingAmount,
-      status: 'captured',
-    })) as any;
+    await paymentService.processWebhook(webhookBody, webhookSig);
+    // Replay exact same webhook event to verify duplicate-event idempotency
+    const replayRes = await paymentService.processWebhook(webhookBody, webhookSig);
+    console.log(`✅ Webhook Replay Idempotency Check: ${JSON.stringify(replayRes)}`);
 
-    const finalVerification = await paymentService.verifyPayment(testUserId, {
-      razorpayOrderId: finalOrderId,
-      razorpayPaymentId: finalPaymentId,
-      razorpaySignature: finalSignature,
-    });
-
-    console.log(`✅ Milestone 2 Payment Status: ${finalVerification.payment.status} (SUCCESS)`);
-    console.log(`✅ Request Status transitioned to: ${finalVerification.requestStatus} (COMPLETED)`);
-    console.log(`✅ Is Download Unlocked: ${finalVerification.isDownloadUnlocked} (TRUE - 100% PAID!)\n`);
+    const reqAfterFinal = await prisma.documentRequest.findUnique({ where: { id: newRequest.id } });
+    if (!reqAfterFinal?.isDownloadUnlocked) {
+      throw new Error('Expected download to be unlocked after Milestone 2 webhook!');
+    }
+    console.log(`✅ Request Status transitioned to: ${reqAfterFinal.status} (COMPLETED)`);
+    console.log(`✅ Is Download Unlocked: ${reqAfterFinal.isDownloadUnlocked} (TRUE - 100% PAID!)\n`);
 
     // -------------------------------------------------------------
     // STEP 11: Download Gatekeeper AFTER 100% Payment (Download Enabled!)
@@ -304,7 +313,12 @@ async function runEndToEndVerification() {
       { id: testUserId, email: 'e2e_user@example.com', role: Role.USER, isBlocked: false }
     );
 
-    console.log(`✅ Download Granted!`);
+    const downloadRes = await fetch(downloadPayload.downloadUrl);
+    if (downloadRes.status !== 200) {
+      throw new Error(`Signed Cloudinary download URL failed with HTTP ${downloadRes.status}!`);
+    }
+
+    console.log(`✅ Download Granted & Verified Live HTTP ${downloadRes.status} OK!`);
     console.log(`✅ Signed Download URL generated (valid for ${downloadPayload.expiresInSeconds}s):`);
     console.log(`   ${downloadPayload.downloadUrl.slice(0, 80)}...`);
     console.log(`✅ File Name: ${downloadPayload.fileName}`);

@@ -15,6 +15,23 @@ export interface PostMessageInput {
   metadata?: any;
 }
 
+const formatMessageSender = (msg: any) => {
+  const { userSender, adminSender, ...rest } = msg;
+  const sender =
+    msg.senderRole === Role.ADMIN
+      ? adminSender
+        ? { ...adminSender, role: Role.ADMIN }
+        : null
+      : userSender
+      ? { ...userSender, role: Role.USER }
+      : null;
+
+  return {
+    ...rest,
+    sender,
+  };
+};
+
 export class ChatService {
   /**
    * Fetch conversation messages for a request with strict authorization
@@ -57,12 +74,18 @@ export class ChatService {
       ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
       orderBy: { createdAt: 'desc' },
       include: {
-        sender: {
+        userSender: {
           select: {
             id: true,
             fullName: true,
             avatarUrl: true,
-            role: true,
+          },
+        },
+        adminSender: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
           },
         },
       },
@@ -70,11 +93,13 @@ export class ChatService {
 
     const hasMore = messages.length > limit;
     const items = hasMore ? messages.slice(0, limit) : messages;
+    // Capture cursor of the oldest message in this batch BEFORE reversing!
+    const nextCursor = hasMore ? items[items.length - 1].id : null;
 
     return {
       conversationId: conversation.id,
-      messages: items.reverse(), // chronologically ordered (oldest to newest)
-      nextCursor: hasMore ? items[items.length - 1].id : null,
+      messages: [...items].reverse().map(formatMessageSender), // chronologically ordered (oldest to newest)
+      nextCursor,
     };
   }
 
@@ -133,43 +158,61 @@ export class ChatService {
         conversationId: conversation.id,
         senderId: user.id,
         senderRole: user.role,
+        ...(user.role === Role.ADMIN
+          ? { adminSenderId: user.id }
+          : { userSenderId: user.id }),
         messageType,
         content: data.content || (file ? `Shared a file: ${file.originalname}` : ''),
         metadata,
         status: MessageStatus.SENT,
       },
       include: {
-        sender: {
+        userSender: {
           select: {
             id: true,
             fullName: true,
             avatarUrl: true,
-            role: true,
+          },
+        },
+        adminSender: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
           },
         },
       },
     });
 
-    return message;
+    return formatMessageSender(message);
   }
 
   /**
    * Mark all unread messages in conversation as READ (WhatsApp blue ticks)
+   * Enforces strict ownership / admin authorization
    */
-  async markMessagesAsRead(userId: string, requestId: string) {
-    const conversation = await prisma.conversation.findUnique({
-      where: { requestId },
-      select: { id: true },
+  async markMessagesAsRead(userId: string, requestId: string, userRole?: Role) {
+    const request = await prisma.documentRequest.findUnique({
+      where: { id: requestId },
+      select: { userId: true, conversation: { select: { id: true } } },
     });
 
-    if (!conversation) {
+    if (!request || !request.conversation) {
       return { count: 0 };
+    }
+
+    const isAdmin =
+      userRole === Role.ADMIN ||
+      (userRole === undefined && Boolean(await prisma.admin.findUnique({ where: { id: userId } })));
+
+    if (!isAdmin && request.userId !== userId) {
+      throw new ApiError(403, 'Forbidden: You cannot modify read status for this conversation.');
     }
 
     // Mark messages as READ if sender is NOT the current user
     const result = await prisma.message.updateMany({
       where: {
-        conversationId: conversation.id,
+        conversationId: request.conversation.id,
         senderId: { not: userId },
         status: { in: [MessageStatus.SENT, MessageStatus.DELIVERED] },
       },

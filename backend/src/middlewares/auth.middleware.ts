@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { Role } from '@prisma/client';
 import env from '../config/env.js';
 import prisma from '../config/prisma.js';
 import { supabaseAdmin } from '../config/supabase.js';
@@ -51,8 +52,7 @@ export const authenticate = async (
       userId = decoded.sub;
       email = decoded.email;
     } catch (jwtErr) {
-      // If local secret verification fails (e.g., algorithm mismatch or new key),
-      // verify using Supabase Admin Auth API
+      // Fallback to Supabase Admin Auth API
       const { data: authUser, error: authError } = await supabaseAdmin.auth.getUser(token);
       if (authError || !authUser?.user) {
         throw new ApiError(401, 'Invalid or expired session. Please log in again.');
@@ -65,41 +65,62 @@ export const authenticate = async (
       throw new ApiError(401, 'Invalid token payload: user identifier missing.');
     }
 
-    // 4. Fetch user profile from database
-    let profile = await prisma.profile.findUnique({
+    // 4. First check separate Admins table
+    const admin = await prisma.admin.findUnique({
       where: { id: userId },
     });
 
-    // Failsafe: If profile doesn't exist yet, fetch details from Supabase Auth and create it
-    if (!profile) {
+    if (admin) {
+      if (!admin.isActive) {
+        throw new ApiError(403, 'Admin account has been deactivated. Contact super admin.');
+      }
+
+      req.user = {
+        id: admin.id,
+        email: admin.email,
+        role: Role.ADMIN,
+        fullName: admin.fullName,
+        avatarUrl: admin.avatarUrl,
+        isBlocked: !admin.isActive,
+      } as AuthenticatedUser;
+
+      return next();
+    }
+
+    // 5. Otherwise check separate Users table
+    let user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    // Failsafe: If user record doesn't exist yet, fetch details from Supabase Auth and create in users table
+    if (!user) {
       const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
       const userMeta = authUser?.user?.user_metadata || {};
 
-      profile = await prisma.profile.create({
+      user = await prisma.user.create({
         data: {
           id: userId,
           email: email || authUser?.user?.email || '',
           fullName: userMeta.full_name || userMeta.name || null,
-          avatarUrl: userMeta.avatar_url || null,
-          role: 'USER',
+          avatarUrl: userMeta.avatar_url || userMeta.picture || null,
           isBlocked: false,
         },
       });
     }
 
-    // 5. Check if user is blocked by admin
-    if (profile.isBlocked) {
+    // 6. Check if user is blocked by admin
+    if (user.isBlocked) {
       throw new ApiError(403, 'Your account has been suspended. Please contact support.');
     }
 
-    // 6. Attach authenticated user to Express request
+    // 7. Attach authenticated user to Express request
     req.user = {
-      id: profile.id,
-      email: profile.email,
-      role: profile.role,
-      fullName: profile.fullName,
-      avatarUrl: profile.avatarUrl,
-      isBlocked: profile.isBlocked,
+      id: user.id,
+      email: user.email,
+      role: Role.USER,
+      fullName: user.fullName,
+      avatarUrl: user.avatarUrl,
+      isBlocked: user.isBlocked,
     } as AuthenticatedUser;
 
     next();

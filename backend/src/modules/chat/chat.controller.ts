@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import chatService from './chat.service.js';
 import { sendResponse } from '../../utils/apiResponse.js';
 import { ApiError } from '../../utils/apiError.js';
+import { emitToRequestRoom } from '../../sockets/socket.server.js';
+import SOCKET_EVENTS from '../../constants/socketEvents.js';
 
 export class ChatController {
   /**
@@ -48,6 +50,9 @@ export class ChatController {
       const file = req.file as Express.Multer.File | undefined;
       const message = await chatService.postMessage(req.user, requestId, req.body, file);
 
+      // Broadcast to active Socket.IO room so clients see REST/file messages live
+      emitToRequestRoom(requestId, SOCKET_EVENTS.NEW_MESSAGE, message);
+
       sendResponse({
         res,
         statusCode: 201,
@@ -70,7 +75,15 @@ export class ChatController {
       }
 
       const requestId = req.params.requestId as string;
-      const result = await chatService.markMessagesAsRead(req.user.id, requestId);
+      const result = await chatService.markMessagesAsRead(req.user.id, requestId, req.user.role);
+
+      if (result.count > 0) {
+        emitToRequestRoom(requestId, SOCKET_EVENTS.MESSAGES_READ, {
+          requestId,
+          readerId: req.user.id,
+          readAt: new Date(),
+        });
+      }
 
       sendResponse({
         res,
