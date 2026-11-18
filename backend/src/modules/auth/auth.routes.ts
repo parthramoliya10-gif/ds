@@ -10,10 +10,10 @@ import {
   loginSchema,
   forgotPasswordSchema,
   establishSessionSchema,
-  updateProfileSchema,
   updateRoleSchema,
   updateStatusSchema,
 } from './auth.validation.js';
+import { updateProfileSchema } from '../profile/profile.validation.js';
 
 const router = Router();
 

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import authService from './auth.service.js';
+import profileService from '../profile/profile.service.js';
 import env from '../../config/env.js';
 import { sendResponse } from '../../utils/apiResponse.js';
 import { ApiError } from '../../utils/apiError.js';
@@ -253,7 +254,7 @@ export class AuthController {
       if (!req.user) {
         throw new ApiError(401, 'Unauthorized');
       }
-      const profile = await authService.getProfile(req.user.id, req.user.role);
+      const profile = await profileService.getMyProfile(req.user.id, req.user.role);
       sendResponse({
         res,
         statusCode: 200,
@@ -270,7 +271,7 @@ export class AuthController {
       if (!req.user) {
         throw new ApiError(401, 'Unauthorized');
       }
-      const updated = await authService.updateProfile(req.user.id, req.user.role, req.body);
+      const updated = await profileService.updateMyProfile(req.user.id, req.user.role, req.body);
       sendResponse({
         res,
         statusCode: 200,
