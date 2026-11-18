@@ -144,7 +144,7 @@ export default function AdminPaymentsPage() {
   );
 
   const handleExportCSV = () => {
-    const csvHeader = "Transaction ID,Request ID,Task Title,Student,Milestone,Amount (INR),Status,Date\n";
+    const csvHeader = "Transaction ID,Request ID,Task Title,Student,Milestone,Amount (USD),Status,Date\n";
     const csvRows = payments
       .map(
         (t) =>
@@ -216,16 +216,16 @@ export default function AdminPaymentsPage() {
 
       {/* Main Tabs Section */}
       <Card className="rounded-[8px] border border-border bg-background shadow-none">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="p-4 sm:p-5 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <TabsList className="bg-surface border border-border h-9">
-              <TabsTrigger value="history" className="text-[13px]">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-full min-w-0">
+          <div className="p-4 sm:p-5 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4 min-w-0">
+            <TabsList className="bg-surface border border-border h-10 max-w-full flex items-center justify-start overflow-x-auto no-scrollbar">
+              <TabsTrigger value="history" className="text-[13px] px-3 shrink-0">
                 Transaction History ({payments.length})
               </TabsTrigger>
-              <TabsTrigger value="quotations" className="text-[13px]">
+              <TabsTrigger value="quotations" className="text-[13px] px-3 shrink-0">
                 Quotations Table ({quotations.length})
               </TabsTrigger>
-              <TabsTrigger value="milestones" className="text-[13px]">
+              <TabsTrigger value="milestones" className="text-[13px] px-3 shrink-0">
                 Milestone Status Per Request
               </TabsTrigger>
             </TabsList>

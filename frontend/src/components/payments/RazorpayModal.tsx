@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatCurrencyINR } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import {
   ShieldCheck,
   CheckCircle2,
@@ -45,8 +45,8 @@ export function RazorpayModal({
   quotationId,
   onSuccess,
 }: RazorpayModalProps) {
-  const [activeTab, setActiveTab] = React.useState("upi");
-  const [upiId, setUpiId] = React.useState("aarav@okhdfcbank");
+  const [activeTab, setActiveTab] = React.useState("card");
+  const [upiId, setUpiId] = React.useState("");
   const [status, setStatus] = React.useState<"idle" | "processing" | "success" | "failure">("idle");
   const [simulateFail, setSimulateFail] = React.useState(false);
   const [transactionId, setTransactionId] = React.useState("");
@@ -109,7 +109,7 @@ export function RazorpayModal({
           <div className="text-right">
             <span className="text-[10px] text-background/80 block uppercase tracking-wider">To Pay</span>
             <span className="text-[18px] font-bold tracking-tight">
-              {formatCurrencyINR(amount)}
+              {formatCurrency(amount)}
             </span>
           </div>
         </div>
@@ -155,7 +155,7 @@ export function RazorpayModal({
                   {["Google Pay", "PhonePe", "Paytm"].map((app) => (
                     <div
                       key={app}
-                      onClick={() => setUpiId(`aarav@${app.toLowerCase().replace(" ", "")}`)}
+                      onClick={() => setUpiId(`user@${app.toLowerCase().replace(" ", "")}`)}
                       className="p-2 rounded-[6px] border border-border hover:bg-surface text-[12px] font-medium cursor-pointer transition-colors"
                     >
                       {app}
@@ -220,7 +220,7 @@ export function RazorpayModal({
               onClick={handlePay}
               className="w-full h-10 font-semibold text-[14px]"
             >
-              Pay {formatCurrencyINR(amount)} Securely
+              Pay {formatCurrency(amount)} Securely
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
@@ -235,7 +235,7 @@ export function RazorpayModal({
                 Authorizing with bank...
               </h4>
               <p className="text-[12px] text-muted-foreground">
-                Processing {formatCurrencyINR(amount)} via Razorpay Gateway
+                Processing {formatCurrency(amount)} via Razorpay Gateway
               </p>
             </div>
           </div>

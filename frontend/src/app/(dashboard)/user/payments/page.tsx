@@ -16,7 +16,7 @@ import { adaptPaymentToFrontend, adaptRequestToFrontend } from "@/lib/api/adapte
 import { formatCurrencyINR, formatDate } from "@/lib/utils";
 import {
   CreditCard,
-  IndianRupee,
+  DollarSign,
   Download,
   Receipt,
   CheckCircle2,
@@ -167,7 +167,7 @@ export default function UserPaymentsPage() {
         <StatCard
           label="Balance Due"
           value={formatCurrencyINR(totalOutstanding)}
-          icon={<IndianRupee className="h-4 w-4" />}
+          icon={<DollarSign className="h-4 w-4" />}
           helperText="Payable to unlock ready documents"
         />
       </div>

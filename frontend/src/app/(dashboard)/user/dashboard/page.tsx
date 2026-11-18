@@ -27,7 +27,7 @@ import {
   Clock,
   CheckCircle2,
   Hourglass,
-  IndianRupee,
+  DollarSign,
   MessageSquare,
   ArrowRight,
   Plus,
@@ -247,11 +247,11 @@ export default function UserDashboardPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <span className="text-[12px] text-muted-foreground font-mono block">
-              {user?.college || "Delhi Technological University"}
+              {user?.college || "University Student Portal"}
             </span>
 
             <h1 className="text-[26px] font-bold tracking-tight text-foreground">
-              Welcome back, {user?.name || "Aarav Sharma"}!
+              Welcome back, {user?.name || "Student"}!
             </h1>
 
             <p className="text-[14px] text-muted-foreground max-w-2xl leading-relaxed">
@@ -559,7 +559,7 @@ export default function UserDashboardPage() {
               Escrow Balance
             </span>
             <div className="h-8 w-8 rounded-[8px] bg-surface border border-border flex items-center justify-center text-foreground">
-              <IndianRupee className="h-4 w-4" />
+              <DollarSign className="h-4 w-4" />
             </div>
           </div>
           <div className="text-[28px] font-bold tracking-tight text-foreground">
@@ -572,8 +572,8 @@ export default function UserDashboardPage() {
       </div>
 
       {/* 5. Recent Requests Hub (Search, Filter Tabs, Dual View) */}
-      <Card className="border border-border bg-background rounded-[10px] p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <Card className="border border-border bg-background rounded-[10px] p-4 sm:p-6 overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
             <h3 className="text-[18px] font-semibold text-foreground tracking-tight">
               My Academic Requests
@@ -583,9 +583,9 @@ export default function UserDashboardPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between sm:justify-start gap-2">
             {/* View Mode Toggle */}
-            <div className="flex items-center border border-border rounded-[8px] p-0.5 bg-surface">
+            <div className="flex items-center border border-border rounded-[8px] p-0.5 bg-surface shrink-0">
               <button
                 type="button"
                 onClick={() => setViewMode("cards")}
@@ -612,7 +612,7 @@ export default function UserDashboardPage() {
               </button>
             </div>
 
-            <Link href="/user/requests">
+            <Link href="/user/requests" className="shrink-0">
               <Button variant="outline" size="sm" className="h-8 text-[12px] border-border text-foreground hover:bg-surface">
                 View All ({requests.length})
                 <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
@@ -622,28 +622,28 @@ export default function UserDashboardPage() {
         </div>
 
         {/* Filter Controls: Tabs & Search Input */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
-            <TabsList className="h-9 border border-border bg-surface p-1">
-              <TabsTrigger value="all" className="text-[12px] px-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 min-w-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto max-w-full min-w-0">
+            <TabsList className="w-full sm:w-auto max-w-full flex items-center justify-start overflow-x-auto no-scrollbar h-10 border border-border bg-surface p-1">
+              <TabsTrigger value="all" className="text-[12px] px-3 shrink-0">
                 All ({requests.length})
               </TabsTrigger>
-              <TabsTrigger value="in_progress" className="text-[12px] px-3">
+              <TabsTrigger value="in_progress" className="text-[12px] px-3 shrink-0">
                 In Progress ({inProgressCount})
               </TabsTrigger>
-              <TabsTrigger value="ready" className="text-[12px] px-3">
+              <TabsTrigger value="ready" className="text-[12px] px-3 shrink-0">
                 Ready to Unlock ({readyCount})
               </TabsTrigger>
-              <TabsTrigger value="quoted" className="text-[12px] px-3">
+              <TabsTrigger value="quoted" className="text-[12px] px-3 shrink-0">
                 Pending Quote
               </TabsTrigger>
-              <TabsTrigger value="completed" className="text-[12px] px-3">
+              <TabsTrigger value="completed" className="text-[12px] px-3 shrink-0">
                 Completed ({completedCount})
               </TabsTrigger>
             </TabsList>
           </Tabs>
 
-          <div className="relative w-full sm:w-72">
+          <div className="relative w-full sm:w-72 shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               type="text"

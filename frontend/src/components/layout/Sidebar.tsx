@@ -109,12 +109,12 @@ export function Sidebar({ role = "student" }: SidebarProps) {
               {user?.name
                 ?.split(" ")
                 .map((n) => n[0])
-                .join("") || (role === "admin" ? "AD" : "AS")}
+                .join("") || (role === "admin" ? "AD" : "ST")}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-[14px] font-semibold text-foreground truncate leading-tight">
-              {user?.name || (role === "admin" ? "Admin" : "Aarav Sharma")}
+              {user?.name || (role === "admin" ? "Admin" : "Student")}
             </p>
             <div className="flex items-center mt-1">
               <Badge

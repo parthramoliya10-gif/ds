@@ -152,7 +152,7 @@ export default function UserChatConversationPage() {
     const newMsg: Message = {
       id: tempId,
       requestId,
-      senderId: user?.id || "usr_aarav_01",
+      senderId: user?.id || "student_user",
       senderRole: "student",
       content: content || (file ? `Uploaded reference file: ${file.name}` : ""),
       timestamp: new Date().toISOString(),
@@ -238,7 +238,7 @@ export default function UserChatConversationPage() {
       requestId,
       senderId: "system",
       senderRole: "system",
-      content: `50% Advance Milestone payment of ₹${currentQuotation?.advanceAmount || 0} verified (Ref: ${transactionId}). Work has officially commenced!`,
+      content: `50% Advance Milestone payment of $${currentQuotation?.advanceAmount || 0} verified (Ref: ${transactionId}). Work has officially commenced!`,
       timestamp: new Date().toISOString(),
       type: "text",
       status: "read",

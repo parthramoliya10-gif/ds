@@ -167,12 +167,12 @@ export default function UserRequestsListPage() {
       {/* Status Filter Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
-          <TabsList className="h-10 border border-border bg-surface p-1">
-            <TabsTrigger value="all" className="text-[12px]">All ({requests.length})</TabsTrigger>
-            <TabsTrigger value="in_progress" className="text-[12px]">In Progress</TabsTrigger>
-            <TabsTrigger value="pending" className="text-[12px]">Pending Quote</TabsTrigger>
-            <TabsTrigger value="ready" className="text-[12px]">Ready for Download</TabsTrigger>
-            <TabsTrigger value="completed" className="text-[12px]">Completed</TabsTrigger>
+          <TabsList className="h-10 border border-border bg-surface p-1 overflow-x-auto no-scrollbar max-w-full">
+            <TabsTrigger value="all" className="text-[12px] shrink-0">All ({requests.length})</TabsTrigger>
+            <TabsTrigger value="in_progress" className="text-[12px] shrink-0">In Progress</TabsTrigger>
+            <TabsTrigger value="pending" className="text-[12px] shrink-0">Pending Quote</TabsTrigger>
+            <TabsTrigger value="ready" className="text-[12px] shrink-0">Ready for Download</TabsTrigger>
+            <TabsTrigger value="completed" className="text-[12px] shrink-0">Completed</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

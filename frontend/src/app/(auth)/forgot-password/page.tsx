@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
   } = useForm<ForgotFormValues>({
     resolver: zodResolver(forgotSchema),
     defaultValues: {
-      email: "aarav.sharma@dtu.ac.in",
+      email: "",
     },
   });
 
@@ -68,7 +68,7 @@ export default function ForgotPasswordPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="aarav.sharma@dtu.ac.in"
+                  placeholder="name@university.edu"
                   {...register("email")}
                   className={errors.email ? "border-foreground" : ""}
                   aria-invalid={Boolean(errors.email)}

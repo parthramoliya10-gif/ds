@@ -92,7 +92,7 @@ export default function LoginPage() {
             <Input
               id="email"
               type="email"
-              placeholder="aarav.sharma@dtu.ac.in"
+              placeholder="name@university.edu"
               {...register("email")}
               className={errors.email ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.email)}

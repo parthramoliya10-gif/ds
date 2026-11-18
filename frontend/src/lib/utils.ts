@@ -5,13 +5,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrencyINR(amount: number): string {
-  return new Intl.NumberFormat("en-IN", {
+export function formatCurrencyUSD(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "INR",
+    currency: "USD",
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(amount || 0);
 }
+
+export const formatCurrency = formatCurrencyUSD;
+export const formatCurrencyINR = formatCurrencyUSD;
 
 export function formatDate(dateString: string): string {
   const date = new Date(dateString);

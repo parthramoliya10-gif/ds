@@ -116,7 +116,7 @@ export function CreateQuotationModal({
           {/* Total Amount Input */}
           <div className="space-y-1.5">
             <Label htmlFor="quotationAmount" className="text-[13px]">
-              Total Quotation Amount (INR ₹)
+              Total Quotation Amount (USD $)
             </Label>
             <Input
               id="quotationAmount"

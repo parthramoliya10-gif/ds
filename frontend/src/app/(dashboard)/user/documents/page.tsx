@@ -96,12 +96,12 @@ export default function UserDocumentsPage() {
       />
 
       {/* Tabs */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <Tabs value={filter} onValueChange={setFilter} className="w-full sm:w-auto">
-          <TabsList className="h-10 border border-border bg-surface p-1">
-            <TabsTrigger value="all" className="text-[12px]">All Files ({documents.length})</TabsTrigger>
-            <TabsTrigger value="unlocked" className="text-[12px]">Unlocked ({documents.filter((d) => !d.isLocked).length})</TabsTrigger>
-            <TabsTrigger value="locked" className="text-[12px]">Locked ({documents.filter((d) => d.isLocked).length})</TabsTrigger>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 min-w-0">
+        <Tabs value={filter} onValueChange={setFilter} className="w-full sm:w-auto max-w-full min-w-0">
+          <TabsList className="w-full sm:w-auto max-w-full flex items-center justify-start overflow-x-auto no-scrollbar h-10 border border-border bg-surface p-1">
+            <TabsTrigger value="all" className="text-[12px] px-3 shrink-0">All Files ({documents.length})</TabsTrigger>
+            <TabsTrigger value="unlocked" className="text-[12px] px-3 shrink-0">Unlocked ({documents.filter((d) => !d.isLocked).length})</TabsTrigger>
+            <TabsTrigger value="locked" className="text-[12px] px-3 shrink-0">Locked ({documents.filter((d) => d.isLocked).length})</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

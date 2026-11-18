@@ -101,7 +101,7 @@ export function ContactForm() {
           </Label>
           <Input
             id="fullName"
-            placeholder="e.g. Aarav Sharma"
+            placeholder="Enter your full name"
             {...register("fullName")}
             className="h-10 text-[14px] bg-background border-border"
           />
@@ -120,7 +120,7 @@ export function ContactForm() {
           <Input
             id="collegeEmail"
             type="email"
-            placeholder="aarav@dtu.ac.in"
+            placeholder="name@university.edu"
             {...register("collegeEmail")}
             className="h-10 text-[14px] bg-background border-border"
           />

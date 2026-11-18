@@ -124,7 +124,7 @@ export default function VerifyOtpPage() {
         </CardTitle>
         <CardDescription className="text-[14px] text-muted-foreground">
           We sent a 6-digit confirmation code to{" "}
-          <span className="font-semibold text-foreground">aarav.sharma@dtu.ac.in</span>
+          <span className="font-semibold text-foreground">your registered email</span>
         </CardDescription>
       </CardHeader>
 

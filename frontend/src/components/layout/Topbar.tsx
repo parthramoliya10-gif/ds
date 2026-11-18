@@ -59,12 +59,19 @@ export function Topbar({ title, role = "student" }: TopbarProps) {
       {/* Right Actions: New Request + Notifications + ThemeToggle */}
       <div className="flex items-center space-x-2.5">
         {role === "student" && (
-          <Link href="/user/requests/new" className="hidden sm:inline-flex">
-            <Button size="sm" className="h-9 px-3.5 text-[13px] font-medium rounded-[8px]">
-              <Plus className="h-4 w-4 mr-1.5" />
-              New Request
-            </Button>
-          </Link>
+          <>
+            <Link href="/user/requests/new" className="hidden sm:inline-flex">
+              <Button size="sm" className="h-9 px-3.5 text-[13px] font-medium rounded-[8px]">
+                <Plus className="h-4 w-4 mr-1.5" />
+                New Request
+              </Button>
+            </Link>
+            <Link href="/user/requests/new" className="sm:hidden inline-flex">
+              <Button size="icon" className="h-9 w-9 rounded-[8px]" aria-label="Create new request">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </Link>
+          </>
         )}
         {/* Notification Bell */}
         <Popover>

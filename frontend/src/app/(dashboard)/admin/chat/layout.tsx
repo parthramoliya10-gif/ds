@@ -53,8 +53,8 @@ export default function AdminChatLayout({
       {/* Conversation List Sidebar */}
       <div
         className={cn(
-          "w-full sm:w-80 md:w-96 border-r border-border flex flex-col bg-background shrink-0",
-          isDetailView && "hidden sm:flex"
+          "w-full min-[860px]:w-80 md:w-96 border-r border-border flex flex-col bg-background shrink-0",
+          isDetailView && "hidden min-[860px]:flex"
         )}
       >
         <div className="p-3 border-b border-border">
@@ -110,7 +110,7 @@ export default function AdminChatLayout({
       <div
         className={cn(
           "flex-1 flex flex-col bg-surface/30 min-w-0",
-          !isDetailView && "hidden sm:flex"
+          !isDetailView && "hidden min-[860px]:flex"
         )}
       >
         {children}

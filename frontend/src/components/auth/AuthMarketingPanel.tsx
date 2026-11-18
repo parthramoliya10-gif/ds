@@ -56,7 +56,7 @@ export function AuthMarketingPanel() {
               Milestone Quotation
             </span>
             <span className="text-[20px] font-bold text-white tracking-tight">
-              ₹900
+              $900
             </span>
           </div>
 
@@ -66,12 +66,12 @@ export function AuthMarketingPanel() {
                 <Check className="h-3.5 w-3.5 mr-1.5 stroke-[3] text-white" />
                 50% Advance Milestone
               </span>
-              <span className="font-semibold text-white">₹450 Paid</span>
+              <span className="font-semibold text-white">$450 Paid</span>
             </div>
 
             <div className="flex items-center justify-between text-[12px] p-2 rounded-[6px] border border-dashed border-white/20 text-[#A3A3A3]">
               <span>50% Balance (Unlocks Download)</span>
-              <span className="font-semibold text-white">₹450 Due</span>
+              <span className="font-semibold text-white">$450 Due</span>
             </div>
           </div>
 

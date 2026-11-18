@@ -39,8 +39,15 @@ export function MobileTabBar({ role = "student" }: MobileTabBarProps) {
 
   const tabs = role === "admin" ? adminTabs : userTabs;
 
+  // Hide mobile tab bar inside active chat rooms to let the chat composer take 100% of mobile screen
+  const isChatRoom =
+    (pathname.startsWith("/user/chat/") && pathname !== "/user/chat") ||
+    (pathname.startsWith("/admin/chat/") && pathname !== "/admin/chat");
+
+  if (isChatRoom) return null;
+
   return (
-    <nav className="min-[860px]:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border px-2 py-1 flex items-center justify-around h-16">
+    <nav className="min-[860px]:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border px-2 py-1 flex items-center justify-around h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)]">
       {tabs.map((tab) => {
         const isActive =
           pathname === tab.href ||

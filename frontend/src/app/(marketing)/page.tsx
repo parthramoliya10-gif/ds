@@ -1,22 +1,21 @@
 import * as React from "react";
 import { Metadata } from "next";
 import { HeroSection } from "@/components/marketing/HeroSection";
-import { TrustStats } from "@/components/marketing/TrustStats";
-import { ServicesGrid } from "@/components/marketing/ServicesGrid";
-import { HowItWorksSteps } from "@/components/marketing/HowItWorksSteps";
-import { PricingEscrowNote } from "@/components/marketing/PricingEscrowNote";
-import { TestimonialsSection } from "@/components/marketing/TestimonialsSection";
+import { LiveWorkspaceSection } from "@/components/marketing/LiveWorkspaceSection";
+import { ActualFeaturesGrid } from "@/components/marketing/ActualFeaturesGrid";
+import { RealLifecycleSteps } from "@/components/marketing/RealLifecycleSteps";
+import { ChatQuotationEscrow } from "@/components/marketing/ChatQuotationEscrow";
 import { FaqAccordion } from "@/components/marketing/FaqAccordion";
 import { CtaBanner } from "@/components/marketing/CtaBanner";
 
 export const metadata: Metadata = {
-  title: "DSMS — College Document & Academic Task Management Platform",
+  title: "DSMS — Academic Document Service & Milestone Escrow Platform",
   description:
-    "India's dedicated academic service management system for college students. Get assignments, lab manuals, practical files, and project reports completed with 50-50 milestone escrow.",
+    "Document Service Management System for college students. Submit assignments, lab manuals, and practical files with typed or handwritten options, chat directly with administrators, and pay through 50-50 milestone escrow in USD ($).",
   openGraph: {
-    title: "DSMS — College Document Service Management System",
+    title: "DSMS — Document Service Management System",
     description:
-      "Handwritten or typed college tasks delivered on time. Verified code, simulated outputs, and guaranteed 50-50 milestone escrow protection.",
+      "Handwritten or typed college tasks delivered on time. Custom quotation via direct admin chat, and guaranteed 50-50 milestone escrow protection in USD ($).",
     type: "website",
     url: "https://dsms.college",
     siteName: "DSMS",
@@ -25,29 +24,26 @@ export const metadata: Metadata = {
 
 export default function MarketingLandingPage() {
   return (
-    <div className="flex flex-col items-center">
-      {/* 1. Hero Section with Bold Typography and Dual CTAs */}
+    <div className="flex flex-col items-center w-full overflow-x-hidden">
+      {/* 1. Hero Section: Obsidian Opening Screen with 3D Concentric Tunnel & Metric Bar (1 Screen) */}
       <HeroSection />
 
-      {/* 2. Trust Stats Bar */}
-      <TrustStats />
+      {/* 2. Platform Overview: Interactive Live Request & Escrow Workspace Simulator (1 Screen) */}
+      <LiveWorkspaceSection />
 
-      {/* 3. Five Core Services Grid */}
-      <ServicesGrid />
+      {/* 3. Core Capabilities: 6 Real Codebase Features in Compact Bento Grid (1 Screen) */}
+      <ActualFeaturesGrid />
 
-      {/* 4. 4-Step How It Works with Big Muted Numbers */}
-      <HowItWorksSteps />
+      {/* 4. Request Lifecycle: 4-Stage Progression (PENDING -> QUOTED -> IN_PROGRESS -> COMPLETED) (1 Screen) */}
+      <RealLifecycleSteps />
 
-      {/* 5. 50/50 Milestone Escrow Callout */}
-      <PricingEscrowNote />
+      {/* 5. Custom Quotation via Admin Chat & 50/50 Escrow Model (1 Screen) */}
+      <ChatQuotationEscrow />
 
-      {/* 6. Real Student Testimonials */}
-      <TestimonialsSection />
-
-      {/* 7. Semantic FAQ Accordion */}
+      {/* 6. Frequently Asked Questions: 2-Column Balanced FAQ (1 Screen) */}
       <FaqAccordion />
 
-      {/* 8. High-Contrast Black CTA Section */}
+      {/* 7. Standout Call to Action (1 Screen) */}
       <CtaBanner />
     </div>
   );

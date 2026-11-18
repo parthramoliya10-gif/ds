@@ -104,7 +104,7 @@ export default function RegisterPage() {
             </Label>
             <Input
               id="name"
-              placeholder="Aarav Sharma"
+              placeholder="Enter your full name"
               {...register("name")}
               className={errors.name ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.name)}
@@ -124,7 +124,7 @@ export default function RegisterPage() {
             <Input
               id="email"
               type="email"
-              placeholder="aarav.sharma@dtu.ac.in"
+              placeholder="name@university.edu"
               {...register("email")}
               className={errors.email ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.email)}

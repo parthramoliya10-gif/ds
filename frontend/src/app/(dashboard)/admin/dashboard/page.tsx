@@ -17,7 +17,7 @@ import { formatCurrencyINR, formatDate, isDeadlineUrgent } from "@/lib/utils";
 import {
   FileText,
   Clock,
-  IndianRupee,
+  DollarSign,
   AlertCircle,
   TrendingUp,
   BarChart3,
@@ -135,7 +135,7 @@ export default function AdminDashboardPage() {
         <StatCard
           label="Revenue This Month"
           value={formatCurrencyINR(revenueThisMonth)}
-          icon={<IndianRupee className="h-4 w-4" />}
+          icon={<DollarSign className="h-4 w-4" />}
           helperText="Advance deposits + completion releases"
         />
         <StatCard
@@ -157,7 +157,7 @@ export default function AdminDashboardPage() {
                 Monthly Revenue Trend
               </CardTitle>
               <CardDescription className="text-[12px] text-muted-foreground mt-0.5">
-                Gross milestone settlements (INR) over the last 6 months
+                Gross milestone settlements (USD) over the last 6 months
               </CardDescription>
             </div>
             <span className="text-[14px] font-bold text-foreground">

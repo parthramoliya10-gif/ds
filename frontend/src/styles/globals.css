@@ -24,7 +24,6 @@
 @layer base {
   * {
     border-color: var(--border);
-    box-shadow: none !important;
   }
   
   body {
@@ -59,4 +58,143 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
+}
+
+/* Hide scrollbar utility for smooth horizontal touch swipe on mobile */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ========================================================================= */
+/* LUXURY EDITORIAL ANIMATIONS                                               */
+/* ========================================================================= */
+
+@keyframes floatSmoke {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translate3d(-15px, -20px, 0) scale(1.04);
+    opacity: 0.9;
+  }
+}
+
+@keyframes tunnelBreathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.025);
+  }
+}
+
+@keyframes barcodeFlicker {
+  0%, 100% {
+    opacity: 0.75;
+  }
+  30% {
+    opacity: 0.45;
+  }
+  60% {
+    opacity: 0.95;
+  }
+  80% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes dataWirePulse {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes terminalBlink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.4;
+  }
+}
+
+.animate-float-smoke {
+  animation: floatSmoke 18s ease-in-out infinite;
+}
+
+.animate-tunnel-breathe {
+  animation: tunnelBreathe 7s ease-in-out infinite;
+}
+
+.animate-barcode-flicker {
+  animation: barcodeFlicker 4s steps(4) infinite;
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 32s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+.animate-terminal-blink {
+  animation: terminalBlink 1s infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 20px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Card hover smooth lift */
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-3px);
 }
