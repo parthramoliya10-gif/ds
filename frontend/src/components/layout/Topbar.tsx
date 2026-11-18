@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, Plus } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,16 +44,28 @@ export function Topbar({ title, role = "student" }: TopbarProps) {
   };
 
   return (
-    <header className="h-16 border-b border-border bg-background/95 backdrop-blur-none sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between">
-      {/* Page Title */}
-      <div className="flex items-center space-x-3">
-        <h2 className="text-[18px] font-semibold tracking-tight text-foreground">
+    <header className="h-16 border-b border-border bg-background sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between">
+      {/* Page Title & Breadcrumb Context */}
+      <div className="flex items-center space-x-2">
+        <span className="text-[12px] font-mono uppercase tracking-wider text-muted-foreground hidden sm:inline">
+          {role === "admin" ? "Admin" : "Student Desk"}
+        </span>
+        <span className="text-muted-foreground/40 hidden sm:inline">/</span>
+        <h2 className="text-[17px] font-semibold tracking-tight text-foreground">
           {derivedTitle}
         </h2>
       </div>
 
-      {/* Right Actions: Notifications + ThemeToggle */}
-      <div className="flex items-center space-x-2">
+      {/* Right Actions: New Request + Notifications + ThemeToggle */}
+      <div className="flex items-center space-x-2.5">
+        {role === "student" && (
+          <Link href="/user/requests/new" className="hidden sm:inline-flex">
+            <Button size="sm" className="h-9 px-3.5 text-[13px] font-medium rounded-[8px]">
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Request
+            </Button>
+          </Link>
+        )}
         {/* Notification Bell */}
         <Popover>
           <PopoverTrigger asChild>
