@@ -305,7 +305,7 @@ export default function AdminRequestDetailPage() {
                   </span>
                   <span className="font-medium text-foreground flex items-center">
                     <GraduationCap className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-                    {request.semester} • CSE Department
+                    Sem {request.semester} • {request.subject}
                   </span>
                 </div>
 

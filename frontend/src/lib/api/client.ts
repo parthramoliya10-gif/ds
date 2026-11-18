@@ -19,8 +19,7 @@ export async function getAuthToken(): Promise<string | null> {
     console.warn("Could not retrieve Supabase session:", err);
   }
 
-  // Fallback to locally saved token (e.g. for demo logins)
-  return localStorage.getItem("dsms_auth_token");
+  return null;
 }
 
 export async function apiRequest<T = any>(
@@ -72,6 +71,20 @@ export async function apiRequest<T = any>(
   }
 
   if (!response.ok) {
+    // On 401, sign out and redirect to login on client-side
+    if (response.status === 401 && typeof window !== "undefined") {
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // ignore background signout error
+      }
+      if (window.location.pathname !== "/login") {
+        window.location.href = `/login?redirect=${encodeURIComponent(
+          window.location.pathname + window.location.search
+        )}`;
+      }
+    }
+
     const errorMessage =
       (responseData && responseData.message) ||
       `API error ${response.status}: ${response.statusText}`;

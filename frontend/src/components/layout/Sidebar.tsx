@@ -14,6 +14,7 @@ import {
   LogOut,
   GraduationCap,
   ShieldAlert,
+  User as UserIcon,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -31,12 +32,15 @@ export function Sidebar({ role = "student" }: SidebarProps) {
   const { user, logout } = useAuth();
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = React.useState(false);
 
+  const profileHref = role === "admin" ? "/admin/profile" : "/user/profile";
+
   const userNavItems = [
     { label: "Dashboard", href: "/user/dashboard", icon: LayoutDashboard },
     { label: "My Requests", href: "/user/requests", icon: FileText },
     { label: "Chat & Queries", href: "/user/chat", icon: MessageSquare },
     { label: "My Documents", href: "/user/documents", icon: FolderDown },
     { label: "Payments", href: "/user/payments", icon: CreditCard },
+    { label: "My Profile", href: "/user/profile", icon: UserIcon },
   ];
 
   const adminNavItems = [
@@ -45,6 +49,7 @@ export function Sidebar({ role = "student" }: SidebarProps) {
     { label: "Chat", href: "/admin/chat", icon: MessageSquare },
     { label: "Documents", href: "/admin/documents", icon: UploadCloud },
     { label: "Payments", href: "/admin/payments", icon: CreditCard },
+    { label: "Admin Profile", href: "/admin/profile", icon: UserIcon },
   ];
 
   const navItems = role === "admin" ? adminNavItems : userNavItems;
@@ -102,8 +107,12 @@ export function Sidebar({ role = "student" }: SidebarProps) {
 
       {/* Profile Card & Logout */}
       <div className="p-4 border-t border-border bg-surface/50">
-        <div className="flex items-center space-x-3 mb-3">
-          <Avatar className="h-10 w-10 border border-border">
+        <Link
+          href={profileHref}
+          className="flex items-center space-x-3 mb-3 p-1.5 -m-1.5 rounded-[8px] hover:bg-surface transition-colors group"
+          title="Manage Profile & Credentials"
+        >
+          <Avatar className="h-10 w-10 border border-border group-hover:border-foreground/50 transition-colors">
             <AvatarImage src={user?.avatar} alt={user?.name || "User"} />
             <AvatarFallback>
               {user?.name
@@ -113,7 +122,7 @@ export function Sidebar({ role = "student" }: SidebarProps) {
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-[14px] font-semibold text-foreground truncate leading-tight">
+            <p className="text-[14px] font-semibold text-foreground truncate leading-tight group-hover:underline">
               {user?.name || (role === "admin" ? "Admin" : "Student")}
             </p>
             <div className="flex items-center mt-1">
@@ -125,7 +134,7 @@ export function Sidebar({ role = "student" }: SidebarProps) {
               </Badge>
             </div>
           </div>
-        </div>
+        </Link>
 
         <Button
           variant="outline"

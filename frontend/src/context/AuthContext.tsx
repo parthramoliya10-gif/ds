@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { User, Role } from "@/types";
 import supabase from "@/lib/supabase/client";
 import api from "@/lib/api/client";
@@ -10,11 +10,20 @@ import { adaptProfileToUser } from "@/lib/api/adapters";
 interface AuthContextType {
   user: User | null;
   role: Role;
-  login: (email: string, password?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   registerUser: (data: { email: string; password: string; fullName: string }) => Promise<void>;
   logout: () => Promise<void>;
-  switchRole: (role: Role) => Promise<void>;
   isLoading: boolean;
+  updateProfile: (data: {
+    fullName?: string;
+    phone?: string;
+    avatarUrl?: string;
+    college?: string;
+    semester?: number | string;
+  }) => Promise<void>;
+  updateEmail: (newEmail: string) => Promise<any>;
+  updatePassword: (newPassword: string) => Promise<any>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,9 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const pathname = usePathname();
 
-  // Load user session on mount
+  // Load user session on mount (runs once)
   useEffect(() => {
     let isMounted = true;
 
@@ -34,8 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data } = await supabase.auth.getSession();
         const session = data.session;
 
-        if (session?.access_token) {
-          localStorage.setItem("dsms_auth_token", session.access_token);
+        if (session?.user) {
           try {
             const profile = await api.auth.getMe();
             if (isMounted && profile) {
@@ -48,12 +55,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.warn("Backend profile lookup failed, using Supabase metadata:", profileErr);
             if (isMounted) {
               const meta = session.user.user_metadata || {};
-              const isAdmin = session.user.email?.includes("admin");
               setUser({
                 id: session.user.id,
                 name: meta.full_name || meta.name || session.user.email?.split("@")[0] || "User",
                 email: session.user.email || "",
-                role: isAdmin ? "admin" : "student",
+                role: "student",
               });
             }
           }
@@ -72,17 +78,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen to Supabase auth state change events
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session?.access_token) {
-          localStorage.setItem("dsms_auth_token", session.access_token);
+        if (session?.user) {
           try {
             const profile = await api.auth.getMe();
             setUser(adaptProfileToUser(profile));
           } catch {
-            // Ignore background error
+            const meta = session.user.user_metadata || {};
+            setUser({
+              id: session.user.id,
+              name: meta.full_name || meta.name || session.user.email?.split("@")[0] || "User",
+              email: session.user.email || "",
+              role: "student",
+            });
           }
         } else if (event === "SIGNED_OUT") {
-          localStorage.removeItem("dsms_auth_token");
-          localStorage.removeItem("dsms_mock_role");
           setUser(null);
         }
       }
@@ -92,12 +101,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isMounted = false;
       authListener.subscription.unsubscribe();
     };
-  }, [pathname]);
+  }, []);
 
-  const login = async (email: string, password = "password123") => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Attempt Supabase Auth login
+      // Attempt Supabase Auth login with cookies handled by @supabase/ssr
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -108,16 +117,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data.session) {
-        localStorage.setItem("dsms_auth_token", data.session.access_token);
-        const profile = await api.auth.getMe();
-        const adapted = adaptProfileToUser(profile);
+        let adapted: User;
+        try {
+          const profile = await api.auth.getMe();
+          adapted = adaptProfileToUser(profile);
+        } catch {
+          const meta = data.user.user_metadata || {};
+          adapted = {
+            id: data.user.id,
+            name: meta.full_name || meta.name || data.user.email?.split("@")[0] || "User",
+            email: data.user.email || "",
+            role: "student",
+          };
+        }
         setUser(adapted);
 
-        if (adapted.role === "admin") {
-          router.push("/admin/dashboard");
-        } else {
-          router.push("/user/dashboard");
+        // Safe redirect check
+        const urlParams =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search)
+            : null;
+        const redirectParam = urlParams?.get("redirect");
+
+        let target = adapted.role === "admin" ? "/admin/dashboard" : "/user/dashboard";
+
+        if (
+          redirectParam &&
+          redirectParam.startsWith("/") &&
+          !redirectParam.startsWith("//")
+        ) {
+          if (adapted.role === "admin" && redirectParam.startsWith("/admin")) {
+            target = redirectParam;
+          } else if (adapted.role !== "admin" && redirectParam.startsWith("/user")) {
+            target = redirectParam;
+          }
         }
+
+        router.push(target);
       }
     } catch (err: any) {
       console.error("Login execution failed:", err);
@@ -137,6 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data: {
             full_name: data.fullName,
           },
+          emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
         },
       });
 
@@ -145,12 +182,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (res.session) {
-        localStorage.setItem("dsms_auth_token", res.session.access_token);
-        const profile = await api.auth.getMe();
-        setUser(adaptProfileToUser(profile));
+        try {
+          const profile = await api.auth.getMe();
+          setUser(adaptProfileToUser(profile));
+        } catch {
+          setUser({
+            id: res.user?.id || "user",
+            name: data.fullName,
+            email: data.email,
+            role: "student",
+          });
+        }
         router.push("/user/dashboard");
       } else {
-        // Needs email verification or auto redirected
         router.push("/verify-otp");
       }
     } finally {
@@ -164,20 +208,97 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Ignore signOut network errors
     }
-    localStorage.removeItem("dsms_auth_token");
-    localStorage.removeItem("dsms_mock_role");
     setUser(null);
     router.push("/login");
   };
 
-  const switchRole = async (newRole: Role) => {
-    setIsLoading(true);
-    if (newRole === "admin" || newRole === "ADMIN") {
-      await login("admin@dsms.internal", "password123");
-    } else {
-      await login("aarav.sharma@dtu.ac.in", "password123");
+  const updateProfile = async (data: {
+    fullName?: string;
+    phone?: string;
+    avatarUrl?: string;
+    college?: string;
+    semester?: number | string;
+  }) => {
+    // 1. Call backend API if user session is active
+    try {
+      const updateData: { fullName?: string; phone?: string; avatarUrl?: string } = {};
+      if (data.fullName !== undefined) updateData.fullName = data.fullName;
+      if (data.phone !== undefined) updateData.phone = data.phone;
+      if (data.avatarUrl !== undefined && data.avatarUrl !== "") {
+        updateData.avatarUrl = data.avatarUrl;
+      }
+      if (Object.keys(updateData).length > 0) {
+        await api.auth.updateMe(updateData);
+      }
+    } catch (err) {
+      console.warn("Backend updateMe failed, continuing with Supabase metadata:", err);
     }
-    setIsLoading(false);
+
+    // 2. Update Supabase Auth user metadata
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          ...(data.fullName !== undefined && { full_name: data.fullName }),
+          ...(data.avatarUrl !== undefined && { avatar_url: data.avatarUrl }),
+          ...(data.phone !== undefined && { phone: data.phone }),
+          ...(data.college !== undefined && { college: data.college }),
+          ...(data.semester !== undefined && { semester: data.semester }),
+        },
+      });
+    } catch (err) {
+      console.warn("Supabase updateUser metadata update failed:", err);
+    }
+
+    // 3. Persist local college & semester override if changed
+    if (data.college) localStorage.setItem("dsms_user_college", data.college);
+    if (data.semester) localStorage.setItem("dsms_user_semester", String(data.semester));
+
+    // 4. Update local user state immediately
+    setUser((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        name: data.fullName ?? prev.name,
+        phone: data.phone ?? prev.phone,
+        avatar: data.avatarUrl !== undefined ? (data.avatarUrl || undefined) : prev.avatar,
+        college: data.college ?? prev.college,
+        semester: data.semester
+          ? typeof data.semester === "number"
+            ? data.semester
+            : parseInt(data.semester, 10)
+          : prev.semester,
+      };
+    });
+  };
+
+  const updateEmail = async (newEmail: string) => {
+    const { data, error } = await supabase.auth.updateUser({ email: newEmail });
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (data.user?.email && data.user.email === newEmail) {
+      setUser((prev) => (prev ? { ...prev, email: newEmail } : null));
+    }
+    return data;
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      throw new Error(error.message);
+    }
+    return data;
+  };
+
+  const refreshUser = async () => {
+    try {
+      const profile = await api.auth.getMe();
+      if (profile) {
+        setUser(adaptProfileToUser(profile));
+      }
+    } catch {
+      // Ignore
+    }
   };
 
   return (
@@ -188,8 +309,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         registerUser,
         logout,
-        switchRole,
         isLoading,
+        updateProfile,
+        updateEmail,
+        updatePassword,
+        refreshUser,
       }}
     >
       {children}

@@ -29,13 +29,39 @@ export function adaptProfileToUser(profile: any): User {
     avatar: profile.avatarUrl || undefined,
     phone: profile.phone || undefined,
     isBlocked: profile.isBlocked || false,
-    college: "Delhi Technological University",
-    semester: 6,
+    college:
+      (typeof window !== "undefined" && localStorage.getItem("dsms_user_college")) ||
+      profile.college ||
+      "University Student",
+    semester:
+      (typeof window !== "undefined" && localStorage.getItem("dsms_user_semester")
+        ? parseInt(localStorage.getItem("dsms_user_semester")!, 10)
+        : profile.semester) || 1,
+  };
+}
+
+export function parseAcademicDetails(description?: string) {
+  if (!description) return {};
+
+  const collegeMatch = description.match(/College:\s*([^|\n\r]+)/i);
+  const semesterMatch = description.match(/Semester:\s*([^|\n\r]+)/i);
+  const pagesMatch = description.match(/(?:Target Pages|Pages):\s*(\d+)/i);
+  const formatMatch = description.match(/Format:\s*(typed|handwritten)/i);
+  const subjectMatch = description.match(/Subject:\s*([^|\n\r]+)/i);
+
+  return {
+    college: collegeMatch ? collegeMatch[1].trim() : undefined,
+    semester: semesterMatch ? semesterMatch[1].trim() : undefined,
+    pages: pagesMatch ? parseInt(pagesMatch[1].trim(), 10) : undefined,
+    format: formatMatch ? (formatMatch[1].trim().toLowerCase() as "typed" | "handwritten") : undefined,
+    subject: subjectMatch ? subjectMatch[1].trim() : undefined,
   };
 }
 
 export function adaptRequestToFrontend(backendReq: any): Request {
   if (!backendReq) return {} as Request;
+
+  const academic = parseAcademicDetails(backendReq.description);
 
   const quotations = backendReq.quotations || [];
   const latestQuotation = quotations[0] || null;
@@ -71,11 +97,11 @@ export function adaptRequestToFrontend(backendReq: any): Request {
   return {
     id: backendReq.id,
     title: backendReq.title,
-    subject: backendReq.category || "General Document",
-    college: "Delhi Technological University",
-    semester: "6",
-    pages: 20, // default display
-    format: "typed",
+    subject: backendReq.category || academic.subject || "General Document",
+    college: backendReq.college || academic.college || (backendReq.user && backendReq.user.college) || "University Student",
+    semester: backendReq.semester ? String(backendReq.semester) : (academic.semester || "1"),
+    pages: backendReq.pages || academic.pages || 10,
+    format: backendReq.format || academic.format || "typed",
     deadline: backendReq.createdAt
       ? new Date(new Date(backendReq.createdAt).getTime() + 48 * 3600 * 1000).toISOString()
       : new Date().toISOString(),

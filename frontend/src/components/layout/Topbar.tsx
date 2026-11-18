@@ -13,6 +13,8 @@ import {
 import { Notification } from "@/types";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface TopbarProps {
   title?: string;
@@ -21,11 +23,13 @@ interface TopbarProps {
 
 export function Topbar({ title, role = "student" }: TopbarProps) {
   const pathname = usePathname();
+  const { user } = useAuth();
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
 
   // Compute a smart page title if not explicitly provided
   const derivedTitle = React.useMemo(() => {
     if (title) return title;
+    if (pathname.includes("/profile")) return role === "admin" ? "Admin Profile" : "My Profile & Settings";
     if (pathname.includes("/dashboard")) return "Dashboard";
     if (pathname.includes("/requests/new")) return "Create New Request";
     if (pathname.includes("/requests/")) return "Request Details";
@@ -35,7 +39,7 @@ export function Topbar({ title, role = "student" }: TopbarProps) {
     if (pathname.includes("/documents")) return "My Documents";
     if (pathname.includes("/payments")) return "Payments & Milestones";
     return "DSMS";
-  }, [pathname, title]);
+  }, [pathname, title, role]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -143,6 +147,24 @@ export function Topbar({ title, role = "student" }: TopbarProps) {
 
         {/* Theme Toggle */}
         <ThemeToggle />
+
+        {/* Profile Avatar Button */}
+        <Link
+          href={role === "admin" ? "/admin/profile" : "/user/profile"}
+          className="rounded-full focus:outline-none focus:ring-2 focus:ring-foreground"
+          title="Manage Profile & Credentials"
+        >
+          <Avatar className="h-9 w-9 border border-border hover:border-foreground transition-colors">
+            <AvatarImage src={user?.avatar} alt={user?.name || "User"} />
+            <AvatarFallback className="text-[12px] font-bold bg-foreground text-background">
+              {user?.name
+                ?.split(" ")
+                .map((n) => n[0])
+                .join("")
+                .toUpperCase() || (role === "admin" ? "AD" : "ST")}
+            </AvatarFallback>
+          </Avatar>
+        </Link>
       </div>
     </header>
   );
