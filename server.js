@@ -45,6 +45,7 @@ log('==================================================');
 function loadEnvironmentVariables() {
   const envCandidates = [
     path.join(rootDir, '.env'),
+    path.join(rootDir, 'New folder', '.env'),
     path.join(backendDir, '.env'),
     path.join(frontendDir, '.env'),
     path.join(frontendDir, '.env.production'),
@@ -264,9 +265,29 @@ async function initializeSubsystems() {
 
     // Prepare Next.js production build
     log('⏳ Preparing Next.js frontend application...');
+    const dev = process.env.NEXT_DEV === 'true';
+    const buildIdFile = path.join(frontendDir, '.next', 'BUILD_ID');
+
+    if (!dev && !fs.existsSync(buildIdFile)) {
+      log('⚠️ Production build not found in frontend/.next. Triggering automated build (npm run build:frontend)...');
+      try {
+        const { execSync } = require('child_process');
+        execSync('npm run build:frontend', {
+          cwd: rootDir,
+          stdio: 'inherit',
+          env: { ...process.env, NODE_ENV: 'production' },
+        });
+        log('✅ Automated Next.js production build completed successfully!');
+      } catch (buildErr) {
+        log(`❌ Automated Next.js build failed: ${buildErr.message}`);
+        throw new Error(
+          `Could not find or automatically generate Next.js production build in "frontend/.next". Please run "npm run build" in Hostinger Terminal or Hostinger NPM scripts.`
+        );
+      }
+    }
+
     const frontendRequire = createRequire(path.join(frontendDir, 'package.json'));
     const next = frontendRequire('next');
-    const dev = process.env.NEXT_DEV === 'true';
     const nextApp = next({ dev, dir: frontendDir });
 
     await nextApp.prepare();
