@@ -11,6 +11,7 @@ interface AuthContextType {
   user: User | null;
   role: Role;
   login: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   registerUser: (data: { email: string; password: string; fullName: string }) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
@@ -163,6 +164,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInWithGoogle = async () => {
+    setIsLoading(true);
+    try {
+      const redirectTo = `${window.location.origin}/auth/callback`;
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: any) {
+      console.error("Google sign-in execution failed:", err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const registerUser = async (data: { email: string; password: string; fullName: string }) => {
     setIsLoading(true);
     try {
@@ -307,6 +338,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         role: (user?.role?.toLowerCase() as Role) || "student",
         login,
+        signInWithGoogle,
         registerUser,
         logout,
         isLoading,

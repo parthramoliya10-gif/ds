@@ -16,8 +16,14 @@ export default function AuthCallbackPage() {
     async function handleAuthCallback() {
       try {
         const params = new URLSearchParams(window.location.search);
-        const code = params.get("code");
+        const errorDesc = params.get("error_description") || params.get("error");
+        if (errorDesc) {
+          console.error("OAuth redirect error:", errorDesc);
+          if (mounted) router.replace("/login");
+          return;
+        }
 
+        const code = params.get("code");
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
@@ -25,9 +31,15 @@ export default function AuthCallbackPage() {
           }
         }
 
-        const {
+        let {
           data: { session },
         } = await supabase.auth.getSession();
+
+        if (!session?.user) {
+          await new Promise((r) => setTimeout(r, 800));
+          const retry = await supabase.auth.getSession();
+          session = retry.data.session;
+        }
 
         if (!session?.user) {
           if (mounted) router.replace("/login");

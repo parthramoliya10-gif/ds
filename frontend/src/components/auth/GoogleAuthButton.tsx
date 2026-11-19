@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface GoogleAuthButtonProps {
   label?: string;
@@ -14,14 +15,17 @@ export function GoogleAuthButton({
   label = "Continue with Google",
   className,
 }: GoogleAuthButtonProps) {
-  const router = useRouter();
+  const { signInWithGoogle } = useAuth();
   const [loading, setLoading] = React.useState(false);
 
-  const handleClick = () => {
-    setLoading(true);
-    setTimeout(() => {
-      router.push("/auth/callback");
-    }, 400);
+  const handleClick = async () => {
+    try {
+      setLoading(true);
+      await signInWithGoogle();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to initiate Google sign-in.");
+      setLoading(false);
+    }
   };
 
   return (
