@@ -13,15 +13,9 @@ backend/node_modules/
 frontend/node_modules/
 build/
 out/
-# Cache and Dev Build directories
-.next/cache/
-frontend/.next/cache/
-.next/static/webpack/
-frontend/.next/static/webpack/
-.next/static/development/
-frontend/.next/static/development/
-frontend/.next/fallback-build-manifest.json
-frontend/.next/static/chunks/fallback/
+# Next.js build output (dynamic webpack cache - do not commit)
+.next/
+frontend/.next/
 *.tsbuildinfo
 
 # Environment files
