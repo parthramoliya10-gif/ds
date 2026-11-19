@@ -10,7 +10,11 @@ const envSchema = z.object({
   CLIENT_URL: z.string().default('http://localhost:3000'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
-  DIRECT_URL: z.string().min(1, 'DIRECT_URL is required'),
+  DIRECT_URL: z
+    .string()
+    .optional()
+    .default('')
+    .transform((val) => val || process.env.DATABASE_URL || ''),
 
   SUPABASE_URL: z.string().url('SUPABASE_URL must be a valid URL'),
   SUPABASE_ANON_KEY: z.string().min(1, 'SUPABASE_ANON_KEY is required'),
