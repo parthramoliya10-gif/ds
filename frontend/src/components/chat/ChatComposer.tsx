@@ -100,7 +100,7 @@ export function ChatComposer({
           onChange={handleTextChange}
           onKeyDown={handleKeyDown}
           placeholder={disabled ? "Chat is disabled for completed or cancelled requests." : placeholder}
-          className="flex-1 min-h-[40px] max-h-32 resize-none rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 min-h-[40px] max-h-32 resize-none rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground placeholder:text-muted-foreground placeholder:truncate focus:outline-none focus:ring-1 focus:ring-foreground disabled:opacity-50 disabled:cursor-not-allowed"
         />
 
         <Button

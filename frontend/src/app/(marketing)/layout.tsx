@@ -62,7 +62,7 @@ export default function MarketingLayout({
 
           {/* Action CTAs & Theme Toggle */}
           <div className="flex items-center space-x-3">
-            <ThemeToggle />
+            <ThemeToggle className="border-white/20 text-white bg-transparent hover:bg-white/10 hover:text-white" />
 
             <div className="hidden sm:flex items-center space-x-2">
               <Link href="/login">

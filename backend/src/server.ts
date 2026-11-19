@@ -6,7 +6,7 @@ import prisma from './config/prisma.js';
 import { initSocketServer } from './sockets/socket.server.js';
 
 const app = createApp();
-const server = http.createServer(app);
+const server = http.createServer({ maxHeaderSize: 1048576 }, app);
 
 // Initialize Socket.IO Server with real-time WhatsApp-style chat engine
 const io = initSocketServer(server);
