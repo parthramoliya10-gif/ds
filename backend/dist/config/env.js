@@ -34,6 +34,38 @@ const envSchema = zod_1.z.object({
     RESEND_FROM_EMAIL: zod_1.z.string().optional().default(''),
 });
 const parseEnv = () => {
+    // Sanitize process.env keys and strip trailing spaces or wrapping quotes
+    for (const [key, val] of Object.entries(process.env)) {
+        const cleanKey = key.trim();
+        let cleanVal = typeof val === 'string' ? val.trim() : val;
+        if (typeof cleanVal === 'string') {
+            if ((cleanVal.startsWith('"') && cleanVal.endsWith('"')) ||
+                (cleanVal.startsWith("'") && cleanVal.endsWith("'"))) {
+                cleanVal = cleanVal.slice(1, -1).trim();
+            }
+        }
+        if (cleanKey !== key) {
+            delete process.env[key];
+        }
+        process.env[cleanKey] = cleanVal;
+    }
+    // Common naming aliases fallbacks
+    if (!process.env.DIRECT_URL && process.env.DATABASE_URL) {
+        process.env.DIRECT_URL = process.env.DATABASE_URL;
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        process.env.SUPABASE_SERVICE_ROLE_KEY =
+            process.env.SUPABASE_SERVICE_KEY ||
+                process.env.SERVICE_ROLE_KEY ||
+                process.env.SUPABASE_SECRET_KEY ||
+                '';
+    }
+    if (!process.env.SUPABASE_JWT_SECRET) {
+        process.env.SUPABASE_JWT_SECRET =
+            process.env.JWT_SECRET ||
+                process.env.SUPABASE_SECRET ||
+                '';
+    }
     const parsed = envSchema.safeParse(process.env);
     if (!parsed.success) {
         const errorDetails = JSON.stringify(parsed.error.format(), null, 2);

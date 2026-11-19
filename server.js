@@ -78,7 +78,45 @@ function loadEnvironmentVariables() {
   }
 }
 
+function sanitizeProcessEnv() {
+  for (const [key, val] of Object.entries(process.env)) {
+    const cleanKey = key.trim();
+    let cleanVal = typeof val === 'string' ? val.trim() : val;
+    if (typeof cleanVal === 'string') {
+      if (
+        (cleanVal.startsWith('"') && cleanVal.endsWith('"')) ||
+        (cleanVal.startsWith("'") && cleanVal.endsWith("'"))
+      ) {
+        cleanVal = cleanVal.slice(1, -1).trim();
+      }
+    }
+    if (cleanKey !== key) {
+      delete process.env[key];
+    }
+    process.env[cleanKey] = cleanVal;
+  }
+
+  // Resilient Aliases & Fallbacks
+  if (!process.env.DIRECT_URL && process.env.DATABASE_URL) {
+    process.env.DIRECT_URL = process.env.DATABASE_URL;
+  }
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    process.env.SUPABASE_SERVICE_ROLE_KEY =
+      process.env.SUPABASE_SERVICE_KEY ||
+      process.env.SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_SECRET_KEY ||
+      '';
+  }
+  if (!process.env.SUPABASE_JWT_SECRET) {
+    process.env.SUPABASE_JWT_SECRET =
+      process.env.JWT_SECRET ||
+      process.env.SUPABASE_SECRET ||
+      '';
+  }
+}
+
 loadEnvironmentVariables();
+sanitizeProcessEnv();
 
 // Force production mode unless explicitly overridden
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
@@ -153,6 +191,30 @@ const server = http.createServer((req, res) => {
   if (serverStatus === 'error') {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.statusCode = 500;
+
+    const envChecklist = [
+      { key: 'DATABASE_URL', ok: !!process.env.DATABASE_URL },
+      { key: 'DIRECT_URL', ok: !!process.env.DIRECT_URL },
+      { key: 'SUPABASE_URL', ok: !!process.env.SUPABASE_URL },
+      { key: 'SUPABASE_ANON_KEY', ok: !!process.env.SUPABASE_ANON_KEY },
+      { key: 'SUPABASE_SERVICE_ROLE_KEY', ok: !!process.env.SUPABASE_SERVICE_ROLE_KEY },
+      { key: 'SUPABASE_JWT_SECRET', ok: !!process.env.SUPABASE_JWT_SECRET },
+      { key: 'CLIENT_URL', ok: !!process.env.CLIENT_URL },
+      { key: 'CLOUDINARY_CLOUD_NAME', ok: !!process.env.CLOUDINARY_CLOUD_NAME },
+      { key: 'RAZORPAY_KEY_ID', ok: !!process.env.RAZORPAY_KEY_ID },
+    ];
+
+    const envRows = envChecklist
+      .map(
+        (item) =>
+          `<tr><td style="padding: 6px 12px; border-bottom: 1px solid #334155; font-family: monospace;">${item.key}</td><td style="padding: 6px 12px; border-bottom: 1px solid #334155;">${
+            item.ok
+              ? '<span style="color: #4ade80; font-weight: bold;">✔ DETECTED</span>'
+              : '<span style="color: #f87171; font-weight: bold;">✖ MISSING</span>'
+          }</td></tr>`
+      )
+      .join('');
+
     const errorHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -166,6 +228,8 @@ const server = http.createServer((req, res) => {
     h1 { color: #f87171; font-size: 24px; margin-top: 0; display: flex; align-items: center; gap: 10px; }
     p { font-size: 15px; color: #94a3b8; line-height: 1.6; }
     pre { background: #020617; color: #fca5a5; padding: 18px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.5; border: 1px solid #7f1d1d; white-space: pre-wrap; word-break: break-all; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; background: #0f172a; border-radius: 8px; overflow: hidden; }
+    th { text-align: left; padding: 8px 12px; background: #1e293b; color: #94a3b8; border-bottom: 2px solid #334155; }
     .guide { background: #0f172a; border-left: 4px solid #38bdf8; padding: 18px; border-radius: 0 8px 8px 0; margin-top: 24px; }
     .guide h3 { margin: 0 0 10px 0; color: #38bdf8; font-size: 16px; }
     .guide ul { margin: 0; padding-left: 20px; color: #cbd5e1; font-size: 14px; line-height: 1.8; }
@@ -178,12 +242,19 @@ const server = http.createServer((req, res) => {
     <h1>⚠️ DSMS Server Initialization Diagnostic</h1>
     <p>The Node.js server process is running, but encountered an initialization issue during startup:</p>
     <pre>${escapeHtml(startupError ? (startupError.stack || startupError.message) : 'Unknown startup error')}</pre>
+    
+    <h3 style="margin-top: 24px; color: #e2e8f0; font-size: 16px;">Environment Variables Status Detected by Node.js:</h3>
+    <table>
+      <thead><tr><th>Variable</th><th>Status</th></tr></thead>
+      <tbody>${envRows}</tbody>
+    </table>
+
     <div class="guide">
       <h3>Troubleshooting Checklist:</h3>
       <ul>
-        <li><strong>Missing Environment Variables?</strong> In Hostinger hPanel ➔ Node.js ➔ Environment Variables, verify that <code>DATABASE_URL</code>, <code>DIRECT_URL</code>, <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code>, and <code>SUPABASE_JWT_SECRET</code> are entered without wrapping quotes.</li>
-        <li><strong>Missing Compiled Build?</strong> If <code>backend/dist</code> or <code>frontend/.next</code> is reported missing, run <code>npm run build</code> in Hostinger's terminal or deploy script.</li>
-        <li><strong>Database Connection?</strong> Ensure Supabase PostgreSQL pooler credentials and network accessibility are active.</li>
+        <li><strong>Missing Environment Variables?</strong> In Hostinger hPanel ➔ Node.js ➔ Environment Variables, verify that keys match without trailing spaces or wrapping quotes.</li>
+        <li><strong>Alternative Fix:</strong> In Hostinger File Manager, you can create a <code>.env</code> file in the app root with all 15 variables. The server will auto-load it.</li>
+        <li><strong>Missing Compiled Build?</strong> If <code>backend/dist</code> or <code>frontend/.next</code> is reported missing, run <code>npm run build</code> in Hostinger's terminal.</li>
       </ul>
     </div>
     <button class="btn" onclick="location.reload()">🔄 Retry / Reload Server</button>
