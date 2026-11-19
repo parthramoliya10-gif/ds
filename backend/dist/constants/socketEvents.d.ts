@@ -1,0 +1,25 @@
+export declare const SOCKET_EVENTS: {
+    readonly CONNECT: "connect";
+    readonly DISCONNECT: "disconnect";
+    readonly ERROR: "error";
+    readonly USER_ONLINE: "user_online";
+    readonly USER_OFFLINE: "user_offline";
+    readonly USER_STATUS_CHANGE: "user_status_change";
+    readonly JOIN_REQUEST_ROOM: "join_request_room";
+    readonly LEAVE_REQUEST_ROOM: "leave_request_room";
+    readonly ROOM_JOINED: "room_joined";
+    readonly ROOM_ERROR: "room_error";
+    readonly SEND_MESSAGE: "send_message";
+    readonly NEW_MESSAGE: "new_message";
+    readonly MESSAGE_SENT: "message_sent";
+    readonly MESSAGE_DELIVERED: "message_delivered";
+    readonly MESSAGE_STATUS_UPDATE: "message_status_update";
+    readonly MARK_READ: "mark_read";
+    readonly MESSAGES_READ: "messages_read";
+    readonly TYPING_START: "typing_start";
+    readonly TYPING_STOP: "typing_stop";
+    readonly USER_TYPING: "user_typing";
+    readonly QUOTATION_RECEIVED: "quotation_received";
+    readonly PAYMENT_CONFIRMED: "payment_confirmed";
+};
+export default SOCKET_EVENTS;

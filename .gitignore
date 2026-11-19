@@ -9,10 +9,13 @@ lerna-debug.log*
 
 # Dependency directories
 node_modules/
-dist/
+backend/node_modules/
+frontend/node_modules/
 build/
-.next/
 out/
+.next/cache/
+frontend/.next/cache/
+*.tsbuildinfo
 
 # Environment files
 .env

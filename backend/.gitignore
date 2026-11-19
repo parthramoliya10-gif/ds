@@ -1,5 +1,6 @@
 node_modules/
-dist/
+# dist/ is included so pre-compiled backend runs on Hostinger shared hosting
+# dist/
 .env
 .env.*
 !.env.example

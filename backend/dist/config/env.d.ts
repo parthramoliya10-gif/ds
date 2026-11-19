@@ -1,0 +1,23 @@
+export declare const env: {
+    PORT: number;
+    NODE_ENV: "development" | "production" | "test";
+    API_PREFIX: string;
+    CLIENT_URL: string;
+    DATABASE_URL: string;
+    DIRECT_URL: string;
+    SUPABASE_URL: string;
+    SUPABASE_ANON_KEY: string;
+    SUPABASE_SERVICE_ROLE_KEY: string;
+    SUPABASE_JWT_SECRET: string;
+    UPSTASH_REDIS_REST_URL: string;
+    UPSTASH_REDIS_REST_TOKEN: string;
+    CLOUDINARY_CLOUD_NAME: string;
+    CLOUDINARY_API_KEY: string;
+    CLOUDINARY_API_SECRET: string;
+    RAZORPAY_KEY_ID: string;
+    RAZORPAY_KEY_SECRET: string;
+    RAZORPAY_WEBHOOK_SECRET: string;
+    RESEND_API_KEY: string;
+    RESEND_FROM_EMAIL: string;
+};
+export default env;

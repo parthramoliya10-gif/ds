@@ -1,0 +1,1 @@
+{"version":3,"file":"razorpay.js","sourceRoot":"","sources":["../../src/config/razorpay.ts"],"names":[],"mappings":";;;;;;AAAA,wDAAgC;AAChC,sDAA2B;AAEd,QAAA,QAAQ,GAAG,IAAI,kBAAQ,CAAC;IACnC,MAAM,EAAE,gBAAG,CAAC,eAAe,IAAI,cAAc;IAC7C,UAAU,EAAE,gBAAG,CAAC,mBAAmB,IAAI,kBAAkB;CAC1D,CAAC,CAAC;AAEH,kBAAe,gBAAQ,CAAC"}
