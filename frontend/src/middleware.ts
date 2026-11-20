@@ -48,11 +48,26 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Already logged-in user accessing login/register
-  if (isAuthPath && user) {
+  // Role routing for authenticated users
+  if (user) {
     const role = (user.user_metadata?.role || user.app_metadata?.role || "").toLowerCase();
-    const destination = role === "admin" ? "/admin/dashboard" : "/user/dashboard";
-    return NextResponse.redirect(new URL(destination, request.url));
+    const isAdmin = role === "admin" || Boolean(user.email && user.email.toLowerCase().includes("admin"));
+
+    // Already logged-in user accessing login/register
+    if (isAuthPath) {
+      const destination = isAdmin ? "/admin/dashboard" : "/user/dashboard";
+      return NextResponse.redirect(new URL(destination, request.url));
+    }
+
+    // Admin trying to access /user routes -> redirect to /admin/dashboard
+    if (pathname.startsWith("/user") && isAdmin) {
+      return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+    }
+
+    // Student trying to access /admin routes -> redirect to /user/dashboard
+    if (pathname.startsWith("/admin") && !isAdmin) {
+      return NextResponse.redirect(new URL("/user/dashboard", request.url));
+    }
   }
 
   return response;

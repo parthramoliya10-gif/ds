@@ -154,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        router.push(target);
+        window.location.href = target;
       }
     } catch (err: any) {
       console.error("Login execution failed:", err);
