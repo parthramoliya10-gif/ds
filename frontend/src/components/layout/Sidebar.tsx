@@ -17,6 +17,7 @@ import {
   User as UserIcon,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useSocket } from "@/context/SocketContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ interface SidebarProps {
 export function Sidebar({ role = "student" }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { unreadChatCount } = useSocket();
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = React.useState(false);
 
   const profileHref = role === "admin" ? "/admin/profile" : "/user/profile";
@@ -37,7 +39,7 @@ export function Sidebar({ role = "student" }: SidebarProps) {
   const userNavItems = [
     { label: "Dashboard", href: "/user/dashboard", icon: LayoutDashboard },
     { label: "My Requests", href: "/user/requests", icon: FileText },
-    { label: "Chat & Queries", href: "/user/chat", icon: MessageSquare },
+    { label: "Chat & Queries", href: "/user/chat", icon: MessageSquare, badge: unreadChatCount },
     { label: "My Documents", href: "/user/documents", icon: FolderDown },
     { label: "Payments", href: "/user/payments", icon: CreditCard },
     { label: "My Profile", href: "/user/profile", icon: UserIcon },
@@ -46,7 +48,7 @@ export function Sidebar({ role = "student" }: SidebarProps) {
   const adminNavItems = [
     { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     { label: "Requests", href: "/admin/requests", icon: FileCheck },
-    { label: "Chat", href: "/admin/chat", icon: MessageSquare },
+    { label: "Chat", href: "/admin/chat", icon: MessageSquare, badge: unreadChatCount },
     { label: "Documents", href: "/admin/documents", icon: UploadCloud },
     { label: "Payments", href: "/admin/payments", icon: CreditCard },
     { label: "Admin Profile", href: "/admin/profile", icon: UserIcon },
@@ -91,15 +93,29 @@ export function Sidebar({ role = "student" }: SidebarProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center space-x-3 px-3 py-2.5 rounded-[8px] text-[14px] font-medium transition-colors",
+                "flex items-center justify-between px-3 py-2.5 rounded-[8px] text-[14px] font-medium transition-colors group",
                 // Active = filled black (light mode) / filled white (dark mode)
                 isActive
                   ? "bg-foreground text-background font-semibold"
                   : "text-muted-foreground hover:bg-surface hover:text-foreground"
               )}
             >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span>{item.label}</span>
+              <div className="flex items-center space-x-3 min-w-0">
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </div>
+              {Boolean(item.badge && item.badge > 0) && (
+                <span
+                  className={cn(
+                    "text-[11px] font-bold px-1.5 py-0.5 min-w-[20px] h-5 rounded-full flex items-center justify-center shrink-0 leading-none",
+                    isActive
+                      ? "bg-background text-foreground"
+                      : "bg-foreground text-background"
+                  )}
+                >
+                  {item.badge! > 99 ? "99+" : item.badge}
+                </span>
+              )}
             </Link>
           );
         })}

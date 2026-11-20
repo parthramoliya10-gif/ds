@@ -11,6 +11,27 @@ const socket_server_js_1 = require("../../sockets/socket.server.js");
 const socketEvents_js_1 = __importDefault(require("../../constants/socketEvents.js"));
 class ChatController {
     /**
+     * GET /api/v1/chat/unread-count
+     * Fetch total unread message count across all conversations
+     */
+    async getUnreadCount(req, res, next) {
+        try {
+            if (!req.user) {
+                throw new apiError_js_1.ApiError(401, 'Unauthorized');
+            }
+            const countData = await chat_service_js_1.default.getUnreadCount(req.user);
+            (0, apiResponse_js_1.sendResponse)({
+                res,
+                statusCode: 200,
+                message: 'Unread message count retrieved successfully',
+                data: countData,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    /**
      * GET /api/v1/chat/:requestId/messages
      * Fetch conversation history
      */

@@ -4,10 +4,13 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { Socket } from "socket.io-client";
 import { getSocket, disconnectSocket, SOCKET_EVENTS } from "@/lib/socket/socketClient";
 import { useAuth } from "./AuthContext";
+import api from "@/lib/api/client";
 
 interface SocketContextType {
   socket: Socket | null;
   isConnected: boolean;
+  unreadChatCount: number;
+  refreshUnreadCount: () => Promise<void>;
   joinRoom: (requestId: string) => Promise<any>;
   leaveRoom: (requestId: string) => void;
   sendMessage: (
@@ -26,6 +29,44 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
+
+  const refreshUnreadCount = useCallback(async () => {
+    if (!user) {
+      setUnreadChatCount(0);
+      return;
+    }
+    try {
+      const res = await api.chat.getUnreadCount();
+      if (res && typeof res.unreadCount === "number") {
+        setUnreadChatCount(res.unreadCount);
+        return;
+      }
+    } catch {
+      // Fallback: calculate from api.requests.list if getUnreadCount endpoint fails
+      try {
+        const res = await api.requests.list({ limit: 50 });
+        if (res && Array.isArray(res.requests)) {
+          const total = res.requests.reduce((acc: number, r: any) => {
+            const count = r.conversation?._count?.messages ?? r.unreadCount ?? 0;
+            return acc + count;
+          }, 0);
+          setUnreadChatCount(total);
+        }
+      } catch {
+        // ignore background fetch error
+      }
+    }
+  }, [user]);
+
+  // Initial load and whenever user changes
+  useEffect(() => {
+    if (user) {
+      refreshUnreadCount();
+    } else {
+      setUnreadChatCount(0);
+    }
+  }, [user, refreshUnreadCount]);
 
   useEffect(() => {
     let active = true;
@@ -42,22 +83,50 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       setSocket(s);
       setIsConnected(s.connected);
 
-      const handleConnect = () => setIsConnected(true);
+      const handleConnect = () => {
+        setIsConnected(true);
+        refreshUnreadCount();
+      };
       const handleDisconnect = () => setIsConnected(false);
+
+      const handleNewMessage = (newMsg: any) => {
+        const isFromCounterpart =
+          user?.role === "admin"
+            ? newMsg.senderRole === "USER" || newMsg.sender?.role?.toUpperCase() === "USER"
+            : newMsg.senderRole === "ADMIN" || newMsg.sender?.role?.toUpperCase() === "ADMIN";
+
+        if (isFromCounterpart) {
+          const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+          const targetReqId = newMsg.requestId || newMsg.conversation?.requestId;
+          const isInCurrentRoom = Boolean(targetReqId && pathname.includes(targetReqId));
+
+          if (!isInCurrentRoom) {
+            setUnreadChatCount((prev) => prev + 1);
+          }
+        }
+      };
+
+      const handleMessagesRead = () => {
+        refreshUnreadCount();
+      };
 
       s.on(SOCKET_EVENTS.CONNECT, handleConnect);
       s.on(SOCKET_EVENTS.DISCONNECT, handleDisconnect);
+      s.on(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
+      s.on(SOCKET_EVENTS.MESSAGES_READ, handleMessagesRead);
 
       return () => {
         s.off(SOCKET_EVENTS.CONNECT, handleConnect);
         s.off(SOCKET_EVENTS.DISCONNECT, handleDisconnect);
+        s.off(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
+        s.off(SOCKET_EVENTS.MESSAGES_READ, handleMessagesRead);
       };
     });
 
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [user, refreshUnreadCount]);
 
   const joinRoom = useCallback(
     async (requestId: string): Promise<any> => {
@@ -132,8 +201,11 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       if (socket) {
         socket.emit(SOCKET_EVENTS.MARK_READ, { requestId });
       }
+      setTimeout(() => {
+        refreshUnreadCount();
+      }, 300);
     },
-    [socket]
+    [socket, refreshUnreadCount]
   );
 
   return (
@@ -141,6 +213,8 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       value={{
         socket,
         isConnected,
+        unreadChatCount,
+        refreshUnreadCount,
         joinRoom,
         leaveRoom,
         sendMessage,

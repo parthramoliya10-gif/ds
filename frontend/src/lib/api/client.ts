@@ -247,6 +247,8 @@ export const api = {
   },
 
   chat: {
+    getUnreadCount: () =>
+      apiRequest<{ unreadCount: number }>("/chat/unread-count", { method: "GET" }),
     getMessages: (requestId: string, params?: { page?: number; limit?: number }) =>
       apiRequest(`/chat/${requestId}/messages`, { method: "GET", params }),
     postMessage: (requestId: string, formDataOrBody: FormData | { content: string; messageType?: string; metadata?: any }) => {

@@ -1,6 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 export declare class ChatController {
     /**
+     * GET /api/v1/chat/unread-count
+     * Fetch total unread message count across all conversations
+     */
+    getUnreadCount(req: Request, res: Response, next: NextFunction): Promise<void>;
+    /**
      * GET /api/v1/chat/:requestId/messages
      * Fetch conversation history
      */

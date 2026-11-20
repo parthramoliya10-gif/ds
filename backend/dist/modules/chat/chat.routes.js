@@ -10,6 +10,8 @@ const upload_middleware_js_1 = require("../../middlewares/upload.middleware.js")
 const router = (0, express_1.Router)();
 // All chat routes require authentication
 router.use(auth_middleware_js_1.authenticate);
+// 0. Fetch total unread message count across all conversations
+router.get('/unread-count', chat_controller_js_1.default.getUnreadCount);
 // 1. Fetch message history
 router.get('/:requestId/messages', chat_controller_js_1.default.getMessages);
 // 2. Post message with optional file upload via REST

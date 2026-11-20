@@ -8,6 +8,9 @@ const router = Router();
 // All chat routes require authentication
 router.use(authenticate);
 
+// 0. Fetch total unread message count across all conversations
+router.get('/unread-count', chatController.getUnreadCount);
+
 // 1. Fetch message history
 router.get('/:requestId/messages', chatController.getMessages);
 

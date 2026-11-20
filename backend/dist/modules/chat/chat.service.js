@@ -27,6 +27,32 @@ const formatMessageSender = (msg) => {
 };
 class ChatService {
     /**
+     * Get total unread message count across all conversations for the user/admin
+     */
+    async getUnreadCount(user) {
+        if (user.role === client_1.Role.ADMIN) {
+            const count = await prisma_js_1.default.message.count({
+                where: {
+                    senderRole: client_1.Role.USER,
+                    status: { in: [client_1.MessageStatus.SENT, client_1.MessageStatus.DELIVERED] },
+                },
+            });
+            return { unreadCount: count };
+        }
+        const count = await prisma_js_1.default.message.count({
+            where: {
+                senderRole: client_1.Role.ADMIN,
+                status: { in: [client_1.MessageStatus.SENT, client_1.MessageStatus.DELIVERED] },
+                conversation: {
+                    request: {
+                        userId: user.id,
+                    },
+                },
+            },
+        });
+        return { unreadCount: count };
+    }
+    /**
      * Fetch conversation messages for a request with strict authorization
      */
     async getConversationMessages(requestId, user, options = {}) {

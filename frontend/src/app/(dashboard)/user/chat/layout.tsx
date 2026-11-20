@@ -50,7 +50,7 @@ export default function UserChatLayout({
   const activeRequestId = params?.requestId as string | undefined;
   const [search, setSearch] = React.useState("");
   const [requests, setRequests] = React.useState<Request[]>([]);
-  const { socket } = useSocket();
+  const { socket, refreshUnreadCount } = useSocket();
 
   // Load chat requests on mount
   React.useEffect(() => {
@@ -74,7 +74,7 @@ export default function UserChatLayout({
     };
   }, [activeRequestId]);
 
-  // When activeRequestId changes / chat is opened, clear unreadCount for that chat
+  // When activeRequestId changes / chat is opened, clear unreadCount for that chat and sync badge
   React.useEffect(() => {
     if (!activeRequestId) return;
     setRequests((prev) =>
@@ -82,7 +82,8 @@ export default function UserChatLayout({
         req.id === activeRequestId ? { ...req, unreadCount: 0 } : req
       )
     );
-  }, [activeRequestId]);
+    refreshUnreadCount();
+  }, [activeRequestId, refreshUnreadCount]);
 
   // Real-time socket updates for new messages & read receipts
   React.useEffect(() => {

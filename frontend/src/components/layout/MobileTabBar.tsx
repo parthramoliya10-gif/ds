@@ -13,6 +13,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSocket } from "@/context/SocketContext";
 
 interface MobileTabBarProps {
   role?: "student" | "admin";
@@ -20,11 +21,12 @@ interface MobileTabBarProps {
 
 export function MobileTabBar({ role = "student" }: MobileTabBarProps) {
   const pathname = usePathname();
+  const { unreadChatCount } = useSocket();
 
   const userTabs = [
     { label: "Dashboard", href: "/user/dashboard", icon: LayoutDashboard },
     { label: "Requests", href: "/user/requests", icon: FileText },
-    { label: "Chat", href: "/user/chat", icon: MessageSquare },
+    { label: "Chat", href: "/user/chat", icon: MessageSquare, badge: unreadChatCount },
     { label: "Files", href: "/user/documents", icon: FolderDown },
     { label: "Pay", href: "/user/payments", icon: CreditCard },
   ];
@@ -32,7 +34,7 @@ export function MobileTabBar({ role = "student" }: MobileTabBarProps) {
   const adminTabs = [
     { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     { label: "Requests", href: "/admin/requests", icon: FileCheck },
-    { label: "Chat", href: "/admin/chat", icon: MessageSquare },
+    { label: "Chat", href: "/admin/chat", icon: MessageSquare, badge: unreadChatCount },
     { label: "Uploads", href: "/admin/documents", icon: UploadCloud },
     { label: "Payments", href: "/admin/payments", icon: CreditCard },
   ];
@@ -69,11 +71,16 @@ export function MobileTabBar({ role = "student" }: MobileTabBarProps) {
           >
             <div
               className={cn(
-                "p-1 rounded-[6px] transition-colors",
+                "p-1 rounded-[6px] transition-colors relative",
                 isActive && "bg-surface border border-border"
               )}
             >
               <Icon className="h-5 w-5" />
+              {Boolean(tab.badge && tab.badge > 0) && (
+                <span className="absolute -top-1 -right-1.5 bg-foreground text-background text-[9px] font-bold h-4 min-w-[16px] px-1 rounded-full flex items-center justify-center leading-none">
+                  {tab.badge! > 99 ? "99+" : tab.badge}
+                </span>
+              )}
             </div>
             <span className="text-[10px] mt-0.5 leading-tight">{tab.label}</span>
           </Link>

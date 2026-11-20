@@ -12,6 +12,12 @@ export interface PostMessageInput {
 }
 export declare class ChatService {
     /**
+     * Get total unread message count across all conversations for the user/admin
+     */
+    getUnreadCount(user: AuthenticatedUser): Promise<{
+        unreadCount: number;
+    }>;
+    /**
      * Fetch conversation messages for a request with strict authorization
      */
     getConversationMessages(requestId: string, user: AuthenticatedUser, options?: GetMessagesOptions): Promise<{
