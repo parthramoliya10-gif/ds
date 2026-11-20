@@ -18,7 +18,7 @@ exports.registerSchema = zod_1.z.object({
     email: zod_1.z.string().email('Please provide a valid email address'),
     password: zod_1.z
         .string()
-        .min(8, 'Password must be at least 8 characters long')
+        .min(6, 'Password must be at least 6 characters long')
         .max(128),
     fullName: zod_1.z.string().min(2, 'Full name must be at least 2 characters').max(100),
 });

@@ -1,8 +1,12 @@
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
 import prisma from '../../config/prisma.js';
 import env from '../../config/env.js';
 import { supabaseAdmin, supabaseClient } from '../../config/supabase.js';
 import { ApiError } from '../../utils/apiError.js';
+import otpStore from './otp.store.js';
+import { sendOtpEmail } from '../../utils/email.js';
 
 export class AuthService {
   /**
@@ -149,24 +153,43 @@ export class AuthService {
   }
 
   /**
-   * 3. Send Email OTP via Supabase Auth
+   * Internal helper: Generate a valid signed JWT for session
+   */
+  private generateCustomJwtToken(authUser: { id: string; email?: string }): string {
+    const payload = {
+      sub: authUser.id,
+      email: authUser.email,
+      role: 'authenticated',
+      aud: 'authenticated',
+      iss: env.SUPABASE_URL ? `${env.SUPABASE_URL}/auth/v1` : 'dsms',
+    };
+    return jwt.sign(payload, env.SUPABASE_JWT_SECRET, { expiresIn: '7d' });
+  }
+
+  /**
+   * 3. Send Email OTP (Custom 6-digit code via Resend)
    */
   async sendEmailOtp(email: string, fullName?: string) {
-    const { error } = await supabaseClient.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-        data: fullName ? { full_name: fullName } : undefined,
-      },
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Generate cryptographic 6-digit OTP stored in memory with 10-minute TTL
+    const { code, expiresAt } = otpStore.createOtp(normalizedEmail, 'LOGIN', {
+      email: normalizedEmail,
+      fullName,
     });
 
-    if (error) {
-      throw new ApiError(400, error.message);
-    }
+    // Dispatch branded DSMS verification email
+    await sendOtpEmail({
+      to: normalizedEmail,
+      otp: code,
+      fullName,
+      type: 'LOGIN',
+    });
 
     return {
-      email,
-      message: 'OTP sent to your email address. Please check your inbox.',
+      email: normalizedEmail,
+      expiresAt,
+      message: 'A 6-digit verification code has been sent to your email address.',
     };
   }
 
@@ -174,17 +197,74 @@ export class AuthService {
    * 4. Verify Email OTP and create authenticated session
    */
   async verifyEmailOtp(email: string, token: string) {
-    const { data, error } = await supabaseClient.auth.verifyOtp({
-      email,
-      token,
-      type: 'email',
-    });
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (error || !data.session || !data.user) {
-      throw new ApiError(401, error?.message || 'Invalid or expired OTP.');
+    // Verify token against OtpStore (checks SIGNUP first, then LOGIN)
+    let verification: { success: boolean; data?: Record<string, any> };
+    try {
+      verification = otpStore.verifyOtp(normalizedEmail, token, 'SIGNUP');
+    } catch (err: any) {
+      try {
+        verification = otpStore.verifyOtp(normalizedEmail, token, 'LOGIN');
+      } catch {
+        throw err;
+      }
     }
 
-    const profile = await this.ensureProfileSynced(data.user);
+    const regData = verification.data || {};
+    let authUser: any;
+
+    // Check if user already exists in Supabase Auth
+    const { data: existingAuthUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const foundUser = existingAuthUsers?.users.find(
+      (u) => u.email?.toLowerCase() === normalizedEmail
+    );
+
+    if (!foundUser) {
+      // Create confirmed user in Supabase Auth via Admin API
+      const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+        email: normalizedEmail,
+        password: regData.password || crypto.randomBytes(16).toString('hex'),
+        email_confirm: true,
+        user_metadata: {
+          full_name: regData.fullName || 'User',
+        },
+      });
+
+      if (createErr || !newUser?.user) {
+        throw new ApiError(500, createErr?.message || 'Failed to create authenticated account.');
+      }
+      authUser = newUser.user;
+    } else {
+      if (!foundUser.email_confirmed_at) {
+        await supabaseAdmin.auth.admin.updateUserById(foundUser.id, {
+          email_confirm: true,
+        });
+      }
+      authUser = foundUser;
+    }
+
+    // Ensure user record is synced into PostgreSQL users / admins table
+    const profile = await this.ensureProfileSynced(authUser);
+
+    // Generate Session Tokens
+    let accessToken: string;
+    let refreshToken: string = '';
+
+    if (regData.password) {
+      const { data: signInRes } = await supabaseClient.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: regData.password,
+      });
+      if (signInRes?.session) {
+        accessToken = signInRes.session.access_token;
+        refreshToken = signInRes.session.refresh_token;
+      } else {
+        accessToken = this.generateCustomJwtToken(authUser);
+      }
+    } else {
+      accessToken = this.generateCustomJwtToken(authUser);
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -194,49 +274,52 @@ export class AuthService {
           ? { adminActorId: profile.id }
           : { userActorId: profile.id }),
         action: 'USER_OTP_VERIFIED',
+        metadata: { email: normalizedEmail },
       },
     });
 
     return {
       profile,
       session: {
-        accessToken: data.session.access_token,
-        refreshToken: data.session.refresh_token,
+        accessToken,
+        refreshToken,
       },
     };
   }
 
   /**
-   * 5. Register with Email & Password (triggers email confirmation / OTP)
+   * 5. Register with Email & Password (generates custom 6-digit OTP & sends branded Resend email)
    */
   async registerWithEmail(email: string, password: string, fullName: string) {
-    const { data, error } = await supabaseClient.auth.signUp({
-      email,
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check if user already exists in PostgreSQL
+    const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const existingAdmin = await prisma.admin.findUnique({ where: { email: normalizedEmail } });
+    if (existingUser || existingAdmin) {
+      throw new ApiError(409, 'An account with this email address already exists. Please log in.');
+    }
+
+    // Generate cryptographic 6-digit OTP stored in memory with 10-minute TTL
+    const { code, expiresAt } = otpStore.createOtp(normalizedEmail, 'SIGNUP', {
+      email: normalizedEmail,
       password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: `${env.CLIENT_URL}/auth/callback`,
-      },
+      fullName,
     });
 
-    if (error) {
-      throw new ApiError(400, error.message);
-    }
-
-    let profile = null;
-    if (data.user) {
-      profile = await this.ensureProfileSynced(data.user);
-    }
+    // Dispatch branded DSMS verification email via Resend
+    await sendOtpEmail({
+      to: normalizedEmail,
+      otp: code,
+      fullName,
+      type: 'SIGNUP',
+    });
 
     return {
-      profile,
-      emailConfirmationRequired: !data.session,
-      session: data.session
-        ? {
-            accessToken: data.session.access_token,
-            refreshToken: data.session.refresh_token,
-          }
-        : null,
+      email: normalizedEmail,
+      emailConfirmationRequired: true,
+      expiresAt,
+      message: 'A 6-digit verification code has been sent to your email address.',
     };
   }
 

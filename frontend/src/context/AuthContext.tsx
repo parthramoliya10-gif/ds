@@ -197,37 +197,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const registerUser = async (data: { email: string; password: string; fullName: string }) => {
     setIsLoading(true);
     try {
-      const { data: res, error } = await supabase.auth.signUp({
+      await api.auth.register({
         email: data.email,
         password: data.password,
-        options: {
-          data: {
-            full_name: data.fullName,
-          },
-          emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
-        },
+        fullName: data.fullName,
       });
 
-      if (error) {
-        throw new Error(error.message);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("dsms_pending_email", data.email);
+        sessionStorage.setItem("dsms_pending_name", data.fullName);
       }
 
-      if (res.session) {
-        try {
-          const profile = await api.auth.getMe();
-          setUser(adaptProfileToUser(profile));
-        } catch {
-          setUser({
-            id: res.user?.id || "user",
-            name: data.fullName,
-            email: data.email,
-            role: "student",
-          });
-        }
-        router.push("/user/dashboard");
-      } else {
-        router.push("/verify-otp");
-      }
+      router.push("/verify-otp");
     } finally {
       setIsLoading(false);
     }

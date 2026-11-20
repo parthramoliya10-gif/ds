@@ -38,9 +38,9 @@ export declare class AdminService {
         };
         recentRequests: ({
             user: {
+                fullName: string | null;
                 id: string;
                 email: string;
-                fullName: string | null;
                 avatarUrl: string | null;
             };
             quotations: {
@@ -63,9 +63,9 @@ export declare class AdminService {
         })[];
         recentPayments: ({
             user: {
+                fullName: string | null;
                 id: string;
                 email: string;
-                fullName: string | null;
             };
             request: {
                 id: string;
@@ -96,14 +96,14 @@ export declare class AdminService {
         logs: {
             actor: {
                 role: "ADMIN";
+                fullName: string | null;
                 id: string;
                 email: string;
-                fullName: string | null;
             } | {
                 role: "USER";
+                fullName: string | null;
                 id: string;
                 email: string;
-                fullName: string | null;
             } | null;
             request: {
                 id: string;

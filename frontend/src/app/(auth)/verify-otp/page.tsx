@@ -8,9 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { cn } from "@/lib/utils";
 import { ArrowRight, RotateCw, AlertCircle, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import api from "@/lib/api/client";
 
 export default function VerifyOtpPage() {
   const router = useRouter();
+  const [email, setEmail] = React.useState<string>("");
   const [otp, setOtp] = React.useState<string[]>(["", "", "", "", "", ""]);
   const [resendTimer, setResendTimer] = React.useState(30);
   const [isShaking, setIsShaking] = React.useState(false);
@@ -18,6 +20,13 @@ export default function VerifyOtpPage() {
   const [submitting, setSubmitting] = React.useState(false);
 
   const inputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = sessionStorage.getItem("dsms_pending_email") || "";
+      setEmail(stored);
+    }
+  }, []);
 
   // 30s Countdown timer
   React.useEffect(() => {
@@ -84,13 +93,21 @@ export default function VerifyOtpPage() {
     inputRefs.current[nextIdx]?.focus();
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (resendTimer > 0) return;
     setResendTimer(30);
     setOtp(["", "", "", "", "", ""]);
     setErrorMessage(null);
     inputRefs.current[0]?.focus();
-    toast.info("A new 6-digit verification code was sent to your email.");
+
+    try {
+      if (email) {
+        await api.auth.sendOtp({ email });
+      }
+      toast.info("A new 6-digit verification code was sent to your email.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to resend code. Please try again.");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,19 +116,28 @@ export default function VerifyOtpPage() {
     if (fullCode.length < 6) return;
 
     setSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    setErrorMessage(null);
 
-    // Rule: Any 6 digits succeed EXCEPT 000000
-    if (fullCode === "000000") {
+    try {
+      const res = await api.auth.verifyOtp({
+        email,
+        token: fullCode,
+      });
+
+      if (res && res.accessToken && typeof window !== "undefined") {
+        localStorage.setItem("dsms_auth_token", res.accessToken);
+        sessionStorage.removeItem("dsms_pending_email");
+        sessionStorage.removeItem("dsms_pending_name");
+      }
+
+      toast.success("College email verified successfully!");
+      window.location.href = "/user/dashboard";
+    } catch (err: any) {
       setIsShaking(true);
-      setErrorMessage("Invalid verification code (000000 is rejected). Please try again.");
+      setErrorMessage(err.message || "Invalid or expired verification code. Please try again.");
       setTimeout(() => setIsShaking(false), 600);
       setSubmitting(false);
-      return;
     }
-
-    toast.success("College email verified successfully!");
-    router.push("/user/dashboard");
   };
 
   const isComplete = otp.every((d) => d.length === 1);
@@ -124,7 +150,7 @@ export default function VerifyOtpPage() {
         </CardTitle>
         <CardDescription className="text-[14px] text-muted-foreground">
           We sent a 6-digit confirmation code to{" "}
-          <span className="font-semibold text-foreground">your registered email</span>
+          <span className="font-semibold text-foreground">{email || "your registered email"}</span>
         </CardDescription>
       </CardHeader>
 

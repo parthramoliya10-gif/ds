@@ -135,19 +135,14 @@ class AuthController {
         try {
             const { email, password, fullName } = req.body;
             const result = await auth_service_js_1.default.registerWithEmail(email, password, fullName);
-            if (result.session) {
-                setAuthCookies(res, result.session.accessToken, result.session.refreshToken);
-            }
             (0, apiResponse_js_1.sendResponse)({
                 res,
                 statusCode: 201,
-                message: result.emailConfirmationRequired
-                    ? 'Registration successful. Please verify your email with the OTP/link sent.'
-                    : 'Registration successful.',
+                message: result.message,
                 data: {
-                    user: result.profile,
+                    email: result.email,
                     emailConfirmationRequired: result.emailConfirmationRequired,
-                    accessToken: result.session?.accessToken,
+                    expiresAt: result.expiresAt,
                 },
             });
         }

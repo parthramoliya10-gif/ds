@@ -18,9 +18,9 @@ export declare class RequestService {
      */
     createRequest(userId: string, data: CreateRequestInput, files?: Express.Multer.File[]): Promise<{
         user: {
+            fullName: string | null;
             id: string;
             email: string;
-            fullName: string | null;
             avatarUrl: string | null;
         };
         conversation: {
@@ -139,9 +139,9 @@ export declare class RequestService {
     getAllRequestsForAdmin(query: ListRequestsQuery): Promise<{
         requests: ({
             user: {
+                fullName: string | null;
                 id: string;
                 email: string;
-                fullName: string | null;
                 avatarUrl: string | null;
             };
             conversation: {
@@ -177,9 +177,9 @@ export declare class RequestService {
      */
     getRequestById(requestId: string, user: AuthenticatedUser): Promise<{
         user: {
+            fullName: string | null;
             id: string;
             email: string;
-            fullName: string | null;
             avatarUrl: string | null;
         };
         conversation: {

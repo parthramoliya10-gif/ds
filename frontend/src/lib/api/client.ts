@@ -111,6 +111,21 @@ export async function apiRequest<T = any>(
 export const api = {
   auth: {
     getMe: () => apiRequest("/auth/me"),
+    register: (data: { email: string; password: string; fullName: string }) =>
+      apiRequest("/auth/register", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    sendOtp: (data: { email: string; fullName?: string }) =>
+      apiRequest("/auth/otp/send", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    verifyOtp: (data: { email: string; token: string }) =>
+      apiRequest("/auth/otp/verify", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     updateMe: (data: { fullName?: string; phone?: string; avatarUrl?: string }) =>
       apiRequest("/auth/me", { method: "PATCH", body: JSON.stringify(data) }),
     updateUserRole: (userId: string, role: "USER" | "ADMIN") =>
