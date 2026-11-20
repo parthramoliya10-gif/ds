@@ -86,13 +86,7 @@ async function sendOtpEmail(params) {
     const fromEmail = senderEmail.includes('<')
         ? senderEmail
         : `DSMS Portal <${senderEmail}>`;
-    // Always log OTP visibly in console for instant testing
-    console.log('\n=============================================================');
-    console.log(`🔐 [DSMS VERIFICATION OTP] For: ${to}`);
-    console.log(`👉 CODE: ${otp}`);
-    console.log(`⏳ Valid for 10 minutes (${typeTitle})`);
-    console.log('=============================================================\n');
-    logger_js_1.default.info(`[OTP] Prepared ${type} OTP "${otp}" for ${to}`);
+    logger_js_1.default.info(`[OTP] Sending ${type} verification code to ${to} via Resend`);
     if (resendClient) {
         try {
             const response = await resendClient.emails.send({
@@ -115,7 +109,7 @@ async function sendOtpEmail(params) {
         }
     }
     else {
-        logger_js_1.default.warn(`[OTP] RESEND_API_KEY not configured. Simulated OTP for ${to}: ${otp}`);
+        logger_js_1.default.warn(`[OTP] RESEND_API_KEY not configured. Cannot send verification email to ${to}`);
         return false;
     }
 }

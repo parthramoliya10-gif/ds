@@ -207,9 +207,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         sessionStorage.setItem("dsms_pending_email", data.email);
         sessionStorage.setItem("dsms_pending_name", data.fullName);
         sessionStorage.setItem("dsms_pending_password", data.password);
-        if (res && (res as any).devOtp) {
-          sessionStorage.setItem("dsms_dev_otp", (res as any).devOtp);
-        }
       }
 
       router.push("/verify-otp");
