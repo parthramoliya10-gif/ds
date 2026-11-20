@@ -26,8 +26,6 @@ import { toast } from "sonner";
 const newRequestSchema = z.object({
   title: z.string().min(5, "Task title must be at least 5 characters"),
   subject: z.string().min(2, "Subject is required"),
-  college: z.string().min(2, "College name is required"),
-  semester: z.string().min(1, "Semester is required"),
   pages: z.coerce.number().min(1, "Pages must be at least 1"),
   format: z.enum(["typed", "handwritten"]),
   description: z.string().optional(),
@@ -55,8 +53,6 @@ export default function NewRequestPage() {
     defaultValues: {
       title: "",
       subject: "",
-      college: "",
-      semester: "1",
       pages: 10,
       format: "typed",
       description: "",
@@ -78,7 +74,7 @@ export default function NewRequestPage() {
       
       const fullDescription = [
         data.description || "Task specification details.",
-        `\n\n[Academic Details] Subject: ${data.subject} | Format: ${data.format} | Target Pages: ${data.pages} | College: ${data.college} | Semester: ${data.semester}`
+        `\n\n[Academic Details] Subject: ${data.subject} | Format: ${data.format} | Target Pages: ${data.pages}`
       ].join(" ");
       formData.append("description", fullDescription);
       formData.append("category", data.subject);
@@ -160,36 +156,6 @@ export default function NewRequestPage() {
                 />
                 {errors.subject && (
                   <p className="text-[12px] font-medium text-foreground">{errors.subject.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="college" className="text-[13px]">College / University</Label>
-                <Input
-                  id="college"
-                  placeholder="e.g. Delhi Technological University"
-                  {...register("college")}
-                  className={errors.college ? "border-foreground" : ""}
-                />
-                {errors.college && (
-                  <p className="text-[12px] font-medium text-foreground">{errors.college.message}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="semester" className="text-[13px]">Semester (1-10)</Label>
-                <Input
-                  id="semester"
-                  type="number"
-                  min={1}
-                  max={10}
-                  {...register("semester")}
-                  className={errors.semester ? "border-foreground" : ""}
-                />
-                {errors.semester && (
-                  <p className="text-[12px] font-medium text-foreground">{errors.semester.message}</p>
                 )}
               </div>
 
