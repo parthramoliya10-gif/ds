@@ -78,9 +78,23 @@ export async function sendOtpEmail(params: SendOtpEmailParams): Promise<boolean>
 
   const html = generateOtpHtml(fullName, otp, typeTitle);
   const subject = `Your DSMS Verification Code: ${otp}`;
-  const fromEmail = env.RESEND_FROM_EMAIL?.includes('@')
-    ? `DSMS Portal <${env.RESEND_FROM_EMAIL}>`
-    : 'DSMS Verification <onboarding@resend.dev>';
+  const isPublicDomain =
+    !env.RESEND_FROM_EMAIL ||
+    env.RESEND_FROM_EMAIL.includes('@gmail.com') ||
+    env.RESEND_FROM_EMAIL.includes('@yahoo.com') ||
+    env.RESEND_FROM_EMAIL.includes('@outlook.com') ||
+    env.RESEND_FROM_EMAIL.includes('@hotmail.com');
+
+  const fromEmail = isPublicDomain
+    ? 'DSMS Verification <onboarding@resend.dev>'
+    : `DSMS Portal <${env.RESEND_FROM_EMAIL}>`;
+
+  // Always log OTP visibly in console for instant testing
+  console.log('\n=============================================================');
+  console.log(`🔐 [DSMS VERIFICATION OTP] For: ${to}`);
+  console.log(`👉 CODE: ${otp}`);
+  console.log(`⏳ Valid for 10 minutes (${typeTitle})`);
+  console.log('=============================================================\n');
 
   logger.info(`[OTP] Prepared ${type} OTP "${otp}" for ${to}`);
 

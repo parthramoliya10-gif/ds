@@ -74,9 +74,20 @@ async function sendOtpEmail(params) {
         typeTitle = 'Password Reset';
     const html = generateOtpHtml(fullName, otp, typeTitle);
     const subject = `Your DSMS Verification Code: ${otp}`;
-    const fromEmail = env_js_1.default.RESEND_FROM_EMAIL?.includes('@')
-        ? `DSMS Portal <${env_js_1.default.RESEND_FROM_EMAIL}>`
-        : 'DSMS Verification <onboarding@resend.dev>';
+    const isPublicDomain = !env_js_1.default.RESEND_FROM_EMAIL ||
+        env_js_1.default.RESEND_FROM_EMAIL.includes('@gmail.com') ||
+        env_js_1.default.RESEND_FROM_EMAIL.includes('@yahoo.com') ||
+        env_js_1.default.RESEND_FROM_EMAIL.includes('@outlook.com') ||
+        env_js_1.default.RESEND_FROM_EMAIL.includes('@hotmail.com');
+    const fromEmail = isPublicDomain
+        ? 'DSMS Verification <onboarding@resend.dev>'
+        : `DSMS Portal <${env_js_1.default.RESEND_FROM_EMAIL}>`;
+    // Always log OTP visibly in console for instant testing
+    console.log('\n=============================================================');
+    console.log(`🔐 [DSMS VERIFICATION OTP] For: ${to}`);
+    console.log(`👉 CODE: ${otp}`);
+    console.log(`⏳ Valid for 10 minutes (${typeTitle})`);
+    console.log('=============================================================\n');
     logger_js_1.default.info(`[OTP] Prepared ${type} OTP "${otp}" for ${to}`);
     if (resendClient) {
         try {

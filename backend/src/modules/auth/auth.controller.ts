@@ -150,6 +150,7 @@ export class AuthController {
           email: result.email,
           emailConfirmationRequired: result.emailConfirmationRequired,
           expiresAt: result.expiresAt,
+          devOtp: (result as any).devOtp,
         },
       });
     } catch (error) {

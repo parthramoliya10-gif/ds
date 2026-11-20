@@ -319,6 +319,7 @@ export class AuthService {
       email: normalizedEmail,
       emailConfirmationRequired: true,
       expiresAt,
+      devOtp: env.NODE_ENV !== 'production' ? code : undefined,
       message: 'A 6-digit verification code has been sent to your email address.',
     };
   }

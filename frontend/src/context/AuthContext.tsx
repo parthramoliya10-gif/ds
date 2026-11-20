@@ -197,7 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const registerUser = async (data: { email: string; password: string; fullName: string }) => {
     setIsLoading(true);
     try {
-      await api.auth.register({
+      const res = await api.auth.register({
         email: data.email,
         password: data.password,
         fullName: data.fullName,
@@ -206,6 +206,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== "undefined") {
         sessionStorage.setItem("dsms_pending_email", data.email);
         sessionStorage.setItem("dsms_pending_name", data.fullName);
+        if (res && (res as any).devOtp) {
+          sessionStorage.setItem("dsms_dev_otp", (res as any).devOtp);
+        }
       }
 
       router.push("/verify-otp");

@@ -25,6 +25,11 @@ export default function VerifyOtpPage() {
     if (typeof window !== "undefined") {
       const stored = sessionStorage.getItem("dsms_pending_email") || "";
       setEmail(stored);
+      const devOtp = sessionStorage.getItem("dsms_dev_otp");
+      if (devOtp && devOtp.length === 6) {
+        setOtp(devOtp.split(""));
+        toast.info(`Development Mode: Auto-filled OTP (${devOtp})`);
+      }
     }
   }, []);
 

@@ -137,6 +137,7 @@ export declare class AuthService {
         email: string;
         emailConfirmationRequired: boolean;
         expiresAt: Date;
+        devOtp: string | undefined;
         message: string;
     }>;
     /**
