@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useAuth } from "@/context/AuthContext";
 import supabase from "@/lib/supabase/client";
+import api from "@/lib/api/client";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -97,7 +98,7 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
     }
   };
 
-  // 2. Handle File Upload for Avatar
+  // 2. Handle File Upload for Avatar via Cloudinary
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -113,26 +114,32 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
     }
 
     setSavingAvatar(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const base64 = reader.result as string;
-        await updateProfile({ avatarUrl: base64 });
-        setAvatarUrl(base64);
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+      const res = await api.profile.uploadAvatar(formData);
+      if (res && res.avatarUrl) {
+        setAvatarUrl(res.avatarUrl);
+        await updateProfile({ avatarUrl: res.avatarUrl });
         toast.success("Profile photo updated successfully!");
-      } catch (err: any) {
-        toast.error(err.message || "Failed to save profile picture.");
-      } finally {
-        setSavingAvatar(false);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to upload profile photo.");
+    } finally {
+      setSavingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   // 3. Handle Reset / Remove Avatar (Click on X sign)
   const handleResetAvatar = async () => {
     setSavingAvatar(true);
     try {
+      try {
+        await api.profile.removeAvatar();
+      } catch (err) {
+        console.warn("Backend removeAvatar skipped:", err);
+      }
       await updateProfile({ avatarUrl: "" });
       setAvatarUrl("");
       if (fileInputRef.current) {

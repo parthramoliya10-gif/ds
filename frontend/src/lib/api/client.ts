@@ -80,18 +80,21 @@ export async function apiRequest<T = any>(
   }
 
   if (!response.ok) {
-    // On 401, sign out and redirect to login on client-side
-    if (response.status === 401 && typeof window !== "undefined") {
+    // On 401, sign out and redirect to login on client-side (only if not already on /login or /register)
+    if (
+      response.status === 401 &&
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/login" &&
+      window.location.pathname !== "/register"
+    ) {
       try {
         await supabase.auth.signOut();
       } catch {
         // ignore background signout error
       }
-      if (window.location.pathname !== "/login") {
-        window.location.href = `/login?redirect=${encodeURIComponent(
-          window.location.pathname + window.location.search
-        )}`;
-      }
+      window.location.href = `/login?redirect=${encodeURIComponent(
+        window.location.pathname + window.location.search
+      )}`;
     }
 
     const errorMessage =
@@ -122,6 +125,19 @@ export const api = {
       apiRequest(`/auth/admin/users/${userId}/status`, {
         method: "PATCH",
         body: JSON.stringify({ isBlocked }),
+      }),
+  },
+
+  profile: {
+    get: () => apiRequest("/profile", { method: "GET" }),
+    uploadAvatar: (formData: FormData) =>
+      apiRequest<{ avatarUrl: string }>("/profile/avatar", {
+        method: "POST",
+        body: formData,
+      }),
+    removeAvatar: () =>
+      apiRequest<{ avatarUrl: null }>("/profile/avatar", {
+        method: "DELETE",
       }),
   },
 

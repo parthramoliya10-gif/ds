@@ -37,18 +37,22 @@ export const SOCKET_EVENTS = {
   PAYMENT_CONFIRMED: "payment_confirmed",
 } as const;
 
-export async function getSocket(): Promise<Socket> {
+export async function getSocket(): Promise<Socket | null> {
+  const token = await getAuthToken();
+  if (!token) {
+    if (socket) {
+      socket.disconnect();
+      socket = null;
+    }
+    return null;
+  }
+
   if (socket && socket.connected) {
     return socket;
   }
 
-  const token = await getAuthToken();
-
   if (socket) {
-    // If socket exists but disconnected or token changed
-    if (token) {
-      socket.auth = { token };
-    }
+    socket.auth = { token };
     socket.connect();
     return socket;
   }

@@ -38,7 +38,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     }
 
     getSocket().then((s) => {
-      if (!active) return;
+      if (!active || !s) return;
       setSocket(s);
       setIsConnected(s.connected);
 

@@ -265,12 +265,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn("Backend updateMe failed, continuing with Supabase metadata:", err);
     }
 
-    // 2. Update Supabase Auth user metadata
+    // 2. Update Supabase Auth user metadata (skip giant base64 data URIs to prevent bloating JWT tokens)
     try {
+      const isBase64 = data.avatarUrl && data.avatarUrl.startsWith("data:");
       await supabase.auth.updateUser({
         data: {
           ...(data.fullName !== undefined && { full_name: data.fullName }),
-          ...(data.avatarUrl !== undefined && { avatar_url: data.avatarUrl }),
+          ...(data.avatarUrl !== undefined && !isBase64 && { avatar_url: data.avatarUrl }),
           ...(data.phone !== undefined && { phone: data.phone }),
           ...(data.college !== undefined && { college: data.college }),
           ...(data.semester !== undefined && { semester: data.semester }),
