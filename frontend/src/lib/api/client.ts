@@ -1,7 +1,15 @@
 import supabase from "../supabase/client";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/v1";
+export function getApiBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+  if (typeof window !== "undefined") {
+    // In browser on unified single-domain deployment (Hostinger), relative URL /api/v1 connects directly
+    return "/api/v1";
+  }
+  return "http://localhost:5000/api/v1";
+}
 
 interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
@@ -27,8 +35,9 @@ export async function apiRequest<T = any>(
   options: RequestOptions = {}
 ): Promise<T> {
   const { params, headers = {}, ...rest } = options;
+  const apiBase = getApiBaseUrl();
 
-  let url = `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  let url = `${apiBase}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   if (params) {
     const searchParams = new URLSearchParams();
@@ -184,7 +193,7 @@ export const api = {
         body: formData,
       }),
     getDownloadUrl: (documentId: string) =>
-      `${API_BASE_URL}/documents/${documentId}/download`,
+      `${getApiBaseUrl()}/documents/${documentId}/download`,
   },
 
   chat: {

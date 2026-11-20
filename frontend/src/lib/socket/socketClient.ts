@@ -1,8 +1,16 @@
 import { io, Socket } from "socket.io-client";
 import { getAuthToken } from "../api/client";
 
-const SOCKET_URL =
-  process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
+export function getSocketUrl(): string {
+  if (process.env.NEXT_PUBLIC_SOCKET_URL) {
+    return process.env.NEXT_PUBLIC_SOCKET_URL;
+  }
+  if (typeof window !== "undefined") {
+    // On unified single-domain deployment (Hostinger), connect to current domain
+    return window.location.origin;
+  }
+  return "http://localhost:5000";
+}
 
 let socket: Socket | null = null;
 
@@ -44,7 +52,8 @@ export async function getSocket(): Promise<Socket> {
     return socket;
   }
 
-  socket = io(SOCKET_URL, {
+  const socketUrl = getSocketUrl();
+  socket = io(socketUrl, {
     auth: { token },
     withCredentials: false,
     transports: ["websocket", "polling"],
