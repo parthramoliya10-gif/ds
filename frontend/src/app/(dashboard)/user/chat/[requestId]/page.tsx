@@ -24,6 +24,15 @@ import {
 import { SOCKET_EVENTS } from "@/lib/socket/socketClient";
 import { ArrowLeft, MoreVertical, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function UserChatConversationPage() {
   const params = useParams();
@@ -37,7 +46,10 @@ export default function UserChatConversationPage() {
   const [currentQuotation, setCurrentQuotation] = React.useState<Quotation | null>(null);
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [isTyping, setIsTyping] = React.useState(false);
+  const [isCounterpartOnline, setIsCounterpartOnline] = React.useState(false);
   const [isRazorpayOpen, setIsRazorpayOpen] = React.useState(false);
+  const [isChangeModalOpen, setIsChangeModalOpen] = React.useState(false);
+  const [changeReason, setChangeReason] = React.useState("");
   const [loading, setLoading] = React.useState(true);
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
@@ -50,103 +62,206 @@ export default function UserChatConversationPage() {
     scrollToBottom();
   }, [messages, isTyping]);
 
-  // Join room and fetch history from backend
+  // 1. Fetch Request & Message History immediately when requestId changes
   React.useEffect(() => {
     let mounted = true;
 
     async function initChat() {
       if (!requestId) return;
 
-      // 1. Join Socket Room
-      await joinRoom(requestId);
-      markRead(requestId);
-
-      // 2. Fetch Request & Quotation Details
       try {
-        const reqData = await api.requests.getById(requestId);
-        if (mounted && reqData) {
-          setRequest(adaptRequestToFrontend(reqData));
-          if (reqData.quotations && reqData.quotations.length > 0) {
-            setCurrentQuotation(adaptQuotationToFrontend(reqData.quotations[0]));
+        setLoading(true);
+
+        const [reqRes, chatRes] = await Promise.allSettled([
+          api.requests.getById(requestId),
+          api.chat.getMessages(requestId),
+        ]);
+
+        if (mounted) {
+          if (reqRes.status === "fulfilled" && reqRes.value) {
+            setRequest(adaptRequestToFrontend(reqRes.value));
+            if (reqRes.value.quotations && reqRes.value.quotations.length > 0) {
+              setCurrentQuotation(adaptQuotationToFrontend(reqRes.value.quotations[0]));
+            }
+          }
+          if (chatRes.status === "fulfilled" && Array.isArray(chatRes.value?.messages)) {
+            setMessages(chatRes.value.messages.map(adaptMessageToFrontend));
           }
         }
       } catch (err) {
-        console.warn("Could not fetch request details:", err);
-      }
-
-      // 3. Fetch Message History
-      try {
-        const chatRes = await api.chat.getMessages(requestId);
-        if (mounted && chatRes && chatRes.messages && chatRes.messages.length > 0) {
-          const adapted = chatRes.messages.map(adaptMessageToFrontend);
-          setMessages(adapted);
-        }
-      } catch (err) {
-        console.warn("Could not fetch message history:", err);
+        console.warn("Could not load chat data:", err);
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
     initChat();
 
-    // Socket Event Listeners
-    if (socket) {
-      const handleNewMessage = (newMsg: any) => {
-        const adapted = adaptMessageToFrontend(newMsg);
-        setMessages((prev) => {
-          // Prevent duplicates
-          if (prev.some((m) => m.id === adapted.id)) return prev;
-          return [...prev, adapted];
-        });
-        markRead(requestId);
-      };
+    return () => {
+      mounted = false;
+    };
+  }, [requestId]);
 
-      const handleStatusUpdate = (update: any) => {
+  // 2. Real-time Socket Room & Listeners
+  React.useEffect(() => {
+    if (!requestId || !socket) return;
+
+    // Join room and mark read in background
+    joinRoom(requestId)
+      .then((roomRes: any) => {
+        if (roomRes && typeof roomRes.counterpartOnline === "boolean") {
+          setIsCounterpartOnline(roomRes.counterpartOnline);
+        }
+      })
+      .catch(() => {});
+
+    markRead(requestId);
+
+    const handleNewMessage = (newMsg: any) => {
+      const adapted = adaptMessageToFrontend(newMsg);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === adapted.id)) return prev;
+
+        const tempIdx = prev.findIndex(
+          (m) =>
+            m.id.startsWith("msg_temp_") &&
+            m.content.trim() === adapted.content.trim()
+        );
+
+        if (tempIdx !== -1) {
+          const next = [...prev];
+          next[tempIdx] = adapted;
+          return next;
+        }
+
+        return [...prev, adapted];
+      });
+      markRead(requestId);
+    };
+
+    const handleStatusUpdate = (update: any) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === update.id
+            ? { ...m, status: (update.status?.toLowerCase() || m.status) as any }
+            : m
+        )
+      );
+    };
+
+    const handleMessagesRead = (payload: any) => {
+      if (payload?.requestId === requestId) {
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === update.id
-              ? { ...m, status: (update.status?.toLowerCase() || m.status) as any }
+            m.senderRole === "student" ? { ...m, status: "read" } : m
+          )
+        );
+      }
+    };
+
+    const handleUserStatusChange = (payload: any) => {
+      if (payload?.role === "ADMIN") {
+        setIsCounterpartOnline(payload.status === "ONLINE");
+      }
+    };
+
+    const handlePeerStatus = (payload: any) => {
+      if (payload?.requestId === requestId && payload?.role === "ADMIN") {
+        setIsCounterpartOnline(payload.status === "ONLINE");
+      }
+    };
+
+    const handleUserTyping = (payload: any) => {
+      if (payload.requestId === requestId && payload.role === "ADMIN") {
+        setIsTyping(Boolean(payload.isTyping));
+      }
+    };
+
+    const handleQuotationReceived = (q: any) => {
+      const adapted = adaptQuotationToFrontend(q);
+      setCurrentQuotation(adapted);
+      toast.info("New quotation received from admin!");
+    };
+
+    const handleMessageDeleted = (payload: any) => {
+      if (payload?.type === "for_everyone") {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === payload.messageId
+              ? {
+                  ...m,
+                  content: "This message was deleted",
+                  isDeletedForEveryone: true,
+                  type: "text",
+                  attachment: undefined,
+                  quotation: undefined,
+                }
               : m
           )
         );
-      };
+      } else {
+        setMessages((prev) => prev.filter((m) => m.id !== payload.messageId));
+      }
+    };
 
-      const handleUserTyping = (payload: any) => {
-        if (payload.requestId === requestId && payload.role === "ADMIN") {
-          setIsTyping(Boolean(payload.isTyping));
-        }
-      };
-
-      const handleQuotationReceived = (q: any) => {
-        const adapted = adaptQuotationToFrontend(q);
-        setCurrentQuotation(adapted);
-        toast.info("New quotation received from admin!");
-      };
-
-      socket.on(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
-      socket.on(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
-      socket.on(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
-      socket.on(SOCKET_EVENTS.QUOTATION_RECEIVED, handleQuotationReceived);
-
-      return () => {
-        socket.off(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
-        socket.off(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
-        socket.off(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
-        socket.off(SOCKET_EVENTS.QUOTATION_RECEIVED, handleQuotationReceived);
-        leaveRoom(requestId);
-        mounted = false;
-      };
-    }
+    socket.on(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
+    socket.on(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
+    socket.on(SOCKET_EVENTS.MESSAGES_READ, handleMessagesRead);
+    socket.on(SOCKET_EVENTS.USER_STATUS_CHANGE, handleUserStatusChange);
+    socket.on("room_peer_status", handlePeerStatus);
+    socket.on(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
+    socket.on(SOCKET_EVENTS.QUOTATION_RECEIVED, handleQuotationReceived);
+    socket.on(SOCKET_EVENTS.MESSAGE_DELETED, handleMessageDeleted);
 
     return () => {
+      socket.off(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
+      socket.off(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
+      socket.off(SOCKET_EVENTS.MESSAGES_READ, handleMessagesRead);
+      socket.off(SOCKET_EVENTS.USER_STATUS_CHANGE, handleUserStatusChange);
+      socket.off("room_peer_status", handlePeerStatus);
+      socket.off(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
+      socket.off(SOCKET_EVENTS.QUOTATION_RECEIVED, handleQuotationReceived);
+      socket.off(SOCKET_EVENTS.MESSAGE_DELETED, handleMessageDeleted);
       leaveRoom(requestId);
-      mounted = false;
     };
-  }, [requestId, socket, joinRoom, leaveRoom, markRead]);
+  }, [requestId, socket]);
+
+  // Handle WhatsApp-style delete message
+  const handleDeleteMessage = async (messageId: string, type: "for_me" | "for_everyone") => {
+    try {
+      if (type === "for_me") {
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        toast.success("Message deleted for you");
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  content: "This message was deleted",
+                  isDeletedForEveryone: true,
+                  type: "text",
+                  attachment: undefined,
+                  quotation: undefined,
+                }
+              : m
+          )
+        );
+        toast.success("Message deleted for everyone");
+      }
+
+      await api.chat.deleteMessage(requestId, messageId, type);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete message");
+    }
+  };
 
   // Handle student sending a new message
   const handleSendMessage = async (content: string, file?: File) => {
+    if (!content.trim() && !file) return;
+
     // Optimistic message
     const tempId = "msg_temp_" + Math.random().toString(36).substring(2, 9);
     const newMsg: Message = {
@@ -157,7 +272,7 @@ export default function UserChatConversationPage() {
       content: content || (file ? `Uploaded reference file: ${file.name}` : ""),
       timestamp: new Date().toISOString(),
       type: file ? "file" : "text",
-      status: "sent",
+      status: isCounterpartOnline ? "delivered" : "sent",
       attachment: file
         ? {
             name: file.name,
@@ -178,24 +293,41 @@ export default function UserChatConversationPage() {
         const saved = await api.chat.postMessage(requestId, formData);
         if (saved) {
           const adapted = adaptMessageToFrontend(saved);
-          setMessages((prev) => prev.map((m) => (m.id === tempId ? adapted : m)));
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === adapted.id)) {
+              return prev.filter((m) => m.id !== tempId);
+            }
+            return prev.map((m) => (m.id === tempId ? adapted : m));
+          });
         }
       } else {
         // Send via real-time WebSocket
         if (socket?.connected) {
-          await sendMessage(requestId, content, "TEXT");
+          const saved = await sendMessage(requestId, content, "TEXT");
+          if (saved) {
+            const adapted = adaptMessageToFrontend(saved);
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === adapted.id)) {
+                return prev.filter((m) => m.id !== tempId);
+              }
+              return prev.map((m) => (m.id === tempId ? adapted : m));
+            });
+          }
         } else {
-          await api.chat.postMessage(requestId, { content, messageType: "TEXT" });
+          const saved = await api.chat.postMessage(requestId, { content, messageType: "TEXT" });
+          if (saved) {
+            const adapted = adaptMessageToFrontend(saved);
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === adapted.id)) {
+                return prev.filter((m) => m.id !== tempId);
+              }
+              return prev.map((m) => (m.id === tempId ? adapted : m));
+            });
+          }
         }
       }
     } catch (err: any) {
       console.warn("Message sending fallback:", err);
-      // Simulate delivered tick if offline
-      setTimeout(() => {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === tempId ? { ...m, status: "delivered" } : m))
-        );
-      }, 600);
     }
   };
 
@@ -249,14 +381,42 @@ export default function UserChatConversationPage() {
   };
 
   const handleRequestChange = (q: Quotation) => {
-    handleSendMessage("I'd like to request an adjustment to the quotation scope or page count.");
-    toast.info("Change request sent in chat.");
+    setChangeReason("");
+    setIsChangeModalOpen(true);
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="h-6 w-6 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col h-full bg-background animate-pulse">
+        {/* Header Skeleton */}
+        <div className="p-3.5 sm:px-5 border-b border-border flex items-center justify-between">
+          <div className="space-y-1.5">
+            <div className="h-3 w-28 bg-muted rounded" />
+            <div className="h-4 w-44 bg-muted/80 rounded" />
+          </div>
+          <div className="h-8 w-20 bg-muted/60 rounded" />
+        </div>
+
+        {/* Message Feed Skeleton */}
+        <div className="flex-1 p-5 space-y-4 overflow-hidden">
+          <div className="flex justify-start">
+            <div className="h-14 w-64 bg-surface border border-border rounded-[8px]" />
+          </div>
+          <div className="flex justify-end">
+            <div className="h-10 w-48 bg-muted rounded-[8px]" />
+          </div>
+          <div className="flex justify-start">
+            <div className="h-24 w-80 bg-surface border border-border rounded-[8px]" />
+          </div>
+          <div className="flex justify-end">
+            <div className="h-12 w-56 bg-muted rounded-[8px]" />
+          </div>
+        </div>
+
+        {/* Composer Skeleton */}
+        <div className="p-3.5 border-t border-border">
+          <div className="h-10 w-full bg-muted/40 rounded-[8px]" />
+        </div>
       </div>
     );
   }
@@ -289,13 +449,32 @@ export default function UserChatConversationPage() {
           <div className="truncate">
             <div className="flex items-center space-x-2">
               <span className="font-mono text-[12px] font-semibold text-muted-foreground">
-                {request.id}
+                {request.id.slice(0, 8)}...
               </span>
               <StatusBadge status={request.status} className="text-[10px] py-0 px-1.5 h-4" />
             </div>
-            <h3 className="text-[14px] font-semibold text-foreground truncate leading-tight">
-              {request.title}
-            </h3>
+            <div className="flex items-center space-x-2">
+              <h3 className="text-[14px] font-semibold text-foreground truncate leading-tight">
+                {request.title}
+              </h3>
+              <span className="text-muted-foreground/30">•</span>
+              <div className="flex items-center space-x-1.5 text-[12px]">
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full shrink-0",
+                    isCounterpartOnline ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/40"
+                  )}
+                />
+                <span
+                  className={cn(
+                    "font-medium text-[11px]",
+                    isCounterpartOnline ? "text-emerald-500" : "text-muted-foreground"
+                  )}
+                >
+                  {isCounterpartOnline ? "Specialist Online" : "Specialist Offline"}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -344,6 +523,7 @@ export default function UserChatConversationPage() {
                 key={msg.id}
                 attachment={msg.attachment}
                 isMe={msg.senderRole === "student" || msg.senderRole === "USER"}
+                onDelete={(type) => handleDeleteMessage(msg.id, type)}
               />
             );
           }
@@ -353,6 +533,7 @@ export default function UserChatConversationPage() {
               key={msg.id}
               message={msg}
               isMe={msg.senderRole === "student" || msg.senderRole === "USER"}
+              onDelete={handleDeleteMessage}
             />
           );
         })}
@@ -384,6 +565,61 @@ export default function UserChatConversationPage() {
           onSuccess={handleRazorpaySuccess}
         />
       )}
+
+      {/* Custom Request Change Dialog */}
+      <Dialog open={isChangeModalOpen} onOpenChange={setIsChangeModalOpen}>
+        <DialogContent className="sm:max-w-md bg-background border border-border rounded-[10px]">
+          <DialogHeader>
+            <DialogTitle className="text-[17px] font-semibold text-foreground">
+              Request Changes & Revisions
+            </DialogTitle>
+            <DialogDescription className="text-[13px] text-muted-foreground leading-relaxed">
+              Describe any adjustments, specific instructions, or requirements you would like the specialist to consider (e.g. topic details, deadline, formatting, or pricing).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2">
+            <textarea
+              rows={4}
+              value={changeReason}
+              onChange={(e) => setChangeReason(e.target.value)}
+              placeholder="Type your instructions, guidelines, deadline preferences, or any specific changes you would like to discuss..."
+              className="w-full rounded-[8px] border border-border bg-surface p-3 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground resize-none"
+              autoFocus
+            />
+          </div>
+
+          <DialogFooter className="flex flex-row justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsChangeModalOpen(false);
+                setChangeReason("");
+              }}
+              className="text-[13px]"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!changeReason.trim()}
+              onClick={() => {
+                if (!changeReason.trim()) return;
+                handleSendMessage(changeReason.trim());
+                setIsChangeModalOpen(false);
+                setChangeReason("");
+                toast.success("Change request sent in chat!");
+              }}
+              className="text-[13px] font-medium"
+            >
+              Send Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

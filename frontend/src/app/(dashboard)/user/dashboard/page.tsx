@@ -40,7 +40,6 @@ import {
   LayoutGrid,
   List,
   Sparkles,
-  ShieldCheck,
   Zap,
   FolderDown,
   Eye,
@@ -354,141 +353,7 @@ export default function UserDashboardPage() {
         </div>
       )}
 
-      {/* 3. Featured Active Task Spotlight (Hero Card) */}
-      {activeRequest ? (
-        <Card className="border border-border bg-background rounded-[10px] p-6 relative overflow-hidden">
-          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-            <div className="space-y-4 max-w-3xl">
-              {/* Header badges */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-                  Nearest Active Task • {activeRequest.id}
-                </span>
-                <StatusBadge status={activeRequest.status} />
-                {activeRequest.urgent && (
-                  <StatusBadge status="urgent" label="Due in < 24 hrs" />
-                )}
-                <span className="text-[11px] font-medium px-2 py-0.5 rounded border border-border bg-surface text-foreground">
-                  {activeRequest.subject}
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  {activeRequest.pages} pages • {activeRequest.format}
-                </span>
-              </div>
-
-              {/* Task Title */}
-              <h2 className="text-[22px] sm:text-[26px] font-bold tracking-tight text-foreground leading-snug">
-                {activeRequest.title}
-              </h2>
-
-              {/* Specialist Status Box */}
-              <div className="rounded-[8px] border border-border bg-surface p-3.5 flex items-start space-x-3 text-[13px]">
-                <div className="h-6 w-6 rounded-full bg-foreground text-background flex items-center justify-center shrink-0 font-bold text-[10px] mt-0.5">
-                  WR
-                </div>
-                <div className="space-y-1">
-                  <p className="font-medium text-foreground">
-                    Specialist Drafting in Progress
-                  </p>
-                  <p className="text-muted-foreground leading-relaxed">
-                    Active specialist is currently documenting Wireshark packet capture analysis, program screenshots, and verification code.
-                  </p>
-                </div>
-              </div>
-
-              {/* Escrow Milestone Strip */}
-              <div className="grid grid-cols-3 gap-3 pt-1 text-[12px]">
-                <div className="p-2.5 rounded-[6px] border border-border bg-surface/50">
-                  <span className="text-muted-foreground block text-[11px]">Total Price</span>
-                  <span className="font-semibold text-foreground text-[14px]">
-                    {formatCurrencyINR(activeRequest.totalAmount || 0)}
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-[6px] border border-border bg-surface/50">
-                  <span className="text-muted-foreground block text-[11px]">50% Advance Paid</span>
-                  <span className="font-semibold text-foreground text-[14px]">
-                    {formatCurrencyINR(activeRequest.advanceAmount || 0)} {activeRequest.advancePaid ? "✓" : ""}
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-[6px] border border-border bg-surface/50">
-                  <span className="text-muted-foreground block text-[11px]">Remaining Milestone</span>
-                  <span className="font-semibold text-foreground text-[14px]">
-                    {formatCurrencyINR(activeRequest.balanceAmount || 0)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Action column */}
-            <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0 lg:items-end lg:min-w-[200px]">
-              <div className="text-left lg:text-right">
-                <span className="text-[11px] uppercase font-mono tracking-wider text-muted-foreground block">
-                  Target Deadline
-                </span>
-                <span className="text-[18px] font-bold text-foreground">
-                  {formatDate(activeRequest.deadline)}
-                </span>
-                <span className="text-[12px] text-muted-foreground block mt-0.5">
-                  Turnaround: Under 24h
-                </span>
-              </div>
-
-              <Button
-                size="lg"
-                className="h-11 px-6 font-semibold rounded-[8px] w-full sm:w-auto"
-                onClick={() => router.push(`/user/chat/${activeRequest.id}`)}
-              >
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Open Task Discussion
-              </Button>
-
-              <Link href={`/user/requests/${activeRequest.id}`} className="w-full sm:w-auto">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 w-full border-border text-foreground hover:bg-surface rounded-[8px] text-[12px]"
-                >
-                  View Request Details
-                  <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-                </Button>
-              </Link>
-            </div>
-          </div>
-
-          {/* Milestone Stepper */}
-          <div className="mt-8 pt-6 border-t border-border">
-            <div className="mb-3 flex items-center justify-between text-[12px] font-medium text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <span>Milestone Progress Timeline</span>
-                <span className="text-[11px] px-1.5 py-0.2 rounded bg-surface border border-border text-foreground">
-                  Active Lifecycle
-                </span>
-              </span>
-              <span className="font-mono text-foreground font-semibold">{activeRequest.id}</span>
-            </div>
-            <Stepper currentStatus={activeRequest.status} />
-          </div>
-        </Card>
-      ) : (
-        <Card className="border border-border bg-background rounded-[10px] p-6 relative overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1 max-w-xl">
-              <h2 className="text-[20px] font-bold text-foreground">Welcome to DSMS Academic Portal</h2>
-              <p className="text-[13px] text-muted-foreground">
-                Get started by creating your first document request. Receive guaranteed milestone protection and rapid turnaround.
-              </p>
-            </div>
-            <Link href="/user/requests/new">
-              <Button className="h-10 px-5 font-semibold shrink-0">
-                <Plus className="h-4 w-4 mr-1.5" />
-                Submit New Task
-              </Button>
-            </Link>
-          </div>
-        </Card>
-      )}
-
-      {/* 4. Executive Key Metric Cards */}
+      {/* 3. Executive Key Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card
           className="p-5 border border-border bg-background rounded-[10px] hover:border-foreground/40 transition-colors cursor-pointer"
@@ -570,6 +435,92 @@ export default function UserDashboardPage() {
           </p>
         </Card>
       </div>
+
+      {/* 4. Featured Active Task Spotlight (Hero Card) */}
+      {activeRequest ? (
+        <Card className="border border-border bg-background rounded-[10px] p-4 sm:p-5 relative overflow-hidden">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-2">
+              {/* Header badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                  Active Task • #{activeRequest.id.slice(0, 8)}
+                </span>
+                <StatusBadge status={activeRequest.status} />
+                {activeRequest.urgent && (
+                  <StatusBadge status="urgent" label="Due < 24h" />
+                )}
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded border border-border bg-surface text-foreground">
+                  {activeRequest.subject}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {activeRequest.pages} pages • {activeRequest.format}
+                </span>
+              </div>
+
+              {/* Task Title */}
+              <h2 className="text-[18px] sm:text-[20px] font-bold tracking-tight text-foreground">
+                {activeRequest.title}
+              </h2>
+
+              {/* Compact Meta row: Deadline & Price */}
+              <div className="flex flex-wrap items-center gap-4 text-[12px] pt-0.5 text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>Deadline:</span>
+                  <strong className="text-foreground font-medium">{formatDate(activeRequest.deadline)}</strong>
+                </span>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span>Price:</span>
+                  <strong className="text-foreground font-medium">
+                    {activeRequest.totalAmount ? formatCurrencyINR(activeRequest.totalAmount) : "Awaiting Quote"}
+                  </strong>
+                </span>
+                {activeRequest.balanceAmount && activeRequest.balanceAmount > 0 ? (
+                  <>
+                    <span>•</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span>Remaining:</span>
+                      <strong className="text-foreground font-medium">
+                        {formatCurrencyINR(activeRequest.balanceAmount)}
+                      </strong>
+                    </span>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 shrink-0">
+              <Button
+                size="sm"
+                className="h-9 px-4 font-medium rounded-[8px]"
+                onClick={() => router.push(`/user/chat/${activeRequest.id}`)}
+              >
+                <MessageSquare className="h-4 w-4 mr-1.5" />
+                Chat
+              </Button>
+
+              <Link href={`/user/requests/${activeRequest.id}`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 px-3.5 border-border text-foreground hover:bg-surface rounded-[8px] text-[12px]"
+                >
+                  View Details
+                  <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Compact Stepper */}
+          <div className="mt-4 pt-4 border-t border-border">
+            <Stepper currentStatus={activeRequest.status} />
+          </div>
+        </Card>
+      ) : null}
 
       {/* 5. Recent Requests Hub (Search, Filter Tabs, Dual View) */}
       <Card className="border border-border bg-background rounded-[10px] p-4 sm:p-6 overflow-hidden">
@@ -789,93 +740,48 @@ export default function UserDashboardPage() {
         )}
       </Card>
 
-      {/* 7. Live Activity Feed & Safety Guarantee */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Recent Milestone Notifications */}
-        <Card className="lg:col-span-2 border border-border bg-background rounded-[10px] p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[15px] font-semibold text-foreground">
-              Recent Order Updates & Milestones
-            </h3>
-            <span className="text-[11px] text-muted-foreground font-mono">
-              Live Feed
-            </span>
-          </div>
+      {/* 6. Live Activity Feed */}
+      <Card className="border border-border bg-background rounded-[10px] p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-[15px] font-semibold text-foreground">
+            Recent Order Updates & Milestones
+          </h3>
+          <span className="text-[11px] text-muted-foreground font-mono">
+            Live Feed
+          </span>
+        </div>
 
-          <div className="space-y-3">
-            {requests.length === 0 ? (
-              <p className="text-[13px] text-muted-foreground p-3">No recent order updates.</p>
-            ) : (
-              requests.slice(0, 3).map((r) => (
-                <Link
-                  key={r.id}
-                  href={`/user/requests/${r.id}`}
-                  className="flex items-start space-x-3 p-3 rounded-[8px] border border-border bg-surface/40 hover:bg-surface transition-colors"
-                >
-                  <div className="h-7 w-7 rounded-full bg-foreground text-background flex items-center justify-center shrink-0 mt-0.5">
-                    <Check className="h-3.5 w-3.5 stroke-[3]" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[13px] font-semibold text-foreground truncate">
-                        {r.title}
-                      </p>
-                      <span className="text-[11px] text-muted-foreground ml-2 shrink-0">
-                        {formatDate(r.updatedAt || r.createdAt)}
-                      </span>
-                    </div>
-                    <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-1">
-                      Status: {r.status.toUpperCase()} • {r.format} ({r.pages} pages)
-                    </p>
-                  </div>
-                </Link>
-              ))
-            )}
-          </div>
-        </Card>
-
-        {/* Academic Trust & Safety */}
-        <Card className="border border-border bg-background rounded-[10px] p-5 flex flex-col justify-between">
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2 text-foreground">
-              <ShieldCheck className="h-5 w-5" />
-              <h4 className="text-[15px] font-semibold tracking-tight">
-                Student Escrow Guarantee
-              </h4>
-            </div>
-            <p className="text-[12px] text-muted-foreground leading-relaxed">
-              Your payments are protected in milestone escrow. Specialists receive the final 50% only after you download, review, and approve your academic document.
-            </p>
-            <ul className="text-[12px] text-foreground space-y-1.5 pt-1">
-              <li className="flex items-center">
-                <Check className="h-3.5 w-3.5 mr-2 text-foreground shrink-0" />
-                100% Plagiarism-Free Standards
-              </li>
-              <li className="flex items-center">
-                <Check className="h-3.5 w-3.5 mr-2 text-foreground shrink-0" />
-                Unlimited Formatting Corrections
-              </li>
-              <li className="flex items-center">
-                <Check className="h-3.5 w-3.5 mr-2 text-foreground shrink-0" />
-                Instant Watermark Removal upon Payment
-              </li>
-            </ul>
-          </div>
-
-          <div className="pt-4 mt-4 border-t border-border">
-            <Link href="/user/chat">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full text-[12px] h-8 border-border text-foreground hover:bg-surface"
+        <div className="space-y-3">
+          {requests.length === 0 ? (
+            <p className="text-[13px] text-muted-foreground p-3">No recent order updates.</p>
+          ) : (
+            requests.slice(0, 3).map((r) => (
+              <Link
+                key={r.id}
+                href={`/user/requests/${r.id}`}
+                className="flex items-start space-x-3 p-3 rounded-[8px] border border-border bg-surface/40 hover:bg-surface transition-colors"
               >
-                <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
-                Contact Helpdesk
-              </Button>
-            </Link>
-          </div>
-        </Card>
-      </div>
+                <div className="h-7 w-7 rounded-full bg-foreground text-background flex items-center justify-center shrink-0 mt-0.5">
+                  <Check className="h-3.5 w-3.5 stroke-[3]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[13px] font-semibold text-foreground truncate">
+                      {r.title}
+                    </p>
+                    <span className="text-[11px] text-muted-foreground ml-2 shrink-0">
+                      {formatDate(r.updatedAt || r.createdAt)}
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-1">
+                    Status: {r.status.toUpperCase()} • {r.format} ({r.pages} pages)
+                  </p>
+                </div>
+              </Link>
+            ))
+          )}
+        </div>
+      </Card>
     </div>
   );
 }

@@ -24,6 +24,7 @@ import {
 import { SOCKET_EVENTS } from "@/lib/socket/socketClient";
 import { ArrowLeft, ShieldCheck, Plus, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export default function AdminChatConversationPage() {
   const params = useParams();
@@ -39,6 +40,10 @@ export default function AdminChatConversationPage() {
   const [loading, setLoading] = React.useState(true);
   const [isQuotationModalOpen, setIsQuotationModalOpen] = React.useState(false);
   const [isTyping, setIsTyping] = React.useState(false);
+  const [isCounterpartOnline, setIsCounterpartOnline] = React.useState(false);
+
+  const requestRef = React.useRef<Request | null>(null);
+  requestRef.current = request;
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
@@ -50,7 +55,7 @@ export default function AdminChatConversationPage() {
     scrollToBottom();
   }, [messages, isTyping]);
 
-  // Join room and fetch history from backend
+  // 1. Fetch Request Details and Messages History immediately on requestId change
   React.useEffect(() => {
     let mounted = true;
 
@@ -59,8 +64,6 @@ export default function AdminChatConversationPage() {
 
       try {
         setLoading(true);
-        await joinRoom(requestId);
-        markRead(requestId);
 
         const [reqRes, chatRes] = await Promise.allSettled([
           api.requests.getById(requestId),
@@ -69,7 +72,9 @@ export default function AdminChatConversationPage() {
 
         if (mounted) {
           if (reqRes.status === "fulfilled" && reqRes.value) {
-            setRequest(adaptRequestToFrontend(reqRes.value));
+            const adapted = adaptRequestToFrontend(reqRes.value);
+            setRequest(adapted);
+            requestRef.current = adapted;
             if (reqRes.value.quotations && reqRes.value.quotations.length > 0) {
               setCurrentQuotation(adaptQuotationToFrontend(reqRes.value.quotations[0]));
             }
@@ -81,72 +86,182 @@ export default function AdminChatConversationPage() {
       } catch (err) {
         console.warn("Could not fetch admin chat:", err);
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
     initAdminChat();
 
-    // Socket Event Listeners
-    if (socket) {
-      const handleNewMessage = (newMsg: any) => {
-        const adapted = adaptMessageToFrontend(newMsg);
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === adapted.id)) return prev;
-          return [...prev, adapted];
-        });
-        markRead(requestId);
-      };
+    return () => {
+      mounted = false;
+    };
+  }, [requestId]);
 
-      const handleStatusUpdate = (update: any) => {
+  // 2. Real-time Socket Room & Event Listeners
+  React.useEffect(() => {
+    if (!requestId || !socket) return;
+
+    // Join room and mark read in background
+    joinRoom(requestId)
+      .then((roomRes: any) => {
+        if (roomRes && typeof roomRes.counterpartOnline === "boolean") {
+          setIsCounterpartOnline(roomRes.counterpartOnline);
+        }
+      })
+      .catch(() => {});
+
+    markRead(requestId);
+
+    const handleNewMessage = (newMsg: any) => {
+      const adapted = adaptMessageToFrontend(newMsg);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === adapted.id)) return prev;
+
+        const tempIdx = prev.findIndex(
+          (m) =>
+            m.id.startsWith("msg_admin_") &&
+            m.content.trim() === adapted.content.trim()
+        );
+
+        if (tempIdx !== -1) {
+          const next = [...prev];
+          next[tempIdx] = adapted;
+          return next;
+        }
+
+        return [...prev, adapted];
+      });
+      markRead(requestId);
+    };
+
+    const handleStatusUpdate = (update: any) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === update.id
+            ? { ...m, status: (update.status?.toLowerCase() || m.status) as any }
+            : m
+        )
+      );
+    };
+
+    const handleMessagesRead = (payload: any) => {
+      if (payload?.requestId === requestId) {
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === update.id
-              ? { ...m, status: (update.status?.toLowerCase() || m.status) as any }
+            m.senderRole === "admin" ? { ...m, status: "read" } : m
+          )
+        );
+      }
+    };
+
+    const handleUserStatusChange = (payload: any) => {
+      const req = requestRef.current;
+      if (req && (payload?.userId === req.studentId || payload?.userId === (req as any).userId)) {
+        setIsCounterpartOnline(payload.status === "ONLINE");
+      }
+    };
+
+    const handlePeerStatus = (payload: any) => {
+      if (payload?.requestId === requestId && payload?.role === "USER") {
+        setIsCounterpartOnline(payload.status === "ONLINE");
+      }
+    };
+
+    const handleUserTyping = (payload: any) => {
+      if (payload.requestId === requestId && (payload.role === "USER" || payload.role === "student")) {
+        setIsTyping(Boolean(payload.isTyping));
+      }
+    };
+
+    const handleQuotationReceived = (q: any) => {
+      setCurrentQuotation(adaptQuotationToFrontend(q));
+    };
+
+    const handlePaymentConfirmed = (p: any) => {
+      toast.success(`Milestone payment confirmed: ${p.milestone}`);
+    };
+
+    const handleMessageDeleted = (payload: any) => {
+      if (payload?.type === "for_everyone") {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === payload.messageId
+              ? {
+                  ...m,
+                  content: "This message was deleted",
+                  isDeletedForEveryone: true,
+                  type: "text",
+                  attachment: undefined,
+                  quotation: undefined,
+                }
               : m
           )
         );
-      };
+      } else {
+        setMessages((prev) => prev.filter((m) => m.id !== payload.messageId));
+      }
+    };
 
-      const handleUserTyping = (payload: any) => {
-        if (payload.requestId === requestId && (payload.role === "USER" || payload.role === "student")) {
-          setIsTyping(Boolean(payload.isTyping));
-        }
-      };
-
-      const handleQuotationReceived = (q: any) => {
-        setCurrentQuotation(adaptQuotationToFrontend(q));
-      };
-
-      const handlePaymentConfirmed = (p: any) => {
-        toast.success(`Milestone payment confirmed: ${p.milestone}`);
-      };
-
-      socket.on(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
-      socket.on(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
-      socket.on(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
-      socket.on(SOCKET_EVENTS.QUOTATION_RECEIVED, handleQuotationReceived);
-      socket.on(SOCKET_EVENTS.PAYMENT_CONFIRMED, handlePaymentConfirmed);
-
-      return () => {
-        socket.off(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
-        socket.off(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
-        socket.off(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
-        socket.off(SOCKET_EVENTS.QUOTATION_RECEIVED, handleQuotationReceived);
-        socket.off(SOCKET_EVENTS.PAYMENT_CONFIRMED, handlePaymentConfirmed);
-        leaveRoom(requestId);
-        mounted = false;
-      };
-    }
+    socket.on(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
+    socket.on(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
+    socket.on(SOCKET_EVENTS.MESSAGES_READ, handleMessagesRead);
+    socket.on(SOCKET_EVENTS.USER_STATUS_CHANGE, handleUserStatusChange);
+    socket.on("room_peer_status", handlePeerStatus);
+    socket.on(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
+    socket.on(SOCKET_EVENTS.QUOTATION_RECEIVED, handleQuotationReceived);
+    socket.on(SOCKET_EVENTS.PAYMENT_CONFIRMED, handlePaymentConfirmed);
+    socket.on(SOCKET_EVENTS.MESSAGE_DELETED, handleMessageDeleted);
 
     return () => {
+      socket.off(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
+      socket.off(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
+      socket.off(SOCKET_EVENTS.MESSAGES_READ, handleMessagesRead);
+      socket.off(SOCKET_EVENTS.USER_STATUS_CHANGE, handleUserStatusChange);
+      socket.off("room_peer_status", handlePeerStatus);
+      socket.off(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
+      socket.off(SOCKET_EVENTS.QUOTATION_RECEIVED, handleQuotationReceived);
+      socket.off(SOCKET_EVENTS.PAYMENT_CONFIRMED, handlePaymentConfirmed);
+      socket.off(SOCKET_EVENTS.MESSAGE_DELETED, handleMessageDeleted);
       leaveRoom(requestId);
-      mounted = false;
     };
-  }, [requestId, socket, joinRoom, leaveRoom, markRead]);
+  }, [requestId, socket]);
+
+  // Handle WhatsApp-style delete message
+  const handleDeleteMessage = async (messageId: string, type: "for_me" | "for_everyone") => {
+    try {
+      if (type === "for_me") {
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        toast.success("Message deleted for you");
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  content: "This message was deleted",
+                  isDeletedForEveryone: true,
+                  type: "text",
+                  attachment: undefined,
+                  quotation: undefined,
+                }
+              : m
+          )
+        );
+        toast.success("Message deleted for everyone");
+      }
+
+      await api.chat.deleteMessage(requestId, messageId, type);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete message");
+    }
+  };
 
   // Admin sending a message
   const handleSendMessage = async (content: string, file?: File) => {
+    if (!content.trim() && !file) return;
+
     const tempId = "msg_admin_" + Math.random().toString(36).substring(2, 9);
     const newMsg: Message = {
       id: tempId,
@@ -156,7 +271,7 @@ export default function AdminChatConversationPage() {
       content: content || (file ? `Shared document: ${file.name}` : ""),
       timestamp: new Date().toISOString(),
       type: file ? "file" : "text",
-      status: "sent",
+      status: isCounterpartOnline ? "delivered" : "sent",
       attachment: file
         ? {
             name: file.name,
@@ -176,22 +291,40 @@ export default function AdminChatConversationPage() {
         const saved = await api.chat.postMessage(requestId, formData);
         if (saved) {
           const adapted = adaptMessageToFrontend(saved);
-          setMessages((prev) => prev.map((m) => (m.id === tempId ? adapted : m)));
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === adapted.id)) {
+              return prev.filter((m) => m.id !== tempId);
+            }
+            return prev.map((m) => (m.id === tempId ? adapted : m));
+          });
         }
       } else {
         if (socket?.connected) {
-          await sendMessage(requestId, content, "TEXT");
+          const saved = await sendMessage(requestId, content, "TEXT");
+          if (saved) {
+            const adapted = adaptMessageToFrontend(saved);
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === adapted.id)) {
+                return prev.filter((m) => m.id !== tempId);
+              }
+              return prev.map((m) => (m.id === tempId ? adapted : m));
+            });
+          }
         } else {
-          await api.chat.postMessage(requestId, { content, messageType: "TEXT" });
+          const saved = await api.chat.postMessage(requestId, { content, messageType: "TEXT" });
+          if (saved) {
+            const adapted = adaptMessageToFrontend(saved);
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === adapted.id)) {
+                return prev.filter((m) => m.id !== tempId);
+              }
+              return prev.map((m) => (m.id === tempId ? adapted : m));
+            });
+          }
         }
       }
     } catch (err: any) {
       console.warn("Admin message send warning:", err);
-      setTimeout(() => {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === tempId ? { ...m, status: "delivered" } : m))
-        );
-      }, 600);
     }
   };
 
@@ -219,9 +352,36 @@ export default function AdminChatConversationPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full space-y-4">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
-        <p className="text-[14px] text-muted-foreground">Loading conversation...</p>
+      <div className="flex flex-col h-full bg-background animate-pulse">
+        {/* Header Skeleton */}
+        <div className="p-3.5 sm:px-5 border-b border-border flex items-center justify-between">
+          <div className="space-y-1.5">
+            <div className="h-3 w-28 bg-muted rounded" />
+            <div className="h-4 w-44 bg-muted/80 rounded" />
+          </div>
+          <div className="h-8 w-24 bg-muted/60 rounded" />
+        </div>
+
+        {/* Message Feed Skeleton */}
+        <div className="flex-1 p-5 space-y-4 overflow-hidden">
+          <div className="flex justify-start">
+            <div className="h-14 w-64 bg-surface border border-border rounded-[8px]" />
+          </div>
+          <div className="flex justify-end">
+            <div className="h-10 w-48 bg-muted rounded-[8px]" />
+          </div>
+          <div className="flex justify-start">
+            <div className="h-20 w-72 bg-surface border border-border rounded-[8px]" />
+          </div>
+          <div className="flex justify-end">
+            <div className="h-12 w-56 bg-muted rounded-[8px]" />
+          </div>
+        </div>
+
+        {/* Composer Skeleton */}
+        <div className="p-3.5 border-t border-border">
+          <div className="h-10 w-full bg-muted/40 rounded-[8px]" />
+        </div>
       </div>
     );
   }
@@ -256,13 +416,32 @@ export default function AdminChatConversationPage() {
           <div className="truncate">
             <div className="flex items-center space-x-2">
               <span className="font-mono text-[12px] font-semibold text-muted-foreground">
-                {request.id}
+                {request.id.slice(0, 8)}...
               </span>
               <StatusBadge status={request.status} className="text-[10px] py-0 px-1.5 h-4" />
             </div>
-            <h3 className="text-[14px] font-semibold text-foreground truncate leading-tight">
-              {request.title}
-            </h3>
+            <div className="flex items-center space-x-2">
+              <h3 className="text-[14px] font-semibold text-foreground truncate leading-tight">
+                {request.title}
+              </h3>
+              <span className="text-muted-foreground/30">•</span>
+              <div className="flex items-center space-x-1.5 text-[12px]">
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full shrink-0",
+                    isCounterpartOnline ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/40"
+                  )}
+                />
+                <span
+                  className={cn(
+                    "font-medium text-[11px]",
+                    isCounterpartOnline ? "text-emerald-500" : "text-muted-foreground"
+                  )}
+                >
+                  {isCounterpartOnline ? "Student Online" : "Student Offline"}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -319,6 +498,7 @@ export default function AdminChatConversationPage() {
                 key={msg.id}
                 attachment={msg.attachment}
                 isMe={msg.senderRole === "admin" || msg.senderRole === "ADMIN"}
+                onDelete={(type) => handleDeleteMessage(msg.id, type)}
               />
             );
           }
@@ -328,6 +508,7 @@ export default function AdminChatConversationPage() {
               key={msg.id}
               message={msg}
               isMe={msg.senderRole === "admin" || msg.senderRole === "ADMIN"}
+              onDelete={handleDeleteMessage}
             />
           );
         })}

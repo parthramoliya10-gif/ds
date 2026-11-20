@@ -22,6 +22,13 @@ import {
 } from "@/lib/api/adapters";
 import { formatCurrencyINR, formatDate, isDeadlineUrgent } from "@/lib/utils";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft,
   MessageSquare,
   FileText,
@@ -32,8 +39,10 @@ import {
   ExternalLink,
   ShieldCheck,
   Calendar,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
+import { downloadFile } from "@/lib/download";
 
 export default function UserRequestDetailPage() {
   const params = useParams();
@@ -46,6 +55,26 @@ export default function UserRequestDetailPage() {
   const [isRazorpayOpen, setIsRazorpayOpen] = React.useState(false);
   const [isRevisionOpen, setIsRevisionOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
+  const [previewFile, setPreviewFile] = React.useState<{
+    name: string;
+    size: string;
+    url?: string;
+  } | null>(null);
+
+  const handleDownloadFile = (file: { name: string; url?: string }) => {
+    if (!file.url || file.url === "#") {
+      toast.error("File download link is not available.");
+      return;
+    }
+
+    try {
+      toast.info(`Downloading ${file.name}...`);
+      downloadFile(file.url, file.name);
+      toast.success(`Download started for ${file.name}`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to download file.");
+    }
+  };
 
   React.useEffect(() => {
     let mounted = true;
@@ -125,10 +154,20 @@ export default function UserRequestDetailPage() {
     toast.success("Payment verified! Document is now unlocked for download.");
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (finalDoc?.id) {
-      window.open(api.documents.getDownloadUrl(finalDoc.id), "_blank");
-      toast.success(`Downloading ${finalDoc.fileName}...`);
+      try {
+        toast.info(`Preparing download for ${finalDoc.fileName}...`);
+        const res = await api.documents.getDownloadInfo(finalDoc.id);
+        if (res && res.downloadUrl) {
+          downloadFile(res.downloadUrl, res.fileName || finalDoc.fileName);
+          toast.success(`Download started for ${finalDoc.fileName}`);
+        } else {
+          toast.error("Download link expired or not found.");
+        }
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to download document.");
+      }
     } else {
       toast.info("Download not ready.");
     }
@@ -259,9 +298,24 @@ export default function UserRequestDetailPage() {
                       <span className="font-medium text-foreground truncate">{file.name}</span>
                       <span className="text-[11px] text-muted-foreground shrink-0">({file.size})</span>
                     </div>
-                    <Button variant="ghost" size="sm" className="h-7 text-[12px] px-2 text-muted-foreground hover:text-foreground">
-                      <Download className="h-3.5 w-3.5 mr-1" /> View
-                    </Button>
+                    <div className="flex items-center space-x-1.5 shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPreviewFile(file)}
+                        className="h-7 text-[12px] px-2.5 border-border"
+                      >
+                        <Eye className="h-3 w-3 mr-1" /> Preview
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadFile(file)}
+                        className="h-7 text-[12px] px-2.5 border-border"
+                      >
+                        <Download className="h-3 w-3 mr-1" /> Download
+                      </Button>
+                    </div>
                   </div>
                 ))
               ) : (
@@ -327,6 +381,117 @@ export default function UserRequestDetailPage() {
           setRequest((prev) => (prev ? { ...prev, status: "in_progress" } : null));
         }}
       />
+
+      {/* Preview File Dialog */}
+      <Dialog open={Boolean(previewFile)} onOpenChange={(open) => !open && setPreviewFile(null)}>
+        <DialogContent className="max-w-4xl w-[95vw] h-[85vh] border border-border bg-background p-6 rounded-[10px] shadow-none flex flex-col">
+          <DialogHeader className="space-y-1 pb-3 border-b border-border shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-[17px] font-semibold text-foreground flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  {previewFile?.name}
+                </DialogTitle>
+                <DialogDescription className="text-[12px] text-muted-foreground mt-0.5">
+                  {previewFile?.size} • Submitted Reference File
+                </DialogDescription>
+              </div>
+              {previewFile?.url && (
+                <a
+                  href={previewFile.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[12px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 mr-6 py-1 px-2.5 rounded-[6px] border border-border bg-surface"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open in New Tab
+                </a>
+              )}
+            </div>
+          </DialogHeader>
+
+          {/* Actual Document Preview Body */}
+          <div className="flex-1 my-3 relative overflow-hidden rounded-[8px] border border-border bg-surface flex flex-col items-center justify-center min-h-[350px]">
+            {previewFile?.url ? (
+              (() => {
+                const ext = previewFile.name.split(".").pop()?.toLowerCase() || "";
+                if (["jpg", "jpeg", "png", "webp", "gif", "svg", "bmp"].includes(ext)) {
+                  return (
+                    <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
+                      <img
+                        src={previewFile.url}
+                        alt={previewFile.name}
+                        className="max-h-[62vh] max-w-full object-contain rounded-[6px]"
+                      />
+                    </div>
+                  );
+                }
+                if (ext === "pdf") {
+                  return (
+                    <iframe
+                      src={`${previewFile.url}#toolbar=1`}
+                      title={previewFile.name}
+                      className="w-full h-full min-h-[450px] border-none"
+                    />
+                  );
+                }
+                if (["docx", "doc", "pptx", "ppt", "xlsx", "xls"].includes(ext)) {
+                  return (
+                    <div className="w-full h-full flex flex-col relative">
+                      <iframe
+                        src={`https://docs.google.com/viewer?url=${encodeURIComponent(previewFile.url)}&embedded=true`}
+                        title={previewFile.name}
+                        className="w-full flex-1 min-h-[450px] border-none"
+                      />
+                    </div>
+                  );
+                }
+                return (
+                  <iframe
+                    src={previewFile.url}
+                    title={previewFile.name}
+                    className="w-full h-full min-h-[450px] border-none"
+                  />
+                );
+              })()
+            ) : (
+              <div className="py-12 text-center space-y-3">
+                <FileText className="h-16 w-16 mx-auto text-muted-foreground stroke-[1.2]" />
+                <div className="text-[14px] text-foreground font-semibold">
+                  Preview Not Available
+                </div>
+                <p className="text-[12px] text-muted-foreground max-w-sm mx-auto">
+                  A preview could not be generated for this file format. Please download the file to view it locally.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t border-border shrink-0">
+            <span className="text-[12px] text-muted-foreground font-mono">
+              {previewFile?.size}
+            </span>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPreviewFile(null)}
+                className="text-[13px] border-border"
+              >
+                Close
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => previewFile && handleDownloadFile(previewFile)}
+                className="text-[13px] font-medium"
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Download File
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

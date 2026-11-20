@@ -6,13 +6,27 @@ import prisma from '../config/prisma.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import SOCKET_EVENTS from '../constants/socketEvents.js';
 import { registerChatHandlers } from './chat.handler.js';
-import { Role } from '@prisma/client';
+import { Role, MessageStatus } from '@prisma/client';
 import logger from '../utils/logger.js';
 
 let io: Server | null = null;
 
 // Track online users: Map<userId, Set<socketId>>
-const onlineUsers = new Map<string, Set<string>>();
+export const onlineUsers = new Map<string, Set<string>>();
+export const onlineUserRoles = new Map<string, Role>();
+
+export const isUserOnline = (userId: string): boolean => {
+  return (onlineUsers.get(userId)?.size || 0) > 0;
+};
+
+export const isAnyAdminOnline = (): boolean => {
+  for (const [userId, sockets] of onlineUsers.entries()) {
+    if (sockets.size > 0 && onlineUserRoles.get(userId) === Role.ADMIN) {
+      return true;
+    }
+  }
+  return false;
+};
 
 export const initSocketServer = (httpServer: HttpServer): Server => {
   const allowedOrigins = [
@@ -142,6 +156,7 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
     // 1. Presence tracking: Add socketId to user's active set
     if (!onlineUsers.has(user.id)) {
       onlineUsers.set(user.id, new Set());
+      onlineUserRoles.set(user.id, user.role);
       // Broadcast online status to all
       io?.emit(SOCKET_EVENTS.USER_STATUS_CHANGE, {
         userId: user.id,
@@ -150,6 +165,32 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
       });
     }
     onlineUsers.get(user.id)!.add(socket.id);
+
+    // Auto-deliver any pending messages waiting for this user
+    if (user.role === Role.USER) {
+      prisma.message.updateMany({
+        where: {
+          status: MessageStatus.SENT,
+          senderRole: Role.ADMIN,
+          conversation: { request: { userId: user.id } },
+        },
+        data: {
+          status: MessageStatus.DELIVERED,
+          deliveredAt: new Date(),
+        },
+      }).catch(() => {});
+    } else if (user.role === Role.ADMIN) {
+      prisma.message.updateMany({
+        where: {
+          status: MessageStatus.SENT,
+          senderRole: Role.USER,
+        },
+        data: {
+          status: MessageStatus.DELIVERED,
+          deliveredAt: new Date(),
+        },
+      }).catch(() => {});
+    }
 
     // 2. Room Joining with Strict Authorization
     socket.on(
@@ -183,8 +224,23 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
           socket.join(roomName);
           logger.info(`👥 User ${user.email} joined room: ${roomName}`);
 
-          socket.emit(SOCKET_EVENTS.ROOM_JOINED, { requestId });
-          if (callback) callback({ success: true, room: roomName });
+          let counterpartOnline = false;
+          if (user.role === Role.ADMIN) {
+            counterpartOnline = isUserOnline(request.userId);
+          } else {
+            counterpartOnline = isAnyAdminOnline();
+          }
+
+          socket.emit(SOCKET_EVENTS.ROOM_JOINED, { requestId, counterpartOnline });
+
+          socket.to(roomName).emit('room_peer_status', {
+            requestId,
+            userId: user.id,
+            role: user.role,
+            status: 'ONLINE',
+          });
+
+          if (callback) callback({ success: true, room: roomName, counterpartOnline });
         } catch (error: any) {
           logger.error('Error joining request room:', error);
           if (callback) callback({ success: false, error: error.message });
@@ -197,6 +253,13 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
       const roomName = `request:${payload.requestId}`;
       socket.leave(roomName);
       logger.info(`🚪 User ${user.email} left room: ${roomName}`);
+
+      socket.to(roomName).emit('room_peer_status', {
+        requestId: payload.requestId,
+        userId: user.id,
+        role: user.role,
+        status: 'OFFLINE',
+      });
     });
 
     // 4. Register WhatsApp Chat Handlers (Messaging, Ticks, Typing)
@@ -211,6 +274,7 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
         userSockets.delete(socket.id);
         if (userSockets.size === 0) {
           onlineUsers.delete(user.id);
+          onlineUserRoles.delete(user.id);
           // Broadcast offline status
           io?.emit(SOCKET_EVENTS.USER_STATUS_CHANGE, {
             userId: user.id,

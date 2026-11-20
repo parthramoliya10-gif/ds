@@ -214,22 +214,28 @@ export function adaptMessageToFrontend(backendMsg: any): Message {
   const role =
     backendMsg.senderRole?.toUpperCase() === "ADMIN" ? "admin" : "student";
 
+  const isDeletedForEveryone = Boolean(
+    backendMsg.isDeletedForEveryone || backendMsg.metadata?.isDeletedForEveryone
+  );
+
   let type: "text" | "quotation" | "file" | "system" = "text";
-  if (backendMsg.messageType === "QUOTATION_CARD") type = "quotation";
-  else if (backendMsg.messageType === "FILE") type = "file";
-  else if (backendMsg.messageType === "SYSTEM") type = "system";
+  if (!isDeletedForEveryone) {
+    if (backendMsg.messageType === "QUOTATION_CARD") type = "quotation";
+    else if (backendMsg.messageType === "FILE") type = "file";
+    else if (backendMsg.messageType === "SYSTEM") type = "system";
+  }
 
   let status: "sent" | "delivered" | "read" = "sent";
   if (backendMsg.status === "READ") status = "read";
   else if (backendMsg.status === "DELIVERED") status = "delivered";
 
   let quotation: Quotation | undefined;
-  if (backendMsg.metadata && backendMsg.metadata.quotation) {
+  if (!isDeletedForEveryone && backendMsg.metadata && backendMsg.metadata.quotation) {
     quotation = adaptQuotationToFrontend(backendMsg.metadata.quotation);
   }
 
   let attachment = undefined;
-  if (backendMsg.metadata && backendMsg.metadata.attachment) {
+  if (!isDeletedForEveryone && backendMsg.metadata && backendMsg.metadata.attachment) {
     attachment = {
       name: backendMsg.metadata.attachment.fileName || "attachment",
       size: backendMsg.metadata.attachment.fileSize
@@ -247,12 +253,13 @@ export function adaptMessageToFrontend(backendMsg: any): Message {
     senderRole: role,
     senderName: backendMsg.sender?.fullName || backendMsg.sender?.email || "User",
     senderAvatar: backendMsg.sender?.avatarUrl || undefined,
-    content: backendMsg.content,
+    content: isDeletedForEveryone ? "This message was deleted" : backendMsg.content,
     timestamp: backendMsg.createdAt || new Date().toISOString(),
     type,
     status,
     quotation,
     attachment,
     metadata: backendMsg.metadata,
+    isDeletedForEveryone,
   };
 }

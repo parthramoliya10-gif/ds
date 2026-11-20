@@ -102,6 +102,7 @@ export interface Message {
   quotation?: Quotation;
   attachment?: MessageAttachment;
   metadata?: any;
+  isDeletedForEveryone?: boolean;
 }
 
 export interface Payment {

@@ -22,6 +22,7 @@ export function ChatComposer({
 }: ChatComposerProps) {
   const [text, setText] = React.useState("");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const typingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -37,12 +38,19 @@ export function ChatComposer({
   };
 
   const handleSend = () => {
-    if (!text.trim() && !selectedFile) return;
+    if ((!text.trim() && !selectedFile) || isSubmitting) return;
+    setIsSubmitting(true);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     if (onTypingChange) onTypingChange(false);
-    onSendMessage(text.trim(), selectedFile || undefined);
+    const contentToSend = text.trim();
+    const fileToSend = selectedFile || undefined;
     setText("");
     setSelectedFile(null);
+    try {
+      onSendMessage(contentToSend, fileToSend);
+    } finally {
+      setTimeout(() => setIsSubmitting(false), 300);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

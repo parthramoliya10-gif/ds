@@ -51,6 +51,7 @@ import {
   Plus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { downloadFile } from "@/lib/download";
 
 export default function AdminRequestDetailPage() {
   const params = useParams();
@@ -61,7 +62,28 @@ export default function AdminRequestDetailPage() {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [isQuotationModalOpen, setIsQuotationModalOpen] = React.useState(false);
-  const [previewFile, setPreviewFile] = React.useState<{ name: string; size: string } | null>(null);
+  const [previewFile, setPreviewFile] = React.useState<{
+    name: string;
+    size: string;
+    url?: string;
+    type?: string;
+    mimeType?: string;
+  } | null>(null);
+
+  const handleDownloadFile = (file: { name: string; url?: string }) => {
+    if (!file.url || file.url === "#") {
+      toast.error("File download link is not available.");
+      return;
+    }
+
+    try {
+      toast.info(`Downloading ${file.name}...`);
+      downloadFile(file.url, file.name);
+      toast.success(`Download started for ${file.name}`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to download file.");
+    }
+  };
 
   React.useEffect(() => {
     let mounted = true;
@@ -135,6 +157,35 @@ export default function AdminRequestDetailPage() {
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to send message");
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string, type: "for_me" | "for_everyone") => {
+    try {
+      if (type === "for_me") {
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        toast.success("Message deleted for you");
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  content: "This message was deleted",
+                  isDeletedForEveryone: true,
+                  type: "text",
+                  attachment: undefined,
+                  quotation: undefined,
+                }
+              : m
+          )
+        );
+        toast.success("Message deleted for everyone");
+      }
+
+      await api.chat.deleteMessage(requestId, messageId, type);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete message");
     }
   };
 
@@ -418,7 +469,7 @@ export default function AdminRequestDetailPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => toast.success(`Downloaded reference file: ${file.name}`)}
+                        onClick={() => handleDownloadFile(file)}
                         className="h-8 text-[12px] border-border"
                       >
                         <Download className="h-3.5 w-3.5 mr-1" />
@@ -554,9 +605,14 @@ export default function AdminRequestDetailPage() {
                           message={msg}
                           isMe={isMe}
                           senderLabel={isMe ? "You (Admin)" : request.studentName}
+                          onDelete={handleDeleteMessage}
                         />
                       )}
-                      <AttachmentBubble attachment={msg.attachment} isMe={isMe} />
+                      <AttachmentBubble
+                        attachment={msg.attachment}
+                        isMe={isMe}
+                        onDelete={(type) => handleDeleteMessage(msg.id, type)}
+                      />
                     </React.Fragment>
                   );
                 }
@@ -567,6 +623,7 @@ export default function AdminRequestDetailPage() {
                     message={msg}
                     isMe={isMe}
                     senderLabel={isMe ? "You (Admin)" : request.studentName}
+                    onDelete={handleDeleteMessage}
                   />
                 );
               })}
@@ -608,46 +665,111 @@ export default function AdminRequestDetailPage() {
 
       {/* Preview File Dialog */}
       <Dialog open={Boolean(previewFile)} onOpenChange={(open) => !open && setPreviewFile(null)}>
-        <DialogContent className="max-w-lg border border-border bg-background p-6 rounded-[8px] shadow-none">
-          <DialogHeader className="space-y-1 pb-3 border-b border-border">
-            <DialogTitle className="text-[16px] font-semibold text-foreground">
-              Document Preview
-            </DialogTitle>
-            <DialogDescription className="text-[12px] text-muted-foreground">
-              {previewFile?.name} ({previewFile?.size})
-            </DialogDescription>
+        <DialogContent className="max-w-4xl w-[95vw] h-[85vh] border border-border bg-background p-6 rounded-[10px] shadow-none flex flex-col">
+          <DialogHeader className="space-y-1 pb-3 border-b border-border shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-[17px] font-semibold text-foreground flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  {previewFile?.name}
+                </DialogTitle>
+                <DialogDescription className="text-[12px] text-muted-foreground mt-0.5">
+                  {previewFile?.size} • Uploaded Reference Document
+                </DialogDescription>
+              </div>
+              {previewFile?.url && (
+                <a
+                  href={previewFile.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[12px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 mr-6 py-1 px-2.5 rounded-[6px] border border-border bg-surface"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open in New Tab
+                </a>
+              )}
+            </div>
           </DialogHeader>
 
-          <div className="py-8 text-center space-y-3">
-            <FileText className="h-16 w-16 mx-auto text-muted-foreground stroke-[1.2]" />
-            <div className="text-[13px] text-foreground font-medium">
-              Verified Student Submission Attachment
-            </div>
-            <p className="text-[12px] text-muted-foreground max-w-sm mx-auto">
-              Contains prompt instructions, problem statement specifications, and university grading rubric.
-            </p>
+          {/* Actual Document Preview Body */}
+          <div className="flex-1 my-3 relative overflow-hidden rounded-[8px] border border-border bg-surface flex flex-col items-center justify-center min-h-[350px]">
+            {previewFile?.url ? (
+              (() => {
+                const ext = previewFile.name.split(".").pop()?.toLowerCase() || "";
+                if (["jpg", "jpeg", "png", "webp", "gif", "svg", "bmp"].includes(ext)) {
+                  return (
+                    <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
+                      <img
+                        src={previewFile.url}
+                        alt={previewFile.name}
+                        className="max-h-[62vh] max-w-full object-contain rounded-[6px]"
+                      />
+                    </div>
+                  );
+                }
+                if (ext === "pdf") {
+                  return (
+                    <iframe
+                      src={`${previewFile.url}#toolbar=1`}
+                      title={previewFile.name}
+                      className="w-full h-full min-h-[450px] border-none"
+                    />
+                  );
+                }
+                if (["docx", "doc", "pptx", "ppt", "xlsx", "xls"].includes(ext)) {
+                  return (
+                    <div className="w-full h-full flex flex-col relative">
+                      <iframe
+                        src={`https://docs.google.com/viewer?url=${encodeURIComponent(previewFile.url)}&embedded=true`}
+                        title={previewFile.name}
+                        className="w-full flex-1 min-h-[450px] border-none"
+                      />
+                    </div>
+                  );
+                }
+                return (
+                  <iframe
+                    src={previewFile.url}
+                    title={previewFile.name}
+                    className="w-full h-full min-h-[450px] border-none"
+                  />
+                );
+              })()
+            ) : (
+              <div className="py-12 text-center space-y-3">
+                <FileText className="h-16 w-16 mx-auto text-muted-foreground stroke-[1.2]" />
+                <div className="text-[14px] text-foreground font-semibold">
+                  Preview Not Available
+                </div>
+                <p className="text-[12px] text-muted-foreground max-w-sm mx-auto">
+                  A preview could not be generated for this file format. Please download the file to view it locally.
+                </p>
+              </div>
+            )}
           </div>
 
-          <div className="flex justify-end space-x-2 pt-3 border-t border-border">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPreviewFile(null)}
-              className="text-[13px] border-border"
-            >
-              Close
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                toast.success(`Downloading ${previewFile?.name}`);
-                setPreviewFile(null);
-              }}
-              className="text-[13px]"
-            >
-              <Download className="h-3.5 w-3.5 mr-1.5" />
-              Download File
-            </Button>
+          <div className="flex items-center justify-between pt-3 border-t border-border shrink-0">
+            <span className="text-[12px] text-muted-foreground font-mono">
+              {previewFile?.size}
+            </span>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPreviewFile(null)}
+                className="text-[13px] border-border"
+              >
+                Close
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => previewFile && handleDownloadFile(previewFile)}
+                className="text-[13px] font-medium"
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Download File
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

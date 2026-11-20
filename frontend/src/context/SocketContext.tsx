@@ -8,7 +8,7 @@ import { useAuth } from "./AuthContext";
 interface SocketContextType {
   socket: Socket | null;
   isConnected: boolean;
-  joinRoom: (requestId: string) => Promise<boolean>;
+  joinRoom: (requestId: string) => Promise<any>;
   leaveRoom: (requestId: string) => void;
   sendMessage: (
     requestId: string,
@@ -60,14 +60,19 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const joinRoom = useCallback(
-    async (requestId: string): Promise<boolean> => {
+    async (requestId: string): Promise<any> => {
       if (!socket) return false;
       return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          resolve({ success: true, counterpartOnline: false });
+        }, 1200);
+
         socket.emit(
           SOCKET_EVENTS.JOIN_REQUEST_ROOM,
           { requestId },
           (response: any) => {
-            resolve(response?.success ?? true);
+            clearTimeout(timer);
+            resolve(response || { success: true });
           }
         );
       });

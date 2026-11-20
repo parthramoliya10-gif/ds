@@ -3,6 +3,7 @@ import { MessageStatus, MessageType, Role } from '@prisma/client';
 import prisma from '../config/prisma.js';
 import SOCKET_EVENTS from '../constants/socketEvents.js';
 import { chatService } from '../modules/chat/chat.service.js';
+import { isUserOnline, isAnyAdminOnline } from './socket.server.js';
 import logger from '../utils/logger.js';
 
 export const registerChatHandlers = (io: Server, socket: Socket) => {
@@ -36,10 +37,34 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
           return;
         }
 
+        // Determine if counterpart is online or active in room
+        const request = await prisma.documentRequest.findUnique({
+          where: { id: requestId },
+          select: { userId: true },
+        });
+
+        let recipientOnline = false;
+        if (currentUser.role === Role.ADMIN) {
+          recipientOnline = request ? isUserOnline(request.userId) : false;
+        } else {
+          recipientOnline = isAnyAdminOnline();
+        }
+
+        const roomSockets = await io.in(roomName).fetchSockets();
+        const recipientInRoom = roomSockets.some(
+          (s) => s.data.user?.id !== currentUser.id
+        );
+
+        let initialStatus: MessageStatus = MessageStatus.SENT;
+        if (recipientInRoom || recipientOnline) {
+          initialStatus = MessageStatus.DELIVERED;
+        }
+
         const savedMessage = await chatService.postMessage(currentUser, requestId, {
           content: content.trim(),
           messageType,
           metadata,
+          status: initialStatus,
         });
 
         io.to(roomName).emit(SOCKET_EVENTS.NEW_MESSAGE, savedMessage);

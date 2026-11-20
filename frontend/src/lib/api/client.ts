@@ -194,6 +194,11 @@ export const api = {
       }),
     getDownloadUrl: (documentId: string) =>
       `${getApiBaseUrl()}/documents/${documentId}/download`,
+    getDownloadInfo: (documentId: string) =>
+      apiRequest<{ downloadUrl: string; fileName: string; mimeType: string }>(
+        `/documents/${documentId}/download`,
+        { method: "GET" }
+      ),
   },
 
   chat: {
@@ -213,6 +218,14 @@ export const api = {
     },
     markRead: (requestId: string) =>
       apiRequest(`/chat/${requestId}/read`, { method: "PATCH" }),
+    deleteMessage: (
+      requestId: string,
+      messageId: string,
+      type: "for_me" | "for_everyone" = "for_me"
+    ) =>
+      apiRequest(`/chat/${requestId}/messages/${messageId}?type=${type}`, {
+        method: "DELETE",
+      }),
   },
 
   admin: {

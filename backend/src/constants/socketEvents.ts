@@ -23,6 +23,7 @@ export const SOCKET_EVENTS = {
   MESSAGE_STATUS_UPDATE: 'message_status_update',
   MARK_READ: 'mark_read',
   MESSAGES_READ: 'messages_read',
+  MESSAGE_DELETED: 'message_deleted',
 
   // Typing
   TYPING_START: 'typing_start',

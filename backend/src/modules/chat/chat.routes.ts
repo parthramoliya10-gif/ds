@@ -21,4 +21,7 @@ router.post(
 // 3. Mark messages as read (Blue ticks)
 router.patch('/:requestId/read', chatController.markRead);
 
+// 4. Delete message (WhatsApp style: 'for_me' or 'for_everyone')
+router.delete('/:requestId/messages/:messageId', chatController.deleteMessage);
+
 export default router;

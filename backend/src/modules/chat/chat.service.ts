@@ -13,6 +13,7 @@ export interface PostMessageInput {
   content: string;
   messageType?: MessageType;
   metadata?: any;
+  status?: MessageStatus;
 }
 
 const formatMessageSender = (msg: any) => {
@@ -26,9 +27,13 @@ const formatMessageSender = (msg: any) => {
       ? { ...userSender, role: Role.USER }
       : null;
 
+  const isDeletedForEveryone = Boolean(msg.metadata?.isDeletedForEveryone);
+
   return {
     ...rest,
     sender,
+    isDeletedForEveryone,
+    content: isDeletedForEveryone ? "This message was deleted" : rest.content,
   };
 };
 
@@ -41,33 +46,28 @@ export class ChatService {
     user: AuthenticatedUser,
     options: GetMessagesOptions = {}
   ) {
-    // 1. Verify access to this request
-    const request = await prisma.documentRequest.findUnique({
-      where: { id: requestId },
-      select: { id: true, userId: true },
-    });
-
-    if (!request) {
-      throw new ApiError(404, 'Document request not found.');
-    }
-
-    if (user.role !== Role.ADMIN && request.userId !== user.id) {
-      throw new ApiError(403, 'Forbidden: You do not have permission to view this chat.');
-    }
-
-    // 2. Find conversation
+    // 1. Single roundtrip: Fetch conversation and verify request authorization simultaneously
     const conversation = await prisma.conversation.findUnique({
       where: { requestId },
-      select: { id: true },
+      select: {
+        id: true,
+        request: {
+          select: { id: true, userId: true },
+        },
+      },
     });
 
-    if (!conversation) {
-      throw new ApiError(404, 'Conversation not found for this request.');
+    if (!conversation || !conversation.request) {
+      throw new ApiError(404, 'Conversation or request not found.');
+    }
+
+    if (user.role !== Role.ADMIN && conversation.request.userId !== user.id) {
+      throw new ApiError(403, 'Forbidden: You do not have permission to view this chat.');
     }
 
     const limit = Math.min(options.limit || 50, 100);
 
-    // 3. Query messages with cursor-based pagination
+    // 2. Query messages with cursor-based pagination
     const messages = await prisma.message.findMany({
       where: { conversationId: conversation.id },
       take: limit + 1,
@@ -91,8 +91,17 @@ export class ChatService {
       },
     });
 
-    const hasMore = messages.length > limit;
-    const items = hasMore ? messages.slice(0, limit) : messages;
+    // Filter out messages that this user deleted for themselves ('Delete for me')
+    const visibleMessages = messages.filter((msg) => {
+      const meta = msg.metadata as any;
+      if (meta && Array.isArray(meta.deletedFor) && meta.deletedFor.includes(user.id)) {
+        return false;
+      }
+      return true;
+    });
+
+    const hasMore = visibleMessages.length > limit;
+    const items = hasMore ? visibleMessages.slice(0, limit) : visibleMessages;
     // Capture cursor of the oldest message in this batch BEFORE reversing!
     const nextCursor = hasMore ? items[items.length - 1].id : null;
 
@@ -137,10 +146,19 @@ export class ChatService {
 
     // If file attached in chat, upload to Cloudinary
     if (file) {
+      const ext = file.originalname.includes('.')
+        ? `.${file.originalname.split('.').pop()}`
+        : '';
+      const baseName = file.originalname
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .slice(0, 40);
+      const customPublicId = `${baseName}_${Date.now()}${ext}`;
+
       const uploadRes = await uploadBufferToCloudinary(
         file.buffer,
         'document-system/chat-files',
-        { resourceType: 'auto' }
+        { resourceType: 'auto', publicId: customPublicId }
       );
       messageType = MessageType.FILE;
       metadata = {
@@ -164,7 +182,7 @@ export class ChatService {
         messageType,
         content: data.content || (file ? `Shared a file: ${file.originalname}` : ''),
         metadata,
-        status: MessageStatus.SENT,
+        status: data.status || MessageStatus.SENT,
       },
       include: {
         userSender: {
@@ -223,6 +241,116 @@ export class ChatService {
     });
 
     return result;
+  }
+
+  /**
+   * Delete a message (WhatsApp style: 'for_me' or 'for_everyone')
+   */
+  async deleteMessage(
+    user: AuthenticatedUser,
+    requestId: string,
+    messageId: string,
+    deleteType: 'for_me' | 'for_everyone'
+  ) {
+    // 1. Verify access to request
+    const request = await prisma.documentRequest.findUnique({
+      where: { id: requestId },
+      select: { id: true, userId: true },
+    });
+
+    if (!request) {
+      throw new ApiError(404, 'Document request not found.');
+    }
+
+    if (user.role !== Role.ADMIN && request.userId !== user.id) {
+      throw new ApiError(403, 'Forbidden: You do not have permission to delete messages in this chat.');
+    }
+
+    // 2. Fetch target message
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        conversation: true,
+        userSender: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
+          },
+        },
+        adminSender: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    if (!message) {
+      throw new ApiError(404, 'Message not found.');
+    }
+
+    if (message.conversation?.requestId !== requestId) {
+      throw new ApiError(400, 'Message does not belong to this request conversation.');
+    }
+
+    const currentMeta = (message.metadata as any) || {};
+
+    if (deleteType === 'for_everyone') {
+      // Only message sender or Admin can delete for everyone
+      if (user.role !== Role.ADMIN && message.senderId !== user.id) {
+        throw new ApiError(403, 'You can only delete your own messages for everyone.');
+      }
+
+      const updated = await prisma.message.update({
+        where: { id: messageId },
+        data: {
+          content: 'This message was deleted',
+          metadata: {
+            ...currentMeta,
+            isDeletedForEveryone: true,
+            deletedAt: new Date().toISOString(),
+            deletedBy: user.id,
+          },
+        },
+        include: {
+          userSender: { select: { id: true, fullName: true, avatarUrl: true } },
+          adminSender: { select: { id: true, fullName: true, avatarUrl: true } },
+        },
+      });
+
+      return {
+        type: 'for_everyone' as const,
+        messageId,
+        message: formatMessageSender(updated),
+      };
+    } else {
+      // 'for_me' - add user.id to deletedFor
+      const deletedFor: string[] = Array.isArray(currentMeta.deletedFor)
+        ? [...currentMeta.deletedFor]
+        : [];
+
+      if (!deletedFor.includes(user.id)) {
+        deletedFor.push(user.id);
+      }
+
+      await prisma.message.update({
+        where: { id: messageId },
+        data: {
+          metadata: {
+            ...currentMeta,
+            deletedFor,
+          },
+        },
+      });
+
+      return {
+        type: 'for_me' as const,
+        messageId,
+      };
+    }
   }
 }
 

@@ -14,6 +14,7 @@ import { adaptFinalDocumentToFrontend, adaptRequestToFrontend } from "@/lib/api/
 import { formatCurrencyINR } from "@/lib/utils";
 import { FolderDown, Lock, Download, CheckCircle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import { downloadFile } from "@/lib/download";
 
 export default function UserDocumentsPage() {
   const [documents, setDocuments] = React.useState<FinalDocument[]>([]);
@@ -79,10 +80,20 @@ export default function UserDocumentsPage() {
     setSelectedDocForPayment(null);
   };
 
-  const handleDownload = (doc: FinalDocument) => {
+  const handleDownload = async (doc: FinalDocument) => {
     if (doc.id) {
-      window.open(api.documents.getDownloadUrl(doc.id), "_blank");
-      toast.success(`Downloading ${doc.fileName}...`);
+      try {
+        toast.info(`Preparing download for ${doc.fileName}...`);
+        const res = await api.documents.getDownloadInfo(doc.id);
+        if (res && res.downloadUrl) {
+          downloadFile(res.downloadUrl, res.fileName || doc.fileName);
+          toast.success(`Download started for ${doc.fileName}`);
+        } else {
+          toast.error("Download link expired or not found.");
+        }
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to download document.");
+      }
     } else {
       toast.info("Download link not available.");
     }

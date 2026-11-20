@@ -42,6 +42,8 @@ export function Topbar({ title, role = "student" }: TopbarProps) {
   }, [pathname, title, role]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+  const isDashboard = pathname.includes("/dashboard");
+  const isNewRequestPage = pathname.includes("/requests/new");
 
   const markAllAsRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
@@ -62,7 +64,7 @@ export function Topbar({ title, role = "student" }: TopbarProps) {
 
       {/* Right Actions: New Request + Notifications + ThemeToggle */}
       <div className="flex items-center space-x-2.5">
-        {role === "student" && (
+        {role === "student" && !isDashboard && !isNewRequestPage && (
           <>
             <Link href="/user/requests/new" className="hidden sm:inline-flex">
               <Button size="sm" className="h-9 px-3.5 text-[13px] font-medium rounded-[8px]">
