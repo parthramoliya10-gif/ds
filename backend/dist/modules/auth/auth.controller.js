@@ -179,8 +179,26 @@ class AuthController {
      */
     async forgotPassword(req, res, next) {
         try {
-            const { email, redirectTo } = req.body;
-            const result = await auth_service_js_1.default.forgotPassword(email, redirectTo);
+            const { email } = req.body;
+            const result = await auth_service_js_1.default.forgotPassword(email);
+            (0, apiResponse_js_1.sendResponse)({
+                res,
+                statusCode: 200,
+                message: result.message,
+                data: { email: result.email },
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    /**
+     * POST /api/v1/auth/reset-password
+     */
+    async resetPassword(req, res, next) {
+        try {
+            const { email, token, password } = req.body;
+            const result = await auth_service_js_1.default.resetPassword(email, token, password);
             (0, apiResponse_js_1.sendResponse)({
                 res,
                 statusCode: 200,

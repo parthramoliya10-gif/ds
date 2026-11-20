@@ -324,18 +324,74 @@ class AuthService {
         };
     }
     /**
-     * 7. Forgot Password (sends email reset link via Supabase)
+     * 7. Forgot Password (generates custom 6-digit OTP & sends branded Resend email)
      */
-    async forgotPassword(email, redirectTo) {
-        const resetRedirect = redirectTo || `${env_js_1.default.CLIENT_URL}/reset-password`;
-        const { error } = await supabase_js_1.supabaseClient.auth.resetPasswordForEmail(email, {
-            redirectTo: resetRedirect,
-        });
-        if (error) {
-            throw new apiError_js_1.ApiError(400, error.message);
+    async forgotPassword(email) {
+        const normalizedEmail = email.trim().toLowerCase();
+        // Verify user exists in PostgreSQL (user or admin)
+        const existingUser = await prisma_js_1.default.user.findUnique({ where: { email: normalizedEmail } });
+        const existingAdmin = await prisma_js_1.default.admin.findUnique({ where: { email: normalizedEmail } });
+        if (!existingUser && !existingAdmin) {
+            throw new apiError_js_1.ApiError(404, 'No registered account found with this email address.');
         }
+        const fullName = existingUser?.fullName || existingAdmin?.fullName || 'User';
+        // Generate cryptographic 6-digit OTP stored in memory with 10-minute TTL
+        const { code, expiresAt } = otp_store_js_1.default.createOtp(normalizedEmail, 'PASSWORD_RESET', {
+            email: normalizedEmail,
+            userId: existingUser?.id || existingAdmin?.id,
+        });
+        // Dispatch branded DSMS password reset email via Resend
+        await (0, email_js_1.sendOtpEmail)({
+            to: normalizedEmail,
+            otp: code,
+            fullName,
+            type: 'PASSWORD_RESET',
+        });
         return {
-            message: 'If an account exists with this email, a password reset link has been sent.',
+            email: normalizedEmail,
+            expiresAt,
+            message: 'A 6-digit password reset code has been sent to your email address.',
+        };
+    }
+    /**
+     * 8. Reset Password with verified 6-digit OTP
+     */
+    async resetPassword(email, token, newPassword) {
+        const normalizedEmail = email.trim().toLowerCase();
+        // 1. Verify OTP code against OtpStore for PASSWORD_RESET
+        otp_store_js_1.default.verifyOtp(normalizedEmail, token, 'PASSWORD_RESET');
+        // 2. Find user in Supabase Auth to update their password
+        const { data: usersData, error: listErr } = await supabase_js_1.supabaseAdmin.auth.admin.listUsers();
+        if (listErr) {
+            throw new apiError_js_1.ApiError(500, 'Failed to process password update.');
+        }
+        const authUser = usersData?.users.find((u) => u.email?.toLowerCase() === normalizedEmail);
+        if (!authUser) {
+            throw new apiError_js_1.ApiError(404, 'Authentication account not found.');
+        }
+        // 3. Update password in Supabase Auth via Admin API
+        const { error: updateErr } = await supabase_js_1.supabaseAdmin.auth.admin.updateUserById(authUser.id, {
+            password: newPassword,
+        });
+        if (updateErr) {
+            throw new apiError_js_1.ApiError(500, updateErr.message || 'Failed to update password.');
+        }
+        // 4. Audit Log
+        const dbUser = await prisma_js_1.default.user.findUnique({ where: { email: normalizedEmail } });
+        const dbAdmin = await prisma_js_1.default.admin.findUnique({ where: { email: normalizedEmail } });
+        const actorId = dbUser?.id || dbAdmin?.id || authUser.id;
+        const actorRole = dbAdmin ? client_1.Role.ADMIN : client_1.Role.USER;
+        await prisma_js_1.default.auditLog.create({
+            data: {
+                actorId,
+                actorRole,
+                ...(actorRole === client_1.Role.ADMIN ? { adminActorId: actorId } : { userActorId: actorId }),
+                action: 'USER_PASSWORD_RESET',
+                metadata: { email: normalizedEmail },
+            },
+        });
+        return {
+            message: 'Password successfully updated! You can now log in with your new password.',
         };
     }
     /**

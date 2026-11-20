@@ -130,6 +130,16 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    forgotPassword: (data: { email: string }) =>
+      apiRequest("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    resetPassword: (data: { email: string; token: string; password: string }) =>
+      apiRequest("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     updateMe: (data: { fullName?: string; phone?: string; avatarUrl?: string }) =>
       apiRequest("/auth/me", { method: "PATCH", body: JSON.stringify(data) }),
     updateUserRole: (userId: string, role: "USER" | "ADMIN") =>

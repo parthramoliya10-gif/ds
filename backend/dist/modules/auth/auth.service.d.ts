@@ -191,9 +191,17 @@ export declare class AuthService {
         };
     }>;
     /**
-     * 7. Forgot Password (sends email reset link via Supabase)
+     * 7. Forgot Password (generates custom 6-digit OTP & sends branded Resend email)
      */
-    forgotPassword(email: string, redirectTo?: string): Promise<{
+    forgotPassword(email: string): Promise<{
+        email: string;
+        expiresAt: Date;
+        message: string;
+    }>;
+    /**
+     * 8. Reset Password with verified 6-digit OTP
+     */
+    resetPassword(email: string, token: string, newPassword: string): Promise<{
         message: string;
     }>;
     /**

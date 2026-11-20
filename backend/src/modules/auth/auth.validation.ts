@@ -33,6 +33,18 @@ export const forgotPasswordSchema = z.object({
   redirectTo: z.string().url().optional(),
 });
 
+export const resetPasswordSchema = z.object({
+  email: z.string().email('Please provide a valid email address'),
+  token: z
+    .string()
+    .min(6, 'OTP must be at least 6 digits')
+    .max(10, 'Invalid OTP format'),
+  password: z
+    .string()
+    .min(6, 'New password must be at least 6 characters long')
+    .max(128),
+});
+
 export const establishSessionSchema = z
   .object({
     code: z.string().min(1).optional(),

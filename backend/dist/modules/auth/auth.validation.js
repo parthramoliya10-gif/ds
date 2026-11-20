@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateStatusSchema = exports.updateRoleSchema = exports.updateProfileSchema = exports.establishSessionSchema = exports.forgotPasswordSchema = exports.loginSchema = exports.registerSchema = exports.verifyOtpSchema = exports.sendOtpSchema = void 0;
+exports.updateStatusSchema = exports.updateRoleSchema = exports.updateProfileSchema = exports.establishSessionSchema = exports.resetPasswordSchema = exports.forgotPasswordSchema = exports.loginSchema = exports.registerSchema = exports.verifyOtpSchema = exports.sendOtpSchema = void 0;
 const zod_1 = require("zod");
 const client_1 = require("@prisma/client");
 exports.sendOtpSchema = zod_1.z.object({
@@ -29,6 +29,17 @@ exports.loginSchema = zod_1.z.object({
 exports.forgotPasswordSchema = zod_1.z.object({
     email: zod_1.z.string().email('Please provide a valid email address'),
     redirectTo: zod_1.z.string().url().optional(),
+});
+exports.resetPasswordSchema = zod_1.z.object({
+    email: zod_1.z.string().email('Please provide a valid email address'),
+    token: zod_1.z
+        .string()
+        .min(6, 'OTP must be at least 6 digits')
+        .max(10, 'Invalid OTP format'),
+    password: zod_1.z
+        .string()
+        .min(6, 'New password must be at least 6 characters long')
+        .max(128),
 });
 exports.establishSessionSchema = zod_1.z
     .object({

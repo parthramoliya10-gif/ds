@@ -9,6 +9,7 @@ import {
   registerSchema,
   loginSchema,
   forgotPasswordSchema,
+  resetPasswordSchema,
   establishSessionSchema,
   updateRoleSchema,
   updateStatusSchema,
@@ -55,11 +56,16 @@ router.post(
   authController.login
 );
 
-// Forgot Password (Email Link)
+// Forgot & Reset Password (6-Digit OTP Verified)
 router.post(
   '/forgot-password',
   validateRequest({ body: forgotPasswordSchema }),
   authController.forgotPassword
+);
+router.post(
+  '/reset-password',
+  validateRequest({ body: resetPasswordSchema }),
+  authController.resetPassword
 );
 
 // Refresh Session & Logout

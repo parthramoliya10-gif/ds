@@ -187,8 +187,27 @@ export class AuthController {
    */
   async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { email, redirectTo } = req.body;
-      const result = await authService.forgotPassword(email, redirectTo);
+      const { email } = req.body;
+      const result = await authService.forgotPassword(email);
+
+      sendResponse({
+        res,
+        statusCode: 200,
+        message: result.message,
+        data: { email: result.email },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/auth/reset-password
+   */
+  async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email, token, password } = req.body;
+      const result = await authService.resetPassword(email, token, password);
 
       sendResponse({
         res,

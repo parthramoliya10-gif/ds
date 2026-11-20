@@ -52,6 +52,19 @@ export declare const forgotPasswordSchema: z.ZodObject<{
     email: string;
     redirectTo?: string | undefined;
 }>;
+export declare const resetPasswordSchema: z.ZodObject<{
+    email: z.ZodString;
+    token: z.ZodString;
+    password: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    email: string;
+    password: string;
+    token: string;
+}, {
+    email: string;
+    password: string;
+    token: string;
+}>;
 export declare const establishSessionSchema: z.ZodEffects<z.ZodObject<{
     code: z.ZodOptional<z.ZodString>;
     accessToken: z.ZodOptional<z.ZodString>;
