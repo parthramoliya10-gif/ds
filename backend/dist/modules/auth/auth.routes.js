@@ -24,8 +24,9 @@ router.post('/otp/verify', (0, validate_middleware_js_1.validateRequest)({ body:
 // Email & Password Registration / Login
 router.post('/register', (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.registerSchema }), auth_controller_js_1.default.register);
 router.post('/login', (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.loginSchema }), auth_controller_js_1.default.login);
-// Forgot Password (Email Link)
+// Forgot & Reset Password (6-Digit OTP Verified)
 router.post('/forgot-password', (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.forgotPasswordSchema }), auth_controller_js_1.default.forgotPassword);
+router.post('/reset-password', (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.resetPasswordSchema }), auth_controller_js_1.default.resetPassword);
 // Refresh Session & Logout
 router.post('/refresh', auth_controller_js_1.default.refresh);
 router.post('/logout', auth_controller_js_1.default.logout);

@@ -24,12 +24,12 @@ export declare const registerSchema: z.ZodObject<{
     password: z.ZodString;
     fullName: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    email: string;
     fullName: string;
+    email: string;
     password: string;
 }, {
-    email: string;
     fullName: string;
+    email: string;
     password: string;
 }>;
 export declare const loginSchema: z.ZodObject<{
@@ -51,6 +51,19 @@ export declare const forgotPasswordSchema: z.ZodObject<{
 }, {
     email: string;
     redirectTo?: string | undefined;
+}>;
+export declare const resetPasswordSchema: z.ZodObject<{
+    email: z.ZodString;
+    token: z.ZodString;
+    password: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    email: string;
+    password: string;
+    token: string;
+}, {
+    email: string;
+    password: string;
+    token: string;
 }>;
 export declare const establishSessionSchema: z.ZodEffects<z.ZodObject<{
     code: z.ZodOptional<z.ZodString>;

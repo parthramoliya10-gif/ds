@@ -127,6 +127,7 @@ export class AuthController {
         data: {
           user: result.profile,
           accessToken: result.session.accessToken,
+          refreshToken: result.session.refreshToken,
         },
       });
     } catch (error) {
@@ -142,20 +143,15 @@ export class AuthController {
       const { email, password, fullName } = req.body;
       const result = await authService.registerWithEmail(email, password, fullName);
 
-      if (result.session) {
-        setAuthCookies(res, result.session.accessToken, result.session.refreshToken);
-      }
-
       sendResponse({
         res,
         statusCode: 201,
-        message: result.emailConfirmationRequired
-          ? 'Registration successful. Please verify your email with the OTP/link sent.'
-          : 'Registration successful.',
+        message: result.message,
         data: {
-          user: result.profile,
+          email: result.email,
           emailConfirmationRequired: result.emailConfirmationRequired,
-          accessToken: result.session?.accessToken,
+          expiresAt: result.expiresAt,
+          devOtp: (result as any).devOtp,
         },
       });
     } catch (error) {
@@ -191,8 +187,27 @@ export class AuthController {
    */
   async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { email, redirectTo } = req.body;
-      const result = await authService.forgotPassword(email, redirectTo);
+      const { email } = req.body;
+      const result = await authService.forgotPassword(email);
+
+      sendResponse({
+        res,
+        statusCode: 200,
+        message: result.message,
+        data: { email: result.email },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/auth/reset-password
+   */
+  async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email, token, password } = req.body;
+      const result = await authService.resetPassword(email, token, password);
 
       sendResponse({
         res,

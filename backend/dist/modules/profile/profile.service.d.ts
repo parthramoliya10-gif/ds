@@ -26,9 +26,9 @@ export declare class ProfileService {
             quotations: number;
             uploadedDocuments: number;
         };
+        fullName: string | null;
         id: string;
         email: string;
-        fullName: string | null;
         phone: string | null;
         avatarUrl: string | null;
         avatarPublicId: string | null;
@@ -52,9 +52,9 @@ export declare class ProfileService {
             requests: number;
             payments: number;
         };
+        fullName: string | null;
         id: string;
         email: string;
-        fullName: string | null;
         phone: string | null;
         avatarUrl: string | null;
         avatarPublicId: string | null;
@@ -80,9 +80,9 @@ export declare class ProfileService {
             quotations: number;
             uploadedDocuments: number;
         };
+        fullName: string | null;
         id: string;
         email: string;
-        fullName: string | null;
         phone: string | null;
         avatarUrl: string | null;
         avatarPublicId: string | null;
@@ -106,9 +106,9 @@ export declare class ProfileService {
             requests: number;
             payments: number;
         };
+        fullName: string | null;
         id: string;
         email: string;
-        fullName: string | null;
         phone: string | null;
         avatarUrl: string | null;
         avatarPublicId: string | null;

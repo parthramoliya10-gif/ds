@@ -18,7 +18,7 @@ export const registerSchema = z.object({
   email: z.string().email('Please provide a valid email address'),
   password: z
     .string()
-    .min(8, 'Password must be at least 8 characters long')
+    .min(6, 'Password must be at least 6 characters long')
     .max(128),
   fullName: z.string().min(2, 'Full name must be at least 2 characters').max(100),
 });
@@ -31,6 +31,18 @@ export const loginSchema = z.object({
 export const forgotPasswordSchema = z.object({
   email: z.string().email('Please provide a valid email address'),
   redirectTo: z.string().url().optional(),
+});
+
+export const resetPasswordSchema = z.object({
+  email: z.string().email('Please provide a valid email address'),
+  token: z
+    .string()
+    .min(6, 'OTP must be at least 6 digits')
+    .max(10, 'Invalid OTP format'),
+  password: z
+    .string()
+    .min(6, 'New password must be at least 6 characters long')
+    .max(128),
 });
 
 export const establishSessionSchema = z

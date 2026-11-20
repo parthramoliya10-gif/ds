@@ -33,6 +33,10 @@ export declare class AuthController {
      */
     forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void>;
     /**
+     * POST /api/v1/auth/reset-password
+     */
+    resetPassword(req: Request, res: Response, next: NextFunction): Promise<void>;
+    /**
      * POST /api/v1/auth/refresh
      * Refreshes access token using HttpOnly refresh cookie
      */

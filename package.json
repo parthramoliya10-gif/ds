@@ -5,6 +5,9 @@
   "description": "Unified single-domain launcher for Document Service Management System (Next.js Frontend + Express API + Socket.IO)",
   "main": "server.js",
   "scripts": {
+    "dev": "npm --prefix backend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
     "postinstall": "npm --prefix backend install --include=dev && npm --prefix frontend install --include=dev && npm --prefix backend run prisma:generate && npm --prefix backend run build && npm --prefix frontend run build",
     "install:all": "npm --prefix backend install --include=dev && npm --prefix frontend install --include=dev",
     "build:backend": "npm --prefix backend run prisma:generate && npm --prefix backend run build",

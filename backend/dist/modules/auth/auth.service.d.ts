@@ -23,9 +23,9 @@ export declare class AuthService {
         profile: {
             role: Role;
             isBlocked: boolean;
+            fullName: string | null;
             id: string;
             email: string;
-            fullName: string | null;
             phone: string | null;
             avatarUrl: string | null;
             avatarPublicId: string | null;
@@ -44,9 +44,9 @@ export declare class AuthService {
             updatedAt: Date;
         } | {
             role: Role;
+            fullName: string | null;
             id: string;
             email: string;
-            fullName: string | null;
             phone: string | null;
             avatarUrl: string | null;
             avatarPublicId: string | null;
@@ -68,10 +68,15 @@ export declare class AuthService {
         };
     }>;
     /**
-     * 3. Send Email OTP via Supabase Auth
+     * Internal helper: Generate a valid signed JWT for session
+     */
+    private generateCustomJwtToken;
+    /**
+     * 3. Send Email OTP (Custom 6-digit code via Resend)
      */
     sendEmailOtp(email: string, fullName?: string): Promise<{
         email: string;
+        expiresAt: Date;
         message: string;
     }>;
     /**
@@ -81,9 +86,9 @@ export declare class AuthService {
         profile: {
             role: Role;
             isBlocked: boolean;
+            fullName: string | null;
             id: string;
             email: string;
-            fullName: string | null;
             phone: string | null;
             avatarUrl: string | null;
             avatarPublicId: string | null;
@@ -102,9 +107,9 @@ export declare class AuthService {
             updatedAt: Date;
         } | {
             role: Role;
+            fullName: string | null;
             id: string;
             email: string;
-            fullName: string | null;
             phone: string | null;
             avatarUrl: string | null;
             avatarPublicId: string | null;
@@ -126,56 +131,13 @@ export declare class AuthService {
         };
     }>;
     /**
-     * 5. Register with Email & Password (triggers email confirmation / OTP)
+     * 5. Register with Email & Password (generates custom 6-digit OTP & sends branded Resend email)
      */
     registerWithEmail(email: string, password: string, fullName: string): Promise<{
-        profile: {
-            role: Role;
-            isBlocked: boolean;
-            id: string;
-            email: string;
-            fullName: string | null;
-            phone: string | null;
-            avatarUrl: string | null;
-            avatarPublicId: string | null;
-            department: string | null;
-            designation: string | null;
-            bio: string | null;
-            specializations: string[];
-            country: string | null;
-            city: string | null;
-            timezone: string | null;
-            notificationPreferences: import("@prisma/client/runtime/library").JsonValue | null;
-            metadata: import("@prisma/client/runtime/library").JsonValue | null;
-            isSuperAdmin: boolean;
-            isActive: boolean;
-            createdAt: Date;
-            updatedAt: Date;
-        } | {
-            role: Role;
-            id: string;
-            email: string;
-            fullName: string | null;
-            phone: string | null;
-            avatarUrl: string | null;
-            avatarPublicId: string | null;
-            bio: string | null;
-            country: string | null;
-            city: string | null;
-            timezone: string | null;
-            notificationPreferences: import("@prisma/client/runtime/library").JsonValue | null;
-            metadata: import("@prisma/client/runtime/library").JsonValue | null;
-            createdAt: Date;
-            updatedAt: Date;
-            organization: string | null;
-            address: string | null;
-            isBlocked: boolean;
-        } | null;
+        email: string;
         emailConfirmationRequired: boolean;
-        session: {
-            accessToken: string;
-            refreshToken: string;
-        } | null;
+        expiresAt: Date;
+        message: string;
     }>;
     /**
      * 6. Login with Email & Password
@@ -184,9 +146,9 @@ export declare class AuthService {
         profile: {
             role: Role;
             isBlocked: boolean;
+            fullName: string | null;
             id: string;
             email: string;
-            fullName: string | null;
             phone: string | null;
             avatarUrl: string | null;
             avatarPublicId: string | null;
@@ -205,9 +167,9 @@ export declare class AuthService {
             updatedAt: Date;
         } | {
             role: Role;
+            fullName: string | null;
             id: string;
             email: string;
-            fullName: string | null;
             phone: string | null;
             avatarUrl: string | null;
             avatarPublicId: string | null;
@@ -229,9 +191,17 @@ export declare class AuthService {
         };
     }>;
     /**
-     * 7. Forgot Password (sends email reset link via Supabase)
+     * 7. Forgot Password (generates custom 6-digit OTP & sends branded Resend email)
      */
-    forgotPassword(email: string, redirectTo?: string): Promise<{
+    forgotPassword(email: string): Promise<{
+        email: string;
+        expiresAt: Date;
+        message: string;
+    }>;
+    /**
+     * 8. Reset Password with verified 6-digit OTP
+     */
+    resetPassword(email: string, token: string, newPassword: string): Promise<{
         message: string;
     }>;
     /**
@@ -241,9 +211,9 @@ export declare class AuthService {
         profile: {
             role: Role;
             isBlocked: boolean;
+            fullName: string | null;
             id: string;
             email: string;
-            fullName: string | null;
             phone: string | null;
             avatarUrl: string | null;
             avatarPublicId: string | null;
@@ -262,9 +232,9 @@ export declare class AuthService {
             updatedAt: Date;
         } | {
             role: Role;
+            fullName: string | null;
             id: string;
             email: string;
-            fullName: string | null;
             phone: string | null;
             avatarUrl: string | null;
             avatarPublicId: string | null;
@@ -294,9 +264,9 @@ export declare class AuthService {
             quotations: number;
             uploadedDocuments: number;
         };
+        fullName: string | null;
         id: string;
         email: string;
-        fullName: string | null;
         phone: string | null;
         avatarUrl: string | null;
         avatarPublicId: string | null;
@@ -319,9 +289,9 @@ export declare class AuthService {
             requests: number;
             payments: number;
         };
+        fullName: string | null;
         id: string;
         email: string;
-        fullName: string | null;
         phone: string | null;
         avatarUrl: string | null;
         avatarPublicId: string | null;
@@ -346,9 +316,9 @@ export declare class AuthService {
         avatarUrl?: string | null;
     }): Promise<{
         role: "ADMIN";
+        fullName: string | null;
         id: string;
         email: string;
-        fullName: string | null;
         phone: string | null;
         avatarUrl: string | null;
         avatarPublicId: string | null;
@@ -367,9 +337,9 @@ export declare class AuthService {
         updatedAt: Date;
     } | {
         role: "USER";
+        fullName: string | null;
         id: string;
         email: string;
-        fullName: string | null;
         phone: string | null;
         avatarUrl: string | null;
         avatarPublicId: string | null;
@@ -390,9 +360,9 @@ export declare class AuthService {
      */
     updateUserRole(adminId: string, targetUserId: string, newRole: Role): Promise<{
         role: "ADMIN";
+        fullName: string | null;
         id: string;
         email: string;
-        fullName: string | null;
         phone: string | null;
         avatarUrl: string | null;
         avatarPublicId: string | null;
@@ -411,9 +381,9 @@ export declare class AuthService {
         updatedAt: Date;
     } | {
         role: "USER";
+        fullName: string | null;
         id: string;
         email: string;
-        fullName: string | null;
         phone: string | null;
         avatarUrl: string | null;
         avatarPublicId: string | null;
@@ -434,9 +404,9 @@ export declare class AuthService {
      */
     updateUserStatus(adminId: string, targetUserId: string, isBlocked: boolean): Promise<{
         role: "USER";
+        fullName: string | null;
         id: string;
         email: string;
-        fullName: string | null;
         phone: string | null;
         avatarUrl: string | null;
         avatarPublicId: string | null;

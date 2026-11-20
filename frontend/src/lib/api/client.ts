@@ -5,7 +5,11 @@ export function getApiBaseUrl(): string {
     return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
   if (typeof window !== "undefined") {
-    // In browser on unified single-domain deployment (Hostinger), relative URL /api/v1 connects directly
+    // In local development, frontend (port 3001) connects to backend API on port 5000
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "http://localhost:5000/api/v1";
+    }
+    // On unified production single-domain deployment, relative URL /api/v1 connects directly
     return "/api/v1";
   }
   return "http://localhost:5000/api/v1";
@@ -114,6 +118,31 @@ export async function apiRequest<T = any>(
 export const api = {
   auth: {
     getMe: () => apiRequest("/auth/me"),
+    register: (data: { email: string; password: string; fullName: string }) =>
+      apiRequest("/auth/register", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    sendOtp: (data: { email: string; fullName?: string }) =>
+      apiRequest("/auth/otp/send", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    verifyOtp: (data: { email: string; token: string }) =>
+      apiRequest("/auth/otp/verify", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    forgotPassword: (data: { email: string }) =>
+      apiRequest("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    resetPassword: (data: { email: string; token: string; password: string }) =>
+      apiRequest("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     updateMe: (data: { fullName?: string; phone?: string; avatarUrl?: string | null }) =>
       apiRequest("/auth/me", { method: "PATCH", body: JSON.stringify(data) }),
     updateUserRole: (userId: string, role: "USER" | "ADMIN") =>

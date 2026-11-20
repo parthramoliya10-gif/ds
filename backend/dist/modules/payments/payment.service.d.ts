@@ -87,9 +87,9 @@ export declare class PaymentService {
      */
     getAllPaymentsForAdmin(): Promise<({
         user: {
+            fullName: string | null;
             id: string;
             email: string;
-            fullName: string | null;
         };
         request: {
             status: import(".prisma/client").$Enums.RequestStatus;

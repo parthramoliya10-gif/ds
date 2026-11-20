@@ -121,6 +121,7 @@ class AuthController {
                 data: {
                     user: result.profile,
                     accessToken: result.session.accessToken,
+                    refreshToken: result.session.refreshToken,
                 },
             });
         }
@@ -135,19 +136,15 @@ class AuthController {
         try {
             const { email, password, fullName } = req.body;
             const result = await auth_service_js_1.default.registerWithEmail(email, password, fullName);
-            if (result.session) {
-                setAuthCookies(res, result.session.accessToken, result.session.refreshToken);
-            }
             (0, apiResponse_js_1.sendResponse)({
                 res,
                 statusCode: 201,
-                message: result.emailConfirmationRequired
-                    ? 'Registration successful. Please verify your email with the OTP/link sent.'
-                    : 'Registration successful.',
+                message: result.message,
                 data: {
-                    user: result.profile,
+                    email: result.email,
                     emailConfirmationRequired: result.emailConfirmationRequired,
-                    accessToken: result.session?.accessToken,
+                    expiresAt: result.expiresAt,
+                    devOtp: result.devOtp,
                 },
             });
         }
@@ -182,8 +179,26 @@ class AuthController {
      */
     async forgotPassword(req, res, next) {
         try {
-            const { email, redirectTo } = req.body;
-            const result = await auth_service_js_1.default.forgotPassword(email, redirectTo);
+            const { email } = req.body;
+            const result = await auth_service_js_1.default.forgotPassword(email);
+            (0, apiResponse_js_1.sendResponse)({
+                res,
+                statusCode: 200,
+                message: result.message,
+                data: { email: result.email },
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    /**
+     * POST /api/v1/auth/reset-password
+     */
+    async resetPassword(req, res, next) {
+        try {
+            const { email, token, password } = req.body;
+            const result = await auth_service_js_1.default.resetPassword(email, token, password);
             (0, apiResponse_js_1.sendResponse)({
                 res,
                 statusCode: 200,
