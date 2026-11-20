@@ -1,5 +1,9 @@
 import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
+export declare const onlineUsers: Map<string, Set<string>>;
+export declare const onlineUserRoles: Map<string, import(".prisma/client").$Enums.Role>;
+export declare const isUserOnline: (userId: string) => boolean;
+export declare const isAnyAdminOnline: () => boolean;
 export declare const initSocketServer: (httpServer: HttpServer) => Server;
 export declare const getSocketIO: () => Server;
 /**

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.emitToRequestRoom = exports.getSocketIO = exports.initSocketServer = void 0;
+exports.emitToRequestRoom = exports.getSocketIO = exports.initSocketServer = exports.isAnyAdminOnline = exports.isUserOnline = exports.onlineUserRoles = exports.onlineUsers = void 0;
 const socket_io_1 = require("socket.io");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const env_js_1 = __importDefault(require("../config/env.js"));
@@ -15,7 +15,21 @@ const client_1 = require("@prisma/client");
 const logger_js_1 = __importDefault(require("../utils/logger.js"));
 let io = null;
 // Track online users: Map<userId, Set<socketId>>
-const onlineUsers = new Map();
+exports.onlineUsers = new Map();
+exports.onlineUserRoles = new Map();
+const isUserOnline = (userId) => {
+    return (exports.onlineUsers.get(userId)?.size || 0) > 0;
+};
+exports.isUserOnline = isUserOnline;
+const isAnyAdminOnline = () => {
+    for (const [userId, sockets] of exports.onlineUsers.entries()) {
+        if (sockets.size > 0 && exports.onlineUserRoles.get(userId) === client_1.Role.ADMIN) {
+            return true;
+        }
+    }
+    return false;
+};
+exports.isAnyAdminOnline = isAnyAdminOnline;
 const initSocketServer = (httpServer) => {
     const allowedOrigins = [
         env_js_1.default.CLIENT_URL,
@@ -127,8 +141,9 @@ const initSocketServer = (httpServer) => {
         const user = socket.data.user;
         logger_js_1.default.info(`🔌 Socket connected: ${socket.id} (User: ${user.email}, Role: ${user.role})`);
         // 1. Presence tracking: Add socketId to user's active set
-        if (!onlineUsers.has(user.id)) {
-            onlineUsers.set(user.id, new Set());
+        if (!exports.onlineUsers.has(user.id)) {
+            exports.onlineUsers.set(user.id, new Set());
+            exports.onlineUserRoles.set(user.id, user.role);
             // Broadcast online status to all
             io?.emit(socketEvents_js_1.default.USER_STATUS_CHANGE, {
                 userId: user.id,
@@ -136,7 +151,33 @@ const initSocketServer = (httpServer) => {
                 status: 'ONLINE',
             });
         }
-        onlineUsers.get(user.id).add(socket.id);
+        exports.onlineUsers.get(user.id).add(socket.id);
+        // Auto-deliver any pending messages waiting for this user
+        if (user.role === client_1.Role.USER) {
+            prisma_js_1.default.message.updateMany({
+                where: {
+                    status: client_1.MessageStatus.SENT,
+                    senderRole: client_1.Role.ADMIN,
+                    conversation: { request: { userId: user.id } },
+                },
+                data: {
+                    status: client_1.MessageStatus.DELIVERED,
+                    deliveredAt: new Date(),
+                },
+            }).catch(() => { });
+        }
+        else if (user.role === client_1.Role.ADMIN) {
+            prisma_js_1.default.message.updateMany({
+                where: {
+                    status: client_1.MessageStatus.SENT,
+                    senderRole: client_1.Role.USER,
+                },
+                data: {
+                    status: client_1.MessageStatus.DELIVERED,
+                    deliveredAt: new Date(),
+                },
+            }).catch(() => { });
+        }
         // 2. Room Joining with Strict Authorization
         socket.on(socketEvents_js_1.default.JOIN_REQUEST_ROOM, async (payload, callback) => {
             try {
@@ -165,9 +206,22 @@ const initSocketServer = (httpServer) => {
                 const roomName = `request:${requestId}`;
                 socket.join(roomName);
                 logger_js_1.default.info(`👥 User ${user.email} joined room: ${roomName}`);
-                socket.emit(socketEvents_js_1.default.ROOM_JOINED, { requestId });
+                let counterpartOnline = false;
+                if (user.role === client_1.Role.ADMIN) {
+                    counterpartOnline = (0, exports.isUserOnline)(request.userId);
+                }
+                else {
+                    counterpartOnline = (0, exports.isAnyAdminOnline)();
+                }
+                socket.emit(socketEvents_js_1.default.ROOM_JOINED, { requestId, counterpartOnline });
+                socket.to(roomName).emit('room_peer_status', {
+                    requestId,
+                    userId: user.id,
+                    role: user.role,
+                    status: 'ONLINE',
+                });
                 if (callback)
-                    callback({ success: true, room: roomName });
+                    callback({ success: true, room: roomName, counterpartOnline });
             }
             catch (error) {
                 logger_js_1.default.error('Error joining request room:', error);
@@ -180,17 +234,24 @@ const initSocketServer = (httpServer) => {
             const roomName = `request:${payload.requestId}`;
             socket.leave(roomName);
             logger_js_1.default.info(`🚪 User ${user.email} left room: ${roomName}`);
+            socket.to(roomName).emit('room_peer_status', {
+                requestId: payload.requestId,
+                userId: user.id,
+                role: user.role,
+                status: 'OFFLINE',
+            });
         });
         // 4. Register WhatsApp Chat Handlers (Messaging, Ticks, Typing)
         (0, chat_handler_js_1.registerChatHandlers)(io, socket);
         // 5. Disconnect Lifecycle
         socket.on(socketEvents_js_1.default.DISCONNECT, () => {
             logger_js_1.default.info(`🔌 Socket disconnected: ${socket.id} (User: ${user.email})`);
-            const userSockets = onlineUsers.get(user.id);
+            const userSockets = exports.onlineUsers.get(user.id);
             if (userSockets) {
                 userSockets.delete(socket.id);
                 if (userSockets.size === 0) {
-                    onlineUsers.delete(user.id);
+                    exports.onlineUsers.delete(user.id);
+                    exports.onlineUserRoles.delete(user.id);
                     // Broadcast offline status
                     io?.emit(socketEvents_js_1.default.USER_STATUS_CHANGE, {
                         userId: user.id,

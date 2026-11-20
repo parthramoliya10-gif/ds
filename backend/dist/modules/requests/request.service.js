@@ -19,7 +19,15 @@ class RequestService {
         if (files && files.length > 0) {
             for (const file of files) {
                 try {
-                    const uploadRes = await (0, cloudinary_js_1.uploadBufferToCloudinary)(file.buffer, 'document-system/reference-files', { resourceType: 'auto' });
+                    const ext = file.originalname.includes('.')
+                        ? `.${file.originalname.split('.').pop()}`
+                        : '';
+                    const baseName = file.originalname
+                        .replace(/\.[^/.]+$/, '')
+                        .replace(/[^a-zA-Z0-9_-]/g, '_')
+                        .slice(0, 40);
+                    const customPublicId = `${baseName}_${Date.now()}${ext}`;
+                    const uploadRes = await (0, cloudinary_js_1.uploadBufferToCloudinary)(file.buffer, 'document-system/reference-files', { resourceType: 'auto', publicId: customPublicId });
                     uploadedFilesData.push({
                         fileName: file.originalname,
                         fileUrl: uploadRes.secureUrl,

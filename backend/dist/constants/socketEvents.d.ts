@@ -16,6 +16,7 @@ export declare const SOCKET_EVENTS: {
     readonly MESSAGE_STATUS_UPDATE: "message_status_update";
     readonly MARK_READ: "mark_read";
     readonly MESSAGES_READ: "messages_read";
+    readonly MESSAGE_DELETED: "message_deleted";
     readonly TYPING_START: "typing_start";
     readonly TYPING_STOP: "typing_stop";
     readonly USER_TYPING: "user_typing";

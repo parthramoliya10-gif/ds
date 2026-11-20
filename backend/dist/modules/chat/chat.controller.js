@@ -91,6 +91,44 @@ class ChatController {
             next(error);
         }
     }
+    /**
+     * DELETE /api/v1/chat/:requestId/messages/:messageId
+     * WhatsApp style deletion: 'for_me' | 'for_everyone'
+     */
+    async deleteMessage(req, res, next) {
+        try {
+            if (!req.user) {
+                throw new apiError_js_1.ApiError(401, 'Unauthorized');
+            }
+            const requestId = req.params.requestId;
+            const messageId = req.params.messageId;
+            const deleteType = req.query.type || req.body?.type || 'for_me';
+            if (deleteType !== 'for_me' && deleteType !== 'for_everyone') {
+                throw new apiError_js_1.ApiError(400, "Invalid delete type. Must be 'for_me' or 'for_everyone'.");
+            }
+            const result = await chat_service_js_1.default.deleteMessage(req.user, requestId, messageId, deleteType);
+            // If deleted for everyone, broadcast to the request room
+            if (result.type === 'for_everyone') {
+                (0, socket_server_js_1.emitToRequestRoom)(requestId, socketEvents_js_1.default.MESSAGE_DELETED, {
+                    requestId,
+                    messageId,
+                    type: 'for_everyone',
+                    message: result.message,
+                });
+            }
+            (0, apiResponse_js_1.sendResponse)({
+                res,
+                statusCode: 200,
+                message: deleteType === 'for_everyone'
+                    ? 'Message deleted for everyone'
+                    : 'Message deleted for you',
+                data: result,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
 }
 exports.ChatController = ChatController;
 exports.chatController = new ChatController();

@@ -8,6 +8,7 @@ const client_1 = require("@prisma/client");
 const prisma_js_1 = __importDefault(require("../config/prisma.js"));
 const socketEvents_js_1 = __importDefault(require("../constants/socketEvents.js"));
 const chat_service_js_1 = require("../modules/chat/chat.service.js");
+const socket_server_js_1 = require("./socket.server.js");
 const logger_js_1 = __importDefault(require("../utils/logger.js"));
 const registerChatHandlers = (io, socket) => {
     const currentUser = socket.data.user;
@@ -29,10 +30,29 @@ const registerChatHandlers = (io, socket) => {
                     callback({ success: false, error: errorMsg });
                 return;
             }
+            // Determine if counterpart is online or active in room
+            const request = await prisma_js_1.default.documentRequest.findUnique({
+                where: { id: requestId },
+                select: { userId: true },
+            });
+            let recipientOnline = false;
+            if (currentUser.role === client_1.Role.ADMIN) {
+                recipientOnline = request ? (0, socket_server_js_1.isUserOnline)(request.userId) : false;
+            }
+            else {
+                recipientOnline = (0, socket_server_js_1.isAnyAdminOnline)();
+            }
+            const roomSockets = await io.in(roomName).fetchSockets();
+            const recipientInRoom = roomSockets.some((s) => s.data.user?.id !== currentUser.id);
+            let initialStatus = client_1.MessageStatus.SENT;
+            if (recipientInRoom || recipientOnline) {
+                initialStatus = client_1.MessageStatus.DELIVERED;
+            }
             const savedMessage = await chat_service_js_1.chatService.postMessage(currentUser, requestId, {
                 content: content.trim(),
                 messageType,
                 metadata,
+                status: initialStatus,
             });
             io.to(roomName).emit(socketEvents_js_1.default.NEW_MESSAGE, savedMessage);
             if (callback) {
