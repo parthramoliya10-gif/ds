@@ -74,14 +74,18 @@ async function sendOtpEmail(params) {
         typeTitle = 'Password Reset';
     const html = generateOtpHtml(fullName, otp, typeTitle);
     const subject = `Your DSMS Verification Code: ${otp}`;
-    const isPublicDomain = !env_js_1.default.RESEND_FROM_EMAIL ||
-        env_js_1.default.RESEND_FROM_EMAIL.includes('@gmail.com') ||
-        env_js_1.default.RESEND_FROM_EMAIL.includes('@yahoo.com') ||
-        env_js_1.default.RESEND_FROM_EMAIL.includes('@outlook.com') ||
-        env_js_1.default.RESEND_FROM_EMAIL.includes('@hotmail.com');
-    const fromEmail = isPublicDomain
-        ? 'DSMS Verification <onboarding@resend.dev>'
-        : `DSMS Portal <${env_js_1.default.RESEND_FROM_EMAIL}>`;
+    const defaultSender = 'no-reply@ds.we3vision.com';
+    const configuredEmail = env_js_1.default.RESEND_FROM_EMAIL?.trim();
+    const isInvalidOrPublic = !configuredEmail ||
+        configuredEmail === 'onboarding@resend.dev' ||
+        configuredEmail.includes('@gmail.com') ||
+        configuredEmail.includes('@yahoo.com') ||
+        configuredEmail.includes('@outlook.com') ||
+        configuredEmail.includes('@hotmail.com');
+    const senderEmail = isInvalidOrPublic ? defaultSender : configuredEmail;
+    const fromEmail = senderEmail.includes('<')
+        ? senderEmail
+        : `DSMS Portal <${senderEmail}>`;
     // Always log OTP visibly in console for instant testing
     console.log('\n=============================================================');
     console.log(`🔐 [DSMS VERIFICATION OTP] For: ${to}`);
