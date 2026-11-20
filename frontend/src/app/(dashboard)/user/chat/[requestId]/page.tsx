@@ -22,7 +22,14 @@ import {
   adaptQuotationToFrontend,
 } from "@/lib/api/adapters";
 import { SOCKET_EVENTS } from "@/lib/socket/socketClient";
-import { ArrowLeft, MoreVertical, ShieldCheck, CheckCircle2, Trash2 } from "lucide-react";
+import { ArrowLeft, MoreVertical, ShieldCheck, CheckCircle2, Trash2, FileText, Eraser } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -532,29 +539,41 @@ export default function UserChatConversationPage() {
         </div>
 
         <div className="flex items-center space-x-1.5 shrink-0">
-          <Link href={`/user/requests/${request.id}`}>
-            <Button variant="outline" size="sm" className="h-8 text-[12px] border-border">
-              Task Details
-            </Button>
-          </Link>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsClearChatOpen(true)}
-            className="h-8 text-[12px] border-border text-muted-foreground hover:text-foreground"
-            title="Clear chat messages for my account"
-          >
-            Clear Chat
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsDeleteRequestOpen(true)}
-            className="h-8 w-8 border-border text-muted-foreground hover:text-red-500 hover:border-red-500"
-            title="Delete this task request from my account"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 border-border text-muted-foreground hover:text-foreground"
+                title="Options"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link href={`/user/requests/${request.id}`} className="flex items-center w-full">
+                  <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span>Task Details</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setIsClearChatOpen(true)}
+                className="cursor-pointer flex items-center"
+              >
+                <Eraser className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span>Clear Chat</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setIsDeleteRequestOpen(true)}
+                className="cursor-pointer flex items-center text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
+              >
+                <Trash2 className="h-4 w-4 mr-2 text-red-600" />
+                <span>Delete</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
