@@ -5,7 +5,11 @@ export function getApiBaseUrl(): string {
     return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
   if (typeof window !== "undefined") {
-    // In browser on unified single-domain deployment (Hostinger), relative URL /api/v1 connects directly
+    // In local development, frontend (port 3001) connects to backend API on port 5000
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "http://localhost:5000/api/v1";
+    }
+    // On unified production single-domain deployment, relative URL /api/v1 connects directly
     return "/api/v1";
   }
   return "http://localhost:5000/api/v1";

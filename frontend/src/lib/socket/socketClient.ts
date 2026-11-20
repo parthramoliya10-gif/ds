@@ -6,6 +6,10 @@ export function getSocketUrl(): string {
     return process.env.NEXT_PUBLIC_SOCKET_URL;
   }
   if (typeof window !== "undefined") {
+    // In local development, frontend (3001) connects to backend socket on port 5000
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "http://localhost:5000";
+    }
     // On unified single-domain deployment (Hostinger), connect to current domain
     return window.location.origin;
   }
