@@ -111,7 +111,7 @@ export async function apiRequest<T = any>(
 export const api = {
   auth: {
     getMe: () => apiRequest("/auth/me"),
-    updateMe: (data: { fullName?: string; phone?: string; avatarUrl?: string }) =>
+    updateMe: (data: { fullName?: string; phone?: string; avatarUrl?: string | null }) =>
       apiRequest("/auth/me", { method: "PATCH", body: JSON.stringify(data) }),
     updateUserRole: (userId: string, role: "USER" | "ADMIN") =>
       apiRequest(`/auth/admin/users/${userId}/role`, {

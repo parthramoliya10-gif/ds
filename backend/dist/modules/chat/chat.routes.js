@@ -17,5 +17,7 @@ router.post('/:requestId/messages', upload_middleware_js_1.uploadSingleFinalDocu
 chat_controller_js_1.default.postMessage);
 // 3. Mark messages as read (Blue ticks)
 router.patch('/:requestId/read', chat_controller_js_1.default.markRead);
+// 4. Delete message (WhatsApp style: 'for_me' or 'for_everyone')
+router.delete('/:requestId/messages/:messageId', chat_controller_js_1.default.deleteMessage);
 exports.default = router;
 //# sourceMappingURL=chat.routes.js.map

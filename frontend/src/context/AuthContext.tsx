@@ -252,11 +252,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }) => {
     // 1. Call backend API if user session is active
     try {
-      const updateData: { fullName?: string; phone?: string; avatarUrl?: string } = {};
+      const updateData: { fullName?: string; phone?: string; avatarUrl?: string | null } = {};
       if (data.fullName !== undefined) updateData.fullName = data.fullName;
       if (data.phone !== undefined) updateData.phone = data.phone;
-      if (data.avatarUrl !== undefined && data.avatarUrl !== "") {
-        updateData.avatarUrl = data.avatarUrl;
+      if (data.avatarUrl !== undefined) {
+        updateData.avatarUrl = data.avatarUrl === "" ? null : data.avatarUrl;
       }
       if (Object.keys(updateData).length > 0) {
         await api.auth.updateMe(updateData);

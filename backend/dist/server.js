@@ -10,7 +10,7 @@ const logger_js_1 = __importDefault(require("./utils/logger.js"));
 const prisma_js_1 = __importDefault(require("./config/prisma.js"));
 const socket_server_js_1 = require("./sockets/socket.server.js");
 const app = (0, app_js_1.createApp)();
-const server = http_1.default.createServer(app);
+const server = http_1.default.createServer({ maxHeaderSize: 1048576 }, app);
 // Initialize Socket.IO Server with real-time WhatsApp-style chat engine
 const io = (0, socket_server_js_1.initSocketServer)(server);
 const startServer = async (retries = 3, delayMs = 3000) => {

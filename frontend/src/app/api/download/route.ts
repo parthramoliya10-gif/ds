@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 // Common MIME types to file extensions mapping for fallback
 const MIME_TO_EXT: Record<string, string> = {
   "application/pdf": ".pdf",

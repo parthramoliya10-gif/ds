@@ -14,6 +14,7 @@ import { Payment, Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptPaymentToFrontend, adaptRequestToFrontend } from "@/lib/api/adapters";
 import { formatCurrencyINR, formatDate } from "@/lib/utils";
+import { downloadTaxInvoice } from "@/lib/invoice";
 import {
   CreditCard,
   DollarSign,
@@ -69,7 +70,14 @@ export default function UserPaymentsPage() {
   const totalBilled = totalPaid + totalOutstanding;
 
   const handleDownloadInvoice = (payment: Payment) => {
-    toast.success(`Downloading tax invoice for ${payment.transactionId || payment.id}...`);
+    const matchingReq = requests.find((r) => r.id === payment.requestId);
+    downloadTaxInvoice(payment, {
+      studentName: matchingReq?.studentName,
+      college: matchingReq?.college,
+      taskTitle: matchingReq?.title || payment.requestTitle,
+      subject: matchingReq?.subject,
+    });
+    toast.success(`Tax invoice generated for ${payment.transactionId || payment.id}!`);
   };
 
   const paymentColumns: Column<Payment>[] = [

@@ -37,8 +37,8 @@ export declare class QuotationService {
             userId: string;
             currency: string;
             quotationId: string;
-            amount: number;
             milestone: import(".prisma/client").$Enums.PaymentMilestone;
+            amount: number;
             razorpayOrderId: string;
             razorpayPaymentId: string | null;
             razorpaySignature: string | null;

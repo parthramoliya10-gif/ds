@@ -1,4 +1,4 @@
-import { MessageType, Role } from '@prisma/client';
+import { MessageStatus, MessageType, Role } from '@prisma/client';
 import { AuthenticatedUser } from '../../types/express.js';
 export interface GetMessagesOptions {
     limit?: number;
@@ -8,6 +8,7 @@ export interface PostMessageInput {
     content: string;
     messageType?: MessageType;
     metadata?: any;
+    status?: MessageStatus;
 }
 export declare class ChatService {
     /**
@@ -27,6 +28,18 @@ export declare class ChatService {
      * Enforces strict ownership / admin authorization
      */
     markMessagesAsRead(userId: string, requestId: string, userRole?: Role): Promise<import(".prisma/client").Prisma.BatchPayload>;
+    /**
+     * Delete a message (WhatsApp style: 'for_me' or 'for_everyone')
+     */
+    deleteMessage(user: AuthenticatedUser, requestId: string, messageId: string, deleteType: 'for_me' | 'for_everyone'): Promise<{
+        type: "for_everyone";
+        messageId: string;
+        message: any;
+    } | {
+        type: "for_me";
+        messageId: string;
+        message?: undefined;
+    }>;
 }
 export declare const chatService: ChatService;
 export default chatService;

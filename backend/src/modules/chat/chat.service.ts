@@ -227,11 +227,12 @@ export class ChatService {
       throw new ApiError(403, 'Forbidden: You cannot modify read status for this conversation.');
     }
 
-    // Mark messages as READ if sender is NOT the current user
+    // Mark messages sent by the counterpart as READ (Admin marks USER messages, User marks ADMIN messages)
+    const targetSenderRole = isAdmin ? Role.USER : Role.ADMIN;
     const result = await prisma.message.updateMany({
       where: {
         conversationId: request.conversation.id,
-        senderId: { not: userId },
+        senderRole: targetSenderRole,
         status: { in: [MessageStatus.SENT, MessageStatus.DELIVERED] },
       },
       data: {

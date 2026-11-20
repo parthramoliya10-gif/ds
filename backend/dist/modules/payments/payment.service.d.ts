@@ -34,8 +34,8 @@ export declare class PaymentService {
             userId: string;
             currency: string;
             quotationId: string;
-            amount: number;
             milestone: import(".prisma/client").$Enums.PaymentMilestone;
+            amount: number;
             razorpayOrderId: string;
             razorpayPaymentId: string | null;
             razorpaySignature: string | null;
@@ -74,8 +74,8 @@ export declare class PaymentService {
         userId: string;
         currency: string;
         quotationId: string;
-        amount: number;
         milestone: import(".prisma/client").$Enums.PaymentMilestone;
+        amount: number;
         razorpayOrderId: string;
         razorpayPaymentId: string | null;
         razorpaySignature: string | null;
@@ -105,8 +105,8 @@ export declare class PaymentService {
         userId: string;
         currency: string;
         quotationId: string;
-        amount: number;
         milestone: import(".prisma/client").$Enums.PaymentMilestone;
+        amount: number;
         razorpayOrderId: string;
         razorpayPaymentId: string | null;
         razorpaySignature: string | null;

@@ -19,7 +19,15 @@ class RequestService {
         if (files && files.length > 0) {
             for (const file of files) {
                 try {
-                    const uploadRes = await (0, cloudinary_js_1.uploadBufferToCloudinary)(file.buffer, 'document-system/reference-files', { resourceType: 'auto' });
+                    const ext = file.originalname.includes('.')
+                        ? `.${file.originalname.split('.').pop()}`
+                        : '';
+                    const baseName = file.originalname
+                        .replace(/\.[^/.]+$/, '')
+                        .replace(/[^a-zA-Z0-9_-]/g, '_')
+                        .slice(0, 40);
+                    const customPublicId = `${baseName}_${Date.now()}${ext}`;
+                    const uploadRes = await (0, cloudinary_js_1.uploadBufferToCloudinary)(file.buffer, 'document-system/reference-files', { resourceType: 'auto', publicId: customPublicId });
                     uploadedFilesData.push({
                         fileName: file.originalname,
                         fileUrl: uploadRes.secureUrl,
@@ -112,7 +120,30 @@ class RequestService {
                 take: limit,
                 orderBy: { createdAt: 'desc' },
                 include: {
-                    conversation: { select: { id: true } },
+                    conversation: {
+                        select: {
+                            id: true,
+                            messages: {
+                                orderBy: { createdAt: 'desc' },
+                                take: 1,
+                                select: {
+                                    content: true,
+                                    createdAt: true,
+                                    senderRole: true,
+                                },
+                            },
+                            _count: {
+                                select: {
+                                    messages: {
+                                        where: {
+                                            senderRole: client_1.Role.ADMIN,
+                                            status: { in: [client_1.MessageStatus.SENT, client_1.MessageStatus.DELIVERED] },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
                     _count: {
                         select: {
                             referenceFiles: true,
@@ -122,16 +153,34 @@ class RequestService {
                         },
                     },
                     quotations: {
-                        where: { status: 'SENT' },
                         orderBy: { version: 'desc' },
-                        take: 1,
                         select: {
                             id: true,
+                            requestId: true,
                             version: true,
                             totalAmount: true,
                             advanceAmount: true,
                             remainingAmount: true,
+                            currency: true,
+                            terms: true,
+                            estimatedDays: true,
                             status: true,
+                            createdAt: true,
+                            updatedAt: true,
+                        },
+                    },
+                    payments: {
+                        orderBy: { createdAt: 'desc' },
+                        select: {
+                            id: true,
+                            requestId: true,
+                            milestone: true,
+                            amount: true,
+                            currency: true,
+                            status: true,
+                            razorpayPaymentId: true,
+                            paidAt: true,
+                            createdAt: true,
                         },
                     },
                 },
@@ -181,13 +230,67 @@ class RequestService {
                             avatarUrl: true,
                         },
                     },
-                    conversation: { select: { id: true } },
+                    conversation: {
+                        select: {
+                            id: true,
+                            messages: {
+                                orderBy: { createdAt: 'desc' },
+                                take: 1,
+                                select: {
+                                    content: true,
+                                    createdAt: true,
+                                    senderRole: true,
+                                },
+                            },
+                            _count: {
+                                select: {
+                                    messages: {
+                                        where: {
+                                            senderRole: client_1.Role.USER,
+                                            status: { in: [client_1.MessageStatus.SENT, client_1.MessageStatus.DELIVERED] },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
                     _count: {
                         select: {
                             referenceFiles: true,
                             quotations: true,
                             payments: true,
                             finalDocuments: true,
+                        },
+                    },
+                    quotations: {
+                        orderBy: { version: 'desc' },
+                        select: {
+                            id: true,
+                            requestId: true,
+                            version: true,
+                            totalAmount: true,
+                            advanceAmount: true,
+                            remainingAmount: true,
+                            currency: true,
+                            terms: true,
+                            estimatedDays: true,
+                            status: true,
+                            createdAt: true,
+                            updatedAt: true,
+                        },
+                    },
+                    payments: {
+                        orderBy: { createdAt: 'desc' },
+                        select: {
+                            id: true,
+                            requestId: true,
+                            milestone: true,
+                            amount: true,
+                            currency: true,
+                            status: true,
+                            razorpayPaymentId: true,
+                            paidAt: true,
+                            createdAt: true,
                         },
                     },
                 },

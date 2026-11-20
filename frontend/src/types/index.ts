@@ -63,6 +63,12 @@ export interface Request {
   isDownloadUnlocked?: boolean;
   finalDocumentId?: string;
   urgent?: boolean;
+  unreadCount?: number;
+  lastMessage?: {
+    content: string;
+    createdAt: string;
+    senderRole?: string;
+  };
 }
 
 export interface Quotation {

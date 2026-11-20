@@ -124,6 +124,14 @@ export function adaptRequestToFrontend(backendReq: any): Request {
     isDownloadUnlocked: Boolean(backendReq.isDownloadUnlocked),
     finalDocumentId: primaryFinalDoc?.id,
     urgent: backendReq.priority === "URGENT" || backendReq.priority === "HIGH",
+    unreadCount: backendReq.conversation?._count?.messages ?? backendReq.unreadCount ?? 0,
+    lastMessage: backendReq.conversation?.messages?.[0]
+      ? {
+          content: backendReq.conversation.messages[0].content,
+          createdAt: backendReq.conversation.messages[0].createdAt,
+          senderRole: backendReq.conversation.messages[0].senderRole,
+        }
+      : undefined,
   };
 }
 

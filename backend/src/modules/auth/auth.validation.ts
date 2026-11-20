@@ -46,7 +46,7 @@ export const establishSessionSchema = z
 export const updateProfileSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters').max(100).optional(),
   phone: z.string().min(7, 'Invalid phone number').max(20).optional(),
-  avatarUrl: z.string().url('Avatar must be a valid URL').optional(),
+  avatarUrl: z.union([z.string().url('Avatar must be a valid URL'), z.literal(''), z.null()]).optional(),
 });
 
 export const updateRoleSchema = z.object({

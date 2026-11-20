@@ -76,15 +76,15 @@ export declare const establishSessionSchema: z.ZodEffects<z.ZodObject<{
 export declare const updateProfileSchema: z.ZodObject<{
     fullName: z.ZodOptional<z.ZodString>;
     phone: z.ZodOptional<z.ZodString>;
-    avatarUrl: z.ZodOptional<z.ZodString>;
+    avatarUrl: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodLiteral<"">, z.ZodNull]>>;
 }, "strip", z.ZodTypeAny, {
     fullName?: string | undefined;
     phone?: string | undefined;
-    avatarUrl?: string | undefined;
+    avatarUrl?: string | null | undefined;
 }, {
     fullName?: string | undefined;
     phone?: string | undefined;
-    avatarUrl?: string | undefined;
+    avatarUrl?: string | null | undefined;
 }>;
 export declare const updateRoleSchema: z.ZodObject<{
     role: z.ZodNativeEnum<{

@@ -320,7 +320,7 @@ class AuthService {
         const updatePayload = {
             ...(data.fullName !== undefined && { fullName: data.fullName }),
             ...(data.phone !== undefined && { phone: data.phone }),
-            ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
+            ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl === '' ? null : data.avatarUrl }),
         };
         if (role === client_1.Role.ADMIN) {
             const updated = await prisma_js_1.default.admin.update({

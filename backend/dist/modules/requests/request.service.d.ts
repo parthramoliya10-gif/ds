@@ -50,8 +50,8 @@ export declare class RequestService {
             userId: string;
             currency: string;
             quotationId: string;
-            amount: number;
             milestone: import(".prisma/client").$Enums.PaymentMilestone;
+            amount: number;
             razorpayOrderId: string;
             razorpayPaymentId: string | null;
             razorpaySignature: string | null;
@@ -99,14 +99,39 @@ export declare class RequestService {
         requests: ({
             conversation: {
                 id: string;
+                messages: {
+                    createdAt: Date;
+                    senderRole: import(".prisma/client").$Enums.Role;
+                    content: string;
+                }[];
+                _count: {
+                    messages: number;
+                };
             } | null;
             quotations: {
                 status: import(".prisma/client").$Enums.QuotationStatus;
                 id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                requestId: string;
                 version: number;
                 totalAmount: number;
                 advanceAmount: number;
                 remainingAmount: number;
+                currency: string;
+                terms: string | null;
+                estimatedDays: number | null;
+            }[];
+            payments: {
+                status: import(".prisma/client").$Enums.PaymentStatus;
+                id: string;
+                createdAt: Date;
+                requestId: string;
+                currency: string;
+                milestone: import(".prisma/client").$Enums.PaymentMilestone;
+                amount: number;
+                razorpayPaymentId: string | null;
+                paidAt: Date | null;
             }[];
             _count: {
                 quotations: number;
@@ -146,7 +171,40 @@ export declare class RequestService {
             };
             conversation: {
                 id: string;
+                messages: {
+                    createdAt: Date;
+                    senderRole: import(".prisma/client").$Enums.Role;
+                    content: string;
+                }[];
+                _count: {
+                    messages: number;
+                };
             } | null;
+            quotations: {
+                status: import(".prisma/client").$Enums.QuotationStatus;
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                requestId: string;
+                version: number;
+                totalAmount: number;
+                advanceAmount: number;
+                remainingAmount: number;
+                currency: string;
+                terms: string | null;
+                estimatedDays: number | null;
+            }[];
+            payments: {
+                status: import(".prisma/client").$Enums.PaymentStatus;
+                id: string;
+                createdAt: Date;
+                requestId: string;
+                currency: string;
+                milestone: import(".prisma/client").$Enums.PaymentMilestone;
+                amount: number;
+                razorpayPaymentId: string | null;
+                paidAt: Date | null;
+            }[];
             _count: {
                 quotations: number;
                 payments: number;
@@ -209,8 +267,8 @@ export declare class RequestService {
             userId: string;
             currency: string;
             quotationId: string;
-            amount: number;
             milestone: import(".prisma/client").$Enums.PaymentMilestone;
+            amount: number;
             razorpayOrderId: string;
             razorpayPaymentId: string | null;
             razorpaySignature: string | null;

@@ -118,8 +118,10 @@ export default function UserChatConversationPage() {
       .catch(() => {});
 
     markRead(requestId);
+    api.chat.markRead(requestId).catch(() => {});
 
     const handleNewMessage = (newMsg: any) => {
+      if (newMsg?.requestId && newMsg.requestId !== requestId) return;
       const adapted = adaptMessageToFrontend(newMsg);
       setMessages((prev) => {
         if (prev.some((m) => m.id === adapted.id)) return prev;
@@ -139,6 +141,7 @@ export default function UserChatConversationPage() {
         return [...prev, adapted];
       });
       markRead(requestId);
+      api.chat.markRead(requestId).catch(() => {});
     };
 
     const handleStatusUpdate = (update: any) => {

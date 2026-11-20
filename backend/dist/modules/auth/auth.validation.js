@@ -42,7 +42,7 @@ exports.establishSessionSchema = zod_1.z
 exports.updateProfileSchema = zod_1.z.object({
     fullName: zod_1.z.string().min(2, 'Full name must be at least 2 characters').max(100).optional(),
     phone: zod_1.z.string().min(7, 'Invalid phone number').max(20).optional(),
-    avatarUrl: zod_1.z.string().url('Avatar must be a valid URL').optional(),
+    avatarUrl: zod_1.z.union([zod_1.z.string().url('Avatar must be a valid URL'), zod_1.z.literal(''), zod_1.z.null()]).optional(),
 });
 exports.updateRoleSchema = zod_1.z.object({
     role: zod_1.z.nativeEnum(client_1.Role, {

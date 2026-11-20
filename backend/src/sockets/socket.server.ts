@@ -6,6 +6,7 @@ import prisma from '../config/prisma.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import SOCKET_EVENTS from '../constants/socketEvents.js';
 import { registerChatHandlers } from './chat.handler.js';
+import { chatService } from '../modules/chat/chat.service.js';
 import { Role, MessageStatus } from '@prisma/client';
 import logger from '../utils/logger.js';
 
@@ -153,6 +154,12 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
     const user = socket.data.user;
     logger.info(`🔌 Socket connected: ${socket.id} (User: ${user.email}, Role: ${user.role})`);
 
+    // Join personal user room and/or role:admin room for live notifications and badge counts
+    socket.join(`user:${user.id}`);
+    if (user.role === Role.ADMIN) {
+      socket.join('role:admin');
+    }
+
     // 1. Presence tracking: Add socketId to user's active set
     if (!onlineUsers.has(user.id)) {
       onlineUsers.set(user.id, new Set());
@@ -223,6 +230,26 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
           const roomName = `request:${requestId}`;
           socket.join(roomName);
           logger.info(`👥 User ${user.email} joined room: ${roomName}`);
+
+          // Automatically mark counterpart messages as READ when joining the room
+          chatService
+            .markMessagesAsRead(user.id, requestId, user.role)
+            .then((markRes) => {
+              if (markRes.count > 0 && io) {
+                const readPayload = {
+                  requestId,
+                  readerId: user.id,
+                  readerRole: user.role,
+                  readAt: new Date(),
+                };
+                const rooms: string[] = [roomName, 'role:admin'];
+                if (request.userId) {
+                  rooms.push(`user:${request.userId}`);
+                }
+                io.to(rooms).emit(SOCKET_EVENTS.MESSAGES_READ, readPayload);
+              }
+            })
+            .catch(() => {});
 
           let counterpartOnline = false;
           if (user.role === Role.ADMIN) {
@@ -297,12 +324,33 @@ export const getSocketIO = (): Server => {
 };
 
 /**
- * Safely broadcast a real-time event to a specific request room.
+ * Safely broadcast a real-time event to a specific request room,
+ * plus the counterpart's personal notification rooms so sidebar badges update live.
  * No-ops gracefully when Socket.IO is not initialized (e.g. unit/E2E scripts).
  */
 export const emitToRequestRoom = (requestId: string, event: string, payload: unknown): void => {
   if (!io) return;
-  io.to(`request:${requestId}`).emit(event, payload);
+  const eventPayload =
+    typeof payload === 'object' && payload !== null && !('requestId' in payload)
+      ? { ...payload, requestId }
+      : payload;
+
+  prisma.documentRequest
+    .findUnique({
+      where: { id: requestId },
+      select: { userId: true },
+    })
+    .then((request) => {
+      if (!io) return;
+      const rooms: string[] = [`request:${requestId}`, 'role:admin'];
+      if (request?.userId) {
+        rooms.push(`user:${request.userId}`);
+      }
+      io.to(rooms).emit(event, eventPayload);
+    })
+    .catch(() => {
+      io?.to(`request:${requestId}`).emit(event, eventPayload);
+    });
 };
 
 export default initSocketServer;

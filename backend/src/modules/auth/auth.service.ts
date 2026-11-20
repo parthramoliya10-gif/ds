@@ -366,13 +366,13 @@ export class AuthService {
     data: {
       fullName?: string;
       phone?: string;
-      avatarUrl?: string;
+      avatarUrl?: string | null;
     }
   ) {
     const updatePayload = {
       ...(data.fullName !== undefined && { fullName: data.fullName }),
       ...(data.phone !== undefined && { phone: data.phone }),
-      ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
+      ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl === '' ? null : data.avatarUrl }),
     };
 
     if (role === Role.ADMIN) {

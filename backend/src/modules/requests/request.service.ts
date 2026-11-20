@@ -1,4 +1,4 @@
-import { RequestStatus, Role } from '@prisma/client';
+import { RequestStatus, Role, MessageStatus } from '@prisma/client';
 import prisma from '../../config/prisma.js';
 import { ApiError } from '../../utils/apiError.js';
 import { uploadBufferToCloudinary } from '../../utils/cloudinary.js';
@@ -155,7 +155,30 @@ export class RequestService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          conversation: { select: { id: true } },
+          conversation: {
+            select: {
+              id: true,
+              messages: {
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                select: {
+                  content: true,
+                  createdAt: true,
+                  senderRole: true,
+                },
+              },
+              _count: {
+                select: {
+                  messages: {
+                    where: {
+                      senderRole: Role.ADMIN,
+                      status: { in: [MessageStatus.SENT, MessageStatus.DELIVERED] },
+                    },
+                  },
+                },
+              },
+            },
+          },
           _count: {
             select: {
               referenceFiles: true,
@@ -165,16 +188,34 @@ export class RequestService {
             },
           },
           quotations: {
-            where: { status: 'SENT' },
             orderBy: { version: 'desc' },
-            take: 1,
             select: {
               id: true,
+              requestId: true,
               version: true,
               totalAmount: true,
               advanceAmount: true,
               remainingAmount: true,
+              currency: true,
+              terms: true,
+              estimatedDays: true,
               status: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+          payments: {
+            orderBy: { createdAt: 'desc' },
+            select: {
+              id: true,
+              requestId: true,
+              milestone: true,
+              amount: true,
+              currency: true,
+              status: true,
+              razorpayPaymentId: true,
+              paidAt: true,
+              createdAt: true,
             },
           },
         },
@@ -228,13 +269,67 @@ export class RequestService {
               avatarUrl: true,
             },
           },
-          conversation: { select: { id: true } },
+          conversation: {
+            select: {
+              id: true,
+              messages: {
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                select: {
+                  content: true,
+                  createdAt: true,
+                  senderRole: true,
+                },
+              },
+              _count: {
+                select: {
+                  messages: {
+                    where: {
+                      senderRole: Role.USER,
+                      status: { in: [MessageStatus.SENT, MessageStatus.DELIVERED] },
+                    },
+                  },
+                },
+              },
+            },
+          },
           _count: {
             select: {
               referenceFiles: true,
               quotations: true,
               payments: true,
               finalDocuments: true,
+            },
+          },
+          quotations: {
+            orderBy: { version: 'desc' },
+            select: {
+              id: true,
+              requestId: true,
+              version: true,
+              totalAmount: true,
+              advanceAmount: true,
+              remainingAmount: true,
+              currency: true,
+              terms: true,
+              estimatedDays: true,
+              status: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+          payments: {
+            orderBy: { createdAt: 'desc' },
+            select: {
+              id: true,
+              requestId: true,
+              milestone: true,
+              amount: true,
+              currency: true,
+              status: true,
+              razorpayPaymentId: true,
+              paidAt: true,
+              createdAt: true,
             },
           },
         },

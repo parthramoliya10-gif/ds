@@ -343,7 +343,7 @@ export declare class AuthService {
     updateProfile(userId: string, role: Role, data: {
         fullName?: string;
         phone?: string;
-        avatarUrl?: string;
+        avatarUrl?: string | null;
     }): Promise<{
         role: "ADMIN";
         id: string;

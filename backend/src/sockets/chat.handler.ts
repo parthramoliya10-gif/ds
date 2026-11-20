@@ -56,7 +56,9 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
         );
 
         let initialStatus: MessageStatus = MessageStatus.SENT;
-        if (recipientInRoom || recipientOnline) {
+        if (recipientInRoom) {
+          initialStatus = MessageStatus.READ;
+        } else if (recipientOnline) {
           initialStatus = MessageStatus.DELIVERED;
         }
 
@@ -67,7 +69,17 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
           status: initialStatus,
         });
 
-        io.to(roomName).emit(SOCKET_EVENTS.NEW_MESSAGE, savedMessage);
+        const messagePayload = {
+          ...savedMessage,
+          requestId,
+        };
+
+        const targetRooms = [roomName, 'role:admin'];
+        if (request?.userId) {
+          targetRooms.push(`user:${request.userId}`);
+        }
+
+        io.to(targetRooms).emit(SOCKET_EVENTS.NEW_MESSAGE, messagePayload);
 
         if (callback) {
           callback({ success: true, message: savedMessage });
@@ -132,16 +144,26 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       if (!requestId) return;
 
       const roomName = `request:${requestId}`;
-      if (!socket.rooms.has(roomName)) return;
-
-      const result = await chatService.markMessagesAsRead(currentUser.id, requestId);
+      const result = await chatService.markMessagesAsRead(currentUser.id, requestId, currentUser.role);
 
       if (result.count > 0) {
-        io.to(roomName).emit(SOCKET_EVENTS.MESSAGES_READ, {
+        const readPayload = {
           requestId,
           readerId: currentUser.id,
+          readerRole: currentUser.role,
           readAt: new Date(),
+        };
+
+        const targetRooms = [roomName, 'role:admin'];
+        const reqDoc = await prisma.documentRequest.findUnique({
+          where: { id: requestId },
+          select: { userId: true },
         });
+        if (reqDoc?.userId) {
+          targetRooms.push(`user:${reqDoc.userId}`);
+        }
+
+        io.to(targetRooms).emit(SOCKET_EVENTS.MESSAGES_READ, readPayload);
       }
     } catch (error) {
       logger.error('Error handling mark_read event:', error);

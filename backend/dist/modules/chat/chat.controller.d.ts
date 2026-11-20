@@ -15,6 +15,11 @@ export declare class ChatController {
      * Mark all unread messages as READ
      */
     markRead(req: Request, res: Response, next: NextFunction): Promise<void>;
+    /**
+     * DELETE /api/v1/chat/:requestId/messages/:messageId
+     * WhatsApp style deletion: 'for_me' | 'for_everyone'
+     */
+    deleteMessage(req: Request, res: Response, next: NextFunction): Promise<void>;
 }
 export declare const chatController: ChatController;
 export default chatController;

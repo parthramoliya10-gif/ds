@@ -401,7 +401,7 @@ export default function AdminDocumentsPage() {
                     Remaining 50% Balance
                   </span>
                   <span className="text-[16px] font-bold font-mono text-foreground">
-                    {formatCurrencyINR(balanceDue)}
+                    {balanceDue > 0 ? formatCurrencyINR(balanceDue) : "Quotation Pending"}
                   </span>
                 </div>
 
@@ -414,7 +414,9 @@ export default function AdminDocumentsPage() {
                   <p className="text-[12px] leading-relaxed text-foreground">
                     {isUnlocked
                       ? `Student ${currentRequest.studentName} has cleared the remaining milestone via Razorpay. Full file download is unlocked.`
-                      : `Download is locked and encrypted. Student sees a blurred preview and 'Pay ${formatCurrencyINR(balanceDue)} to unlock' button.`}
+                      : balanceDue > 0
+                      ? `Download is locked and encrypted. Student sees a blurred preview and 'Pay ${formatCurrencyINR(balanceDue)} to unlock' button.`
+                      : `Awaiting quotation dispatch. Once quotation is accepted and advance is paid, milestone escrow tracking activates.`}
                   </p>
                 </div>
               </div>

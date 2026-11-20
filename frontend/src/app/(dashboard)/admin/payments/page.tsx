@@ -22,6 +22,7 @@ import { Payment, Quotation, Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptPaymentToFrontend, adaptRequestToFrontend, adaptQuotationToFrontend } from "@/lib/api/adapters";
 import { formatCurrencyINR, formatDate, formatDateTime } from "@/lib/utils";
+import { downloadTaxInvoice } from "@/lib/invoice";
 import {
   DollarSign,
   TrendingUp,
@@ -305,7 +306,16 @@ export default function AdminPaymentsPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => toast.success(`Generated tax invoice for ${txn.transactionId || txn.id}`)}
+                            onClick={() => {
+                              const matchingReq = requests.find((r) => r.id === txn.requestId);
+                              downloadTaxInvoice(txn, {
+                                studentName: matchingReq?.studentName,
+                                college: matchingReq?.college,
+                                taskTitle: matchingReq?.title || txn.requestTitle,
+                                subject: matchingReq?.subject,
+                              });
+                              toast.success(`Generated tax invoice for ${txn.transactionId || txn.id}`);
+                            }}
                             className="h-7 text-[11px] border-border"
                           >
                             <Download className="h-3 w-3 mr-1" />
