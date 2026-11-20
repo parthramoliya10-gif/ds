@@ -119,12 +119,26 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
         return next();
       }
 
-      const user = await prisma.user.findUnique({
+      let user = await prisma.user.findUnique({
         where: { id: userId },
       });
 
       if (!user) {
-        return next(new Error('User profile not found.'));
+        const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+        if (authUser?.user) {
+          const userMeta = authUser.user.user_metadata || {};
+          user = await prisma.user.create({
+            data: {
+              id: userId,
+              email: authUser.user.email || '',
+              fullName: userMeta.fullName || userMeta.name || authUser.user.email?.split('@')[0] || 'User',
+              avatarUrl: userMeta.avatarUrl || userMeta.avatar_url || null,
+              phone: userMeta.phone || null,
+            },
+          });
+        } else {
+          return next(new Error('User profile not found.'));
+        }
       }
 
       if (user.isBlocked) {
@@ -169,6 +183,7 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
         userId: user.id,
         role: user.role,
         status: 'ONLINE',
+        anyAdminOnline: isAnyAdminOnline(),
       });
     }
     onlineUsers.get(user.id)!.add(socket.id);
@@ -281,12 +296,16 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
       socket.leave(roomName);
       logger.info(`🚪 User ${user.email} left room: ${roomName}`);
 
-      socket.to(roomName).emit('room_peer_status', {
-        requestId: payload.requestId,
-        userId: user.id,
-        role: user.role,
-        status: 'OFFLINE',
-      });
+      // Only notify OFFLINE if this user has no remaining active sockets on DSMS
+      const stillOnline = user.role === Role.ADMIN ? isAnyAdminOnline() : isUserOnline(user.id);
+      if (!stillOnline) {
+        socket.to(roomName).emit('room_peer_status', {
+          requestId: payload.requestId,
+          userId: user.id,
+          role: user.role,
+          status: 'OFFLINE',
+        });
+      }
     });
 
     // 4. Register WhatsApp Chat Handlers (Messaging, Ticks, Typing)
@@ -307,6 +326,7 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
             userId: user.id,
             role: user.role,
             status: 'OFFLINE',
+            anyAdminOnline: isAnyAdminOnline(),
           });
         }
       }

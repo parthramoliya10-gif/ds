@@ -17,6 +17,7 @@ export declare class RequestService {
      * Create a new document request with optional reference files
      */
     createRequest(userId: string, data: CreateRequestInput, files?: Express.Multer.File[]): Promise<{
+        isCounterpartOnline: boolean;
         user: {
             fullName: string | null;
             id: string;
@@ -80,7 +81,6 @@ export declare class RequestService {
             mimeType: string;
             downloadCount: number;
         }[];
-    } & {
         status: import(".prisma/client").$Enums.RequestStatus;
         id: string;
         createdAt: Date;
@@ -234,6 +234,7 @@ export declare class RequestService {
      * Get single request details with STRICT Authorization check
      */
     getRequestById(requestId: string, user: AuthenticatedUser): Promise<{
+        isCounterpartOnline: boolean;
         user: {
             fullName: string | null;
             id: string;
@@ -297,7 +298,6 @@ export declare class RequestService {
             mimeType: string;
             downloadCount: number;
         }[];
-    } & {
         status: import(".prisma/client").$Enums.RequestStatus;
         id: string;
         createdAt: Date;

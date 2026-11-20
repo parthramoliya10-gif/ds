@@ -130,11 +130,11 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   const joinRoom = useCallback(
     async (requestId: string): Promise<any> => {
-      if (!socket) return false;
+      if (!socket) return { success: false };
       return new Promise((resolve) => {
         const timer = setTimeout(() => {
-          resolve({ success: true, counterpartOnline: false });
-        }, 1200);
+          resolve({ success: false, timeout: true });
+        }, 3000);
 
         socket.emit(
           SOCKET_EVENTS.JOIN_REQUEST_ROOM,

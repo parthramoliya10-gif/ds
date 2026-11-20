@@ -80,12 +80,20 @@ export default function UserChatConversationPage() {
         if (mounted) {
           if (reqRes.status === "fulfilled" && reqRes.value) {
             setRequest(adaptRequestToFrontend(reqRes.value));
+            if (typeof (reqRes.value as any)?.isCounterpartOnline === "boolean") {
+              setIsCounterpartOnline((reqRes.value as any).isCounterpartOnline);
+            }
             if (reqRes.value.quotations && reqRes.value.quotations.length > 0) {
               setCurrentQuotation(adaptQuotationToFrontend(reqRes.value.quotations[0]));
             }
           }
-          if (chatRes.status === "fulfilled" && Array.isArray(chatRes.value?.messages)) {
-            setMessages(chatRes.value.messages.map(adaptMessageToFrontend));
+          if (chatRes.status === "fulfilled" && chatRes.value) {
+            if (Array.isArray(chatRes.value.messages)) {
+              setMessages(chatRes.value.messages.map(adaptMessageToFrontend));
+            }
+            if (typeof (chatRes.value as any)?.isCounterpartOnline === "boolean") {
+              setIsCounterpartOnline((chatRes.value as any).isCounterpartOnline);
+            }
           }
         }
       } catch (err) {
@@ -108,15 +116,18 @@ export default function UserChatConversationPage() {
   React.useEffect(() => {
     if (!requestId || !socket) return;
 
-    // Join room and mark read in background
-    joinRoom(requestId)
-      .then((roomRes: any) => {
-        if (roomRes && typeof roomRes.counterpartOnline === "boolean") {
-          setIsCounterpartOnline(roomRes.counterpartOnline);
-        }
-      })
-      .catch(() => {});
+    // Join room and sync counterpart online status
+    const syncRoom = () => {
+      joinRoom(requestId)
+        .then((roomRes: any) => {
+          if (roomRes?.success && typeof roomRes.counterpartOnline === "boolean") {
+            setIsCounterpartOnline(roomRes.counterpartOnline);
+          }
+        })
+        .catch(() => {});
+    };
 
+    syncRoom();
     markRead(requestId);
     api.chat.markRead(requestId).catch(() => {});
 
@@ -164,14 +175,24 @@ export default function UserChatConversationPage() {
       }
     };
 
+    const handleRoomJoined = (payload: any) => {
+      if (payload?.requestId === requestId && typeof payload.counterpartOnline === "boolean") {
+        setIsCounterpartOnline(payload.counterpartOnline);
+      }
+    };
+
     const handleUserStatusChange = (payload: any) => {
-      if (payload?.role === "ADMIN") {
-        setIsCounterpartOnline(payload.status === "ONLINE");
+      if (payload?.role === "ADMIN" || payload?.role === "admin") {
+        if (typeof payload.anyAdminOnline === "boolean") {
+          setIsCounterpartOnline(payload.anyAdminOnline);
+        } else {
+          setIsCounterpartOnline(payload.status === "ONLINE");
+        }
       }
     };
 
     const handlePeerStatus = (payload: any) => {
-      if (payload?.requestId === requestId && payload?.role === "ADMIN") {
+      if (payload?.requestId === requestId && (payload?.role === "ADMIN" || payload?.role === "admin")) {
         setIsCounterpartOnline(payload.status === "ONLINE");
       }
     };
@@ -209,6 +230,8 @@ export default function UserChatConversationPage() {
       }
     };
 
+    socket.on(SOCKET_EVENTS.CONNECT, syncRoom);
+    socket.on(SOCKET_EVENTS.ROOM_JOINED, handleRoomJoined);
     socket.on(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
     socket.on(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
     socket.on(SOCKET_EVENTS.MESSAGES_READ, handleMessagesRead);
@@ -219,6 +242,8 @@ export default function UserChatConversationPage() {
     socket.on(SOCKET_EVENTS.MESSAGE_DELETED, handleMessageDeleted);
 
     return () => {
+      socket.off(SOCKET_EVENTS.CONNECT, syncRoom);
+      socket.off(SOCKET_EVENTS.ROOM_JOINED, handleRoomJoined);
       socket.off(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
       socket.off(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, handleStatusUpdate);
       socket.off(SOCKET_EVENTS.MESSAGES_READ, handleMessagesRead);
@@ -474,7 +499,7 @@ export default function UserChatConversationPage() {
                     isCounterpartOnline ? "text-emerald-500" : "text-muted-foreground"
                   )}
                 >
-                  {isCounterpartOnline ? "Specialist Online" : "Specialist Offline"}
+                  {isCounterpartOnline ? "Online" : "Offline"}
                 </span>
               </div>
             </div>

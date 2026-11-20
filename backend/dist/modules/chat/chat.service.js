@@ -8,6 +8,7 @@ const client_1 = require("@prisma/client");
 const prisma_js_1 = __importDefault(require("../../config/prisma.js"));
 const apiError_js_1 = require("../../utils/apiError.js");
 const cloudinary_js_1 = require("../../utils/cloudinary.js");
+const socket_server_js_1 = require("../../sockets/socket.server.js");
 const formatMessageSender = (msg) => {
     const { userSender, adminSender, ...rest } = msg;
     const sender = msg.senderRole === client_1.Role.ADMIN
@@ -108,10 +109,14 @@ class ChatService {
         const items = hasMore ? visibleMessages.slice(0, limit) : visibleMessages;
         // Capture cursor of the oldest message in this batch BEFORE reversing!
         const nextCursor = hasMore ? items[items.length - 1].id : null;
+        const counterpartOnline = user.role === client_1.Role.ADMIN
+            ? (0, socket_server_js_1.isUserOnline)(conversation.request.userId)
+            : (0, socket_server_js_1.isAnyAdminOnline)();
         return {
             conversationId: conversation.id,
             messages: [...items].reverse().map(formatMessageSender), // chronologically ordered (oldest to newest)
             nextCursor,
+            isCounterpartOnline: counterpartOnline,
         };
     }
     /**

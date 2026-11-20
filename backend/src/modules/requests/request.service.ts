@@ -4,6 +4,7 @@ import { ApiError } from '../../utils/apiError.js';
 import { uploadBufferToCloudinary } from '../../utils/cloudinary.js';
 import { AuthenticatedUser } from '../../types/express.js';
 import logger from '../../utils/logger.js';
+import { isUserOnline, isAnyAdminOnline } from '../../sockets/socket.server.js';
 
 export interface CreateRequestInput {
   title: string;
@@ -399,7 +400,15 @@ export class RequestService {
       throw new ApiError(403, 'Forbidden: You do not have permission to view this request.');
     }
 
-    return request;
+    const counterpartOnline =
+      user.role === Role.ADMIN
+        ? isUserOnline(request.userId)
+        : isAnyAdminOnline();
+
+    return {
+      ...request,
+      isCounterpartOnline: counterpartOnline,
+    };
   }
 
   /**

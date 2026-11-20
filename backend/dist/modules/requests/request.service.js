@@ -9,6 +9,7 @@ const prisma_js_1 = __importDefault(require("../../config/prisma.js"));
 const apiError_js_1 = require("../../utils/apiError.js");
 const cloudinary_js_1 = require("../../utils/cloudinary.js");
 const logger_js_1 = __importDefault(require("../../utils/logger.js"));
+const socket_server_js_1 = require("../../sockets/socket.server.js");
 class RequestService {
     /**
      * Create a new document request with optional reference files
@@ -355,7 +356,13 @@ class RequestService {
         if (user.role !== client_1.Role.ADMIN && request.userId !== user.id) {
             throw new apiError_js_1.ApiError(403, 'Forbidden: You do not have permission to view this request.');
         }
-        return request;
+        const counterpartOnline = user.role === client_1.Role.ADMIN
+            ? (0, socket_server_js_1.isUserOnline)(request.userId)
+            : (0, socket_server_js_1.isAnyAdminOnline)();
+        return {
+            ...request,
+            isCounterpartOnline: counterpartOnline,
+        };
     }
     /**
      * Admin-only: Update request status

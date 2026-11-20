@@ -3,6 +3,7 @@ import prisma from '../../config/prisma.js';
 import { ApiError } from '../../utils/apiError.js';
 import { AuthenticatedUser } from '../../types/express.js';
 import { uploadBufferToCloudinary } from '../../utils/cloudinary.js';
+import { isUserOnline, isAnyAdminOnline } from '../../sockets/socket.server.js';
 
 export interface GetMessagesOptions {
   limit?: number;
@@ -133,11 +134,16 @@ export class ChatService {
     const items = hasMore ? visibleMessages.slice(0, limit) : visibleMessages;
     // Capture cursor of the oldest message in this batch BEFORE reversing!
     const nextCursor = hasMore ? items[items.length - 1].id : null;
+    const counterpartOnline =
+      user.role === Role.ADMIN
+        ? isUserOnline(conversation.request.userId)
+        : isAnyAdminOnline();
 
     return {
       conversationId: conversation.id,
       messages: [...items].reverse().map(formatMessageSender), // chronologically ordered (oldest to newest)
       nextCursor,
+      isCounterpartOnline: counterpartOnline,
     };
   }
 

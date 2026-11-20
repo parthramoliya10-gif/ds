@@ -110,11 +110,26 @@ const initSocketServer = (httpServer) => {
                 };
                 return next();
             }
-            const user = await prisma_js_1.default.user.findUnique({
+            let user = await prisma_js_1.default.user.findUnique({
                 where: { id: userId },
             });
             if (!user) {
-                return next(new Error('User profile not found.'));
+                const { data: authUser } = await supabase_js_1.supabaseAdmin.auth.admin.getUserById(userId);
+                if (authUser?.user) {
+                    const userMeta = authUser.user.user_metadata || {};
+                    user = await prisma_js_1.default.user.create({
+                        data: {
+                            id: userId,
+                            email: authUser.user.email || '',
+                            fullName: userMeta.fullName || userMeta.name || authUser.user.email?.split('@')[0] || 'User',
+                            avatarUrl: userMeta.avatarUrl || userMeta.avatar_url || null,
+                            phone: userMeta.phone || null,
+                        },
+                    });
+                }
+                else {
+                    return next(new Error('User profile not found.'));
+                }
             }
             if (user.isBlocked) {
                 return next(new Error('Account suspended. Access denied.'));
@@ -155,6 +170,7 @@ const initSocketServer = (httpServer) => {
                 userId: user.id,
                 role: user.role,
                 status: 'ONLINE',
+                anyAdminOnline: (0, exports.isAnyAdminOnline)(),
             });
         }
         exports.onlineUsers.get(user.id).add(socket.id);
@@ -259,12 +275,16 @@ const initSocketServer = (httpServer) => {
             const roomName = `request:${payload.requestId}`;
             socket.leave(roomName);
             logger_js_1.default.info(`🚪 User ${user.email} left room: ${roomName}`);
-            socket.to(roomName).emit('room_peer_status', {
-                requestId: payload.requestId,
-                userId: user.id,
-                role: user.role,
-                status: 'OFFLINE',
-            });
+            // Only notify OFFLINE if this user has no remaining active sockets on DSMS
+            const stillOnline = user.role === client_1.Role.ADMIN ? (0, exports.isAnyAdminOnline)() : (0, exports.isUserOnline)(user.id);
+            if (!stillOnline) {
+                socket.to(roomName).emit('room_peer_status', {
+                    requestId: payload.requestId,
+                    userId: user.id,
+                    role: user.role,
+                    status: 'OFFLINE',
+                });
+            }
         });
         // 4. Register WhatsApp Chat Handlers (Messaging, Ticks, Typing)
         (0, chat_handler_js_1.registerChatHandlers)(io, socket);
@@ -282,6 +302,7 @@ const initSocketServer = (httpServer) => {
                         userId: user.id,
                         role: user.role,
                         status: 'OFFLINE',
+                        anyAdminOnline: (0, exports.isAnyAdminOnline)(),
                     });
                 }
             }

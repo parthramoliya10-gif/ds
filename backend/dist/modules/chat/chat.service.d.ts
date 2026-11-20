@@ -24,6 +24,7 @@ export declare class ChatService {
         conversationId: string;
         messages: any[];
         nextCursor: string | null;
+        isCounterpartOnline: boolean;
     }>;
     /**
      * Post a new message via REST (supports optional file attachments)
