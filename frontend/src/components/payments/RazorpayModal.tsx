@@ -103,7 +103,7 @@ export function RazorpayModal({
             </div>
             <div>
               <p className="text-[12px] font-semibold leading-none">Razorpay Secure</p>
-              <p className="text-[10px] text-background/80 mt-0.5">DSMS University Escrow</p>
+              <p className="text-[10px] text-background/80 mt-0.5">DSMS Organization Escrow</p>
             </div>
           </div>
           <div className="text-right">

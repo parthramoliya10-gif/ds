@@ -35,7 +35,7 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
   // Form states: General info
   const [fullName, setFullName] = React.useState(user?.name || "");
   const [phone, setPhone] = React.useState(user?.phone || "");
-  const [college, setCollege] = React.useState(user?.college || "ppsu");
+  const [college, setCollege] = React.useState(user?.college || "");
   const [semester, setSemester] = React.useState(String(user?.semester || "4"));
   const [savingGeneral, setSavingGeneral] = React.useState(false);
 
@@ -58,7 +58,7 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
     if (user) {
       setFullName(user.name || "");
       setPhone(user.phone || "");
-      setCollege(user.college || "ppsu");
+      setCollege(user.college || "");
       setSemester(String(user.semester || "4"));
       setAvatarUrl(user.avatar || "");
     }
@@ -213,7 +213,7 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
         description={
           role === "admin"
             ? "Manage your administrative coordinator credentials, communication preferences, and security."
-            : "Update your student identity, college affiliation, contact details, and account security."
+            : "Update your student identity, organization affiliation, contact details, and account security."
         }
       />
 
@@ -325,10 +325,10 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
               <>
                 <div>
                   <span className="text-muted-foreground block text-[11px] uppercase tracking-wider font-semibold">
-                    College / University
+                    Organization Name
                   </span>
                   <span className="font-semibold text-foreground truncate block">
-                    {user?.college || "ppsu"}
+                    {user?.college || "Organization Name"}
                   </span>
                 </div>
                 <div>
@@ -397,7 +397,7 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
             <CardDescription className="text-[13px] text-muted-foreground">
               {role === "admin"
                 ? "Update your administrative contact name and phone number."
-                : "Update your full name, university name, academic semester, and phone number."}
+                : "Update your full name, organization name, academic semester, and phone number."}
             </CardDescription>
           </div>
         </div>
@@ -443,17 +443,17 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
               <>
                 <div className="space-y-1.5">
                   <Label htmlFor="college" className="text-[13px] font-medium">
-                    College / University Name
+                    Organization Name
                   </Label>
                   <Input
                     id="college"
                     value={college}
                     onChange={(e) => setCollege(e.target.value)}
-                    placeholder="e.g. ppsu, DTU, VIT"
+                    placeholder="e.g. Organization Name"
                     className="h-10 text-[14px]"
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    Used by specialists to format covers and lab rubrics.
+                    Used by specialists to format covers and task rubrics.
                   </p>
                 </div>
 

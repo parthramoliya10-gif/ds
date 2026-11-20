@@ -22,8 +22,8 @@ const registerSchema = z.object({
   name: z.string().min(2, "Full name must be at least 2 characters"),
   email: z
     .string()
-    .min(1, "College email is required")
-    .email("Please enter a valid college email address"),
+    .min(1, "Mail ID is required")
+    .email("Please enter a valid email address"),
   password: z
     .string()
     .min(6, "Password must be at least 6 characters"),
@@ -116,15 +116,15 @@ export default function RegisterPage() {
             )}
           </div>
 
-          {/* College Email */}
+          {/* Email ID */}
           <div className="space-y-1.5">
             <Label htmlFor="email" className="text-[13px] font-medium">
-              College Email ID
+              Enter Mail ID
             </Label>
             <Input
               id="email"
               type="email"
-              placeholder="name@university.edu"
+              placeholder="Enter Mail ID"
               {...register("email")}
               className={errors.email ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.email)}
@@ -174,7 +174,7 @@ export default function RegisterPage() {
                 <span className="text-foreground font-medium underline underline-offset-2">
                   Terms of Service
                 </span>{" "}
-                and confirm my submitted tasks adhere to university guidelines.
+                and confirm my submitted tasks adhere to organization guidelines.
               </Label>
             </div>
             {errors.terms && (

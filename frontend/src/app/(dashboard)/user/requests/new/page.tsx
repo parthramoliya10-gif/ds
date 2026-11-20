@@ -26,7 +26,7 @@ import { toast } from "sonner";
 const newRequestSchema = z.object({
   title: z.string().min(5, "Task title must be at least 5 characters"),
   subject: z.string().min(2, "Subject is required"),
-  college: z.string().min(2, "College name is required"),
+  college: z.string().min(2, "Organization name is required"),
   semester: z.string().min(1, "Semester is required"),
   pages: z.coerce.number().min(1, "Pages must be at least 1"),
   format: z.enum(["typed", "handwritten"]),
@@ -129,18 +129,18 @@ export default function NewRequestPage() {
               Task Details
             </CardTitle>
             <CardDescription className="text-[13px] text-muted-foreground">
-              Specify the subject, assignment title, and university guidelines
+              Specify the subject, assignment title, and organization guidelines
             </CardDescription>
           </CardHeader>
 
           <CardContent className="p-0 space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="title" className="text-[13px]">
-                Assignment / Lab Manual Title
+                Assignment / Task Title
               </Label>
               <Input
                 id="title"
-                placeholder="e.g. Computer Networks Socket Programming Lab Manual"
+                placeholder="e.g. Assignment / Project Title"
                 {...register("title")}
                 className={errors.title ? "border-foreground" : ""}
               />
@@ -154,7 +154,7 @@ export default function NewRequestPage() {
                 <Label htmlFor="subject" className="text-[13px]">Subject / Course</Label>
                 <Input
                   id="subject"
-                  placeholder="e.g. Operating Systems"
+                  placeholder="e.g. Subject / Course Name"
                   {...register("subject")}
                   className={errors.subject ? "border-foreground" : ""}
                 />
@@ -164,10 +164,10 @@ export default function NewRequestPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="college" className="text-[13px]">College / University</Label>
+                <Label htmlFor="college" className="text-[13px]">Organization Name</Label>
                 <Input
                   id="college"
-                  placeholder="e.g. Delhi Technological University"
+                  placeholder="e.g. Organization Name"
                   {...register("college")}
                   className={errors.college ? "border-foreground" : ""}
                 />
@@ -297,7 +297,7 @@ export default function NewRequestPage() {
               <Textarea
                 id="description"
                 rows={3}
-                placeholder="List specific experiment numbers, problem statements, output expectations, or preferred formatting guidelines..."
+                placeholder="List specific requirements, problem statements, output expectations, or preferred formatting guidelines..."
                 {...register("description")}
                 className="text-[13px]"
               />
@@ -312,7 +312,7 @@ export default function NewRequestPage() {
               Reference Files & Syllabus
             </CardTitle>
             <CardDescription className="text-[13px] text-muted-foreground">
-              Attach university question PDFs, lab manual index, experiment guidelines, or sample code
+              Attach organization question PDFs, lab manual index, experiment guidelines, or sample code
             </CardDescription>
           </CardHeader>
 

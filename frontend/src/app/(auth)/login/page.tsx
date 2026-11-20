@@ -19,8 +19,8 @@ import { toast } from "sonner";
 const loginSchema = z.object({
   email: z
     .string()
-    .min(1, "College email is required")
-    .email("Please enter a valid college email address"),
+    .min(1, "Mail ID is required")
+    .email("Please enter a valid email address"),
   password: z
     .string()
     .min(6, "Password must be at least 6 characters"),
@@ -68,7 +68,7 @@ export default function LoginPage() {
           Welcome back
         </CardTitle>
         <CardDescription className="text-[14px] text-muted-foreground">
-          Sign in to access your college tasks, milestones, and chat
+          Sign in to access your organization tasks, milestones, and chat
         </CardDescription>
       </CardHeader>
 
@@ -87,12 +87,12 @@ export default function LoginPage() {
           {/* Email Field */}
           <div className="space-y-1.5">
             <Label htmlFor="email" className="text-[13px] font-medium">
-              College Email ID
+              Enter Mail ID
             </Label>
             <Input
               id="email"
               type="email"
-              placeholder="name@university.edu"
+              placeholder="Enter Mail ID"
               {...register("email")}
               className={errors.email ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.email)}

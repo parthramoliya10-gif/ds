@@ -8,7 +8,7 @@ export default function UserChatPlaceholderPage() {
       <EmptyState
         icon={<MessageSquare className="h-6 w-6 stroke-[1.5]" />}
         title="Select a conversation"
-        description="Choose a college task request from the list to view real-time messages, quotation milestones, and task updates."
+        description="Choose an organization task request from the list to view real-time messages, quotation milestones, and task updates."
       />
     </div>
   );

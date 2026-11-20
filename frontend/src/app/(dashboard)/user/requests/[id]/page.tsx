@@ -268,7 +268,7 @@ export default function UserRequestDetailPage() {
                 <span className="font-semibold text-foreground">{request.pages} Pages</span>
               </div>
               <div>
-                <span className="text-[11px] text-muted-foreground block">University</span>
+                <span className="text-[11px] text-muted-foreground block">Organization Name</span>
                 <span className="font-semibold text-foreground">{request.college}</span>
               </div>
               <div>

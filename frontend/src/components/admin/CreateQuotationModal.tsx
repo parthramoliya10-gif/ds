@@ -39,7 +39,7 @@ export function CreateQuotationModal({
   const [amount, setAmount] = React.useState<number>(defaultAmount);
   const [deliveryDate, setDeliveryDate] = React.useState("Within 24 Hours");
   const [notes, setNotes] = React.useState(
-    "Includes full source code implementation, verified screenshots, and university-standard formatting."
+    "Includes full source code implementation, verified screenshots, and organization-standard formatting."
   );
   const [submitting, setSubmitting] = React.useState(false);
 

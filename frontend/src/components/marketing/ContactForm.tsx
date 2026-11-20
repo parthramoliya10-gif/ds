@@ -20,9 +20,9 @@ import { Send, CheckCircle2 } from "lucide-react";
 
 const contactSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
-  collegeEmail: z.string().email("Please provide a valid college or personal email address"),
+  collegeEmail: z.string().email("Please provide a valid email address"),
   phone: z.string().min(10, "Valid 10-digit phone number required for WhatsApp coordination"),
-  college: z.string().min(2, "College or university name is required"),
+  college: z.string().min(2, "Organization name is required"),
   taskType: z.enum([
     "assignment",
     "lab_manual",
@@ -112,15 +112,15 @@ export function ContactForm() {
           )}
         </div>
 
-        {/* College Email */}
+        {/* Mail ID */}
         <div className="space-y-1.5">
           <Label htmlFor="collegeEmail" className="text-[13px]">
-            College Email <span className="text-foreground font-semibold">*</span>
+            Enter Mail ID <span className="text-foreground font-semibold">*</span>
           </Label>
           <Input
             id="collegeEmail"
             type="email"
-            placeholder="name@university.edu"
+            placeholder="Enter Mail ID"
             {...register("collegeEmail")}
             className="h-10 text-[14px] bg-background border-border"
           />
@@ -152,14 +152,14 @@ export function ContactForm() {
           )}
         </div>
 
-        {/* College / University */}
+        {/* Organization Name */}
         <div className="space-y-1.5">
           <Label htmlFor="college" className="text-[13px]">
-            College / Institute <span className="text-foreground font-semibold">*</span>
+            Organization Name <span className="text-foreground font-semibold">*</span>
           </Label>
           <Input
             id="college"
-            placeholder="e.g. Delhi Technological University"
+            placeholder="e.g. Organization Name"
             {...register("college")}
             className="h-10 text-[14px] bg-background border-border"
           />
@@ -224,7 +224,7 @@ export function ContactForm() {
         <Textarea
           id="message"
           rows={4}
-          placeholder="Mention subject name, number of questions or pages, format rules (e.g. IEEE format, handwritten ruled sheets), and college submission deadline..."
+          placeholder="Mention subject name, number of questions or pages, format rules (e.g. IEEE format, handwritten ruled sheets), and submission deadline..."
           {...register("message")}
           className="text-[13px] bg-background border-border resize-none"
         />
