@@ -22,6 +22,8 @@ router.get('/:id', request_controller_js_1.default.getById);
 // 4. Admin updates request status
 router.patch('/:id/status', rbac_middleware_js_1.requireAdmin, (0, validate_middleware_js_1.validateRequest)({ body: request_validation_js_1.updateRequestStatusSchema }), request_controller_js_1.default.updateStatus);
 // 5. User cancels their own PENDING request
-router.delete('/:id', request_controller_js_1.default.cancel);
+router.patch('/:id/cancel', request_controller_js_1.default.cancel);
+// 6. User or Admin deletes request for their own account only ("Delete for me")
+router.delete('/:id', request_controller_js_1.default.delete);
 exports.default = router;
 //# sourceMappingURL=request.routes.js.map

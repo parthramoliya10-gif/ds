@@ -25,6 +25,11 @@ export declare class ChatController {
      * WhatsApp style deletion: 'for_me' | 'for_everyone'
      */
     deleteMessage(req: Request, res: Response, next: NextFunction): Promise<void>;
+    /**
+     * POST /api/v1/chat/:requestId/clear
+     * Clear all messages in conversation for this user only ("Clear chat for me")
+     */
+    clearChat(req: Request, res: Response, next: NextFunction): Promise<void>;
 }
 export declare const chatController: ChatController;
 export default chatController;

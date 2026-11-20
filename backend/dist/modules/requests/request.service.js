@@ -109,7 +109,15 @@ class RequestService {
         const page = Number(query.page) || 1;
         const limit = Number(query.limit) || 10;
         const skip = (page - 1) * limit;
-        const where = { userId };
+        const where = {
+            userId,
+            auditLogs: {
+                none: {
+                    action: 'REQUEST_DELETED_FOR_USER',
+                    actorId: userId,
+                },
+            },
+        };
         if (query.status) {
             where.status = query.status;
         }
@@ -200,11 +208,18 @@ class RequestService {
     /**
      * Get all requests for Admin with search and filters
      */
-    async getAllRequestsForAdmin(query) {
+    async getAllRequestsForAdmin(query, adminId) {
         const page = Number(query.page) || 1;
         const limit = Number(query.limit) || 10;
         const skip = (page - 1) * limit;
-        const where = {};
+        const where = {
+            auditLogs: {
+                none: {
+                    action: 'REQUEST_DELETED_FOR_ADMIN',
+                    ...(adminId ? { actorId: adminId } : {}),
+                },
+            },
+        };
         if (query.status) {
             where.status = query.status;
         }
@@ -424,6 +439,54 @@ class RequestService {
             },
         });
         return cancelled;
+    }
+    /**
+     * Delete request for the caller's account only ("Delete for me").
+     * Request is hidden from this account's dashboard, list, and chat,
+     * but remains completely intact in the other account.
+     */
+    async deleteRequestForAccount(user, requestId) {
+        const request = await prisma_js_1.default.documentRequest.findUnique({
+            where: { id: requestId },
+            select: { id: true, userId: true },
+        });
+        if (!request) {
+            throw new apiError_js_1.ApiError(404, 'Document request not found.');
+        }
+        if (user.role !== client_1.Role.ADMIN && request.userId !== user.id) {
+            throw new apiError_js_1.ApiError(403, 'Forbidden: You can only delete your own requests.');
+        }
+        const action = user.role === client_1.Role.ADMIN
+            ? 'REQUEST_DELETED_FOR_ADMIN'
+            : 'REQUEST_DELETED_FOR_USER';
+        const existing = await prisma_js_1.default.auditLog.findFirst({
+            where: {
+                requestId,
+                actorId: user.id,
+                action,
+            },
+        });
+        if (!existing) {
+            await prisma_js_1.default.auditLog.create({
+                data: {
+                    actorId: user.id,
+                    actorRole: user.role,
+                    ...(user.role === client_1.Role.ADMIN
+                        ? { adminActorId: user.id }
+                        : { userActorId: user.id }),
+                    requestId,
+                    action,
+                    metadata: {
+                        deletedAt: new Date().toISOString(),
+                    },
+                },
+            });
+        }
+        return {
+            success: true,
+            message: 'Request deleted successfully for your account',
+            requestId,
+        };
     }
 }
 exports.RequestService = RequestService;

@@ -40,7 +40,9 @@ import {
   ShieldCheck,
   Calendar,
   Eye,
+  Trash2,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { toast } from "sonner";
 import { downloadFile } from "@/lib/download";
 
@@ -55,6 +57,17 @@ export default function UserRequestDetailPage() {
   const [isRazorpayOpen, setIsRazorpayOpen] = React.useState(false);
   const [isRevisionOpen, setIsRevisionOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
+
+  const handleDeleteRequest = async () => {
+    try {
+      await api.requests.delete(requestId);
+      toast.success("Request removed from your account");
+      router.push("/user/requests");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete request");
+    }
+  };
   const [previewFile, setPreviewFile] = React.useState<{
     name: string;
     size: string;
@@ -210,6 +223,15 @@ export default function UserRequestDetailPage() {
               Live Task Chat
             </Button>
           </Link>
+          <Button
+            variant="outline"
+            className="h-10 text-[13px] border-border text-muted-foreground hover:text-red-500 hover:border-red-500"
+            onClick={() => setIsDeleteModalOpen(true)}
+            title="Delete this request from my account"
+          >
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            Delete
+          </Button>
         </div>
       </div>
 
@@ -492,6 +514,17 @@ export default function UserRequestDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteRequest}
+        title="Delete Request from Your Account?"
+        description="This will remove this request and deliverable records from your account. The specialist desk record will not be affected."
+        confirmLabel="Delete Request"
+        cancelLabel="Keep Request"
+        isDestructive={true}
+      />
     </div>
   );
 }

@@ -150,6 +150,28 @@ class ChatController {
             next(error);
         }
     }
+    /**
+     * POST /api/v1/chat/:requestId/clear
+     * Clear all messages in conversation for this user only ("Clear chat for me")
+     */
+    async clearChat(req, res, next) {
+        try {
+            if (!req.user) {
+                throw new apiError_js_1.ApiError(401, 'Unauthorized');
+            }
+            const requestId = req.params.requestId;
+            const result = await chat_service_js_1.default.clearConversationMessages(req.user, requestId);
+            (0, apiResponse_js_1.sendResponse)({
+                res,
+                statusCode: 200,
+                message: 'Chat cleared successfully for your account',
+                data: result,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
 }
 exports.ChatController = ChatController;
 exports.chatController = new ChatController();

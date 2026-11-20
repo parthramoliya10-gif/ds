@@ -21,5 +21,8 @@ chat_controller_js_1.default.postMessage);
 router.patch('/:requestId/read', chat_controller_js_1.default.markRead);
 // 4. Delete message (WhatsApp style: 'for_me' or 'for_everyone')
 router.delete('/:requestId/messages/:messageId', chat_controller_js_1.default.deleteMessage);
+// 5. Clear all conversation messages for caller only ("Clear chat for me")
+router.post('/:requestId/clear', chat_controller_js_1.default.clearChat);
+router.delete('/:requestId/clear', chat_controller_js_1.default.clearChat);
 exports.default = router;
 //# sourceMappingURL=chat.routes.js.map

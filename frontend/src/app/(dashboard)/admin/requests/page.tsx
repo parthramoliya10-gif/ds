@@ -20,13 +20,29 @@ import { Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
 import { formatDate, isDeadlineUrgent } from "@/lib/utils";
-import { FileText, Eye, MessageSquare, Filter } from "lucide-react";
+import { FileText, Eye, MessageSquare, Filter, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { toast } from "sonner";
 
 export default function AdminRequestsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState("all");
   const [formatFilter, setFormatFilter] = React.useState("all");
   const [requests, setRequests] = React.useState<Request[]>([]);
+  const [deleteRequestId, setDeleteRequestId] = React.useState<string | null>(null);
+
+  const confirmDeleteRequest = async () => {
+    if (!deleteRequestId) return;
+    try {
+      await api.requests.delete(deleteRequestId);
+      setRequests((prev) => prev.filter((r) => r.id !== deleteRequestId));
+      toast.success("Request removed from admin portal");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete request");
+    } finally {
+      setDeleteRequestId(null);
+    }
+  };
 
   React.useEffect(() => {
     let mounted = true;
@@ -123,7 +139,7 @@ export default function AdminRequestsPage() {
     },
     {
       header: "Actions",
-      className: "text-right w-44",
+      className: "text-right w-48",
       cell: (req) => (
         <div className="flex items-center justify-end space-x-1.5" onClick={(e) => e.stopPropagation()}>
           <Link href={`/admin/chat/${req.id}`}>
@@ -138,6 +154,15 @@ export default function AdminRequestsPage() {
               Review
             </Button>
           </Link>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 w-8 p-0 border-border text-muted-foreground hover:text-red-500 hover:border-red-500"
+            onClick={() => setDeleteRequestId(req.id)}
+            title="Delete request from admin portal"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
         </div>
       ),
     },
@@ -197,6 +222,17 @@ export default function AdminRequestsPage() {
           />
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteRequestId)}
+        onClose={() => setDeleteRequestId(null)}
+        onConfirm={confirmDeleteRequest}
+        title="Delete Request from Admin Portal?"
+        description="This will remove this request from the admin portal. The student's portal record will remain unaffected."
+        confirmLabel="Delete Request"
+        cancelLabel="Keep Request"
+        isDestructive={true}
+      />
     </div>
   );
 }

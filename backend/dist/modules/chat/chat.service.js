@@ -36,6 +36,16 @@ class ChatService {
                 where: {
                     senderRole: client_1.Role.USER,
                     status: { in: [client_1.MessageStatus.SENT, client_1.MessageStatus.DELIVERED] },
+                    conversation: {
+                        request: {
+                            auditLogs: {
+                                none: {
+                                    action: 'REQUEST_DELETED_FOR_ADMIN',
+                                    actorId: user.id,
+                                },
+                            },
+                        },
+                    },
                 },
             });
             return { unreadCount: count };
@@ -47,6 +57,12 @@ class ChatService {
                 conversation: {
                     request: {
                         userId: user.id,
+                        auditLogs: {
+                            none: {
+                                action: 'REQUEST_DELETED_FOR_USER',
+                                actorId: user.id,
+                            },
+                        },
                     },
                 },
             },
@@ -318,6 +334,55 @@ class ChatService {
                 messageId,
             };
         }
+    }
+    /**
+     * Clear all messages in a conversation for the caller only ("Clear chat for me").
+     * The counterpart account retains all messages intact.
+     */
+    async clearConversationMessages(user, requestId) {
+        const conversation = await prisma_js_1.default.conversation.findUnique({
+            where: { requestId },
+            include: {
+                request: { select: { id: true, userId: true } },
+            },
+        });
+        if (!conversation || !conversation.request) {
+            throw new apiError_js_1.ApiError(404, 'Conversation or request not found.');
+        }
+        if (user.role !== client_1.Role.ADMIN && conversation.request.userId !== user.id) {
+            throw new apiError_js_1.ApiError(403, 'Forbidden: You do not have permission to clear this chat.');
+        }
+        // Fetch all existing messages in this conversation
+        const messages = await prisma_js_1.default.message.findMany({
+            where: { conversationId: conversation.id },
+            select: { id: true, metadata: true },
+        });
+        if (messages.length > 0) {
+            const updates = messages.map((msg) => {
+                const currentMeta = msg.metadata || {};
+                const deletedFor = Array.isArray(currentMeta.deletedFor)
+                    ? [...currentMeta.deletedFor]
+                    : [];
+                if (!deletedFor.includes(user.id)) {
+                    deletedFor.push(user.id);
+                }
+                return prisma_js_1.default.message.update({
+                    where: { id: msg.id },
+                    data: {
+                        metadata: {
+                            ...currentMeta,
+                            deletedFor,
+                        },
+                    },
+                });
+            });
+            await prisma_js_1.default.$transaction(updates);
+        }
+        return {
+            success: true,
+            clearedCount: messages.length,
+            message: 'Chat cleared successfully for your account',
+        };
     }
 }
 exports.ChatService = ChatService;

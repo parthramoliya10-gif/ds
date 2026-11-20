@@ -143,7 +143,15 @@ export class RequestService {
     const limit = Number(query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const where: any = { userId };
+    const where: any = {
+      userId,
+      auditLogs: {
+        none: {
+          action: 'REQUEST_DELETED_FOR_USER',
+          actorId: userId,
+        },
+      },
+    };
     if (query.status) {
       where.status = query.status;
     }
@@ -237,12 +245,19 @@ export class RequestService {
   /**
    * Get all requests for Admin with search and filters
    */
-  async getAllRequestsForAdmin(query: ListRequestsQuery) {
+  async getAllRequestsForAdmin(query: ListRequestsQuery, adminId?: string) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = {
+      auditLogs: {
+        none: {
+          action: 'REQUEST_DELETED_FOR_ADMIN',
+          ...(adminId ? { actorId: adminId } : {}),
+        },
+      },
+    };
     if (query.status) {
       where.status = query.status;
     }
@@ -485,6 +500,62 @@ export class RequestService {
     });
 
     return cancelled;
+  }
+
+  /**
+   * Delete request for the caller's account only ("Delete for me").
+   * Request is hidden from this account's dashboard, list, and chat,
+   * but remains completely intact in the other account.
+   */
+  async deleteRequestForAccount(user: AuthenticatedUser, requestId: string) {
+    const request = await prisma.documentRequest.findUnique({
+      where: { id: requestId },
+      select: { id: true, userId: true },
+    });
+
+    if (!request) {
+      throw new ApiError(404, 'Document request not found.');
+    }
+
+    if (user.role !== Role.ADMIN && request.userId !== user.id) {
+      throw new ApiError(403, 'Forbidden: You can only delete your own requests.');
+    }
+
+    const action =
+      user.role === Role.ADMIN
+        ? 'REQUEST_DELETED_FOR_ADMIN'
+        : 'REQUEST_DELETED_FOR_USER';
+
+    const existing = await prisma.auditLog.findFirst({
+      where: {
+        requestId,
+        actorId: user.id,
+        action,
+      },
+    });
+
+    if (!existing) {
+      await prisma.auditLog.create({
+        data: {
+          actorId: user.id,
+          actorRole: user.role,
+          ...(user.role === Role.ADMIN
+            ? { adminActorId: user.id }
+            : { userActorId: user.id }),
+          requestId,
+          action,
+          metadata: {
+            deletedAt: new Date().toISOString(),
+          },
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Request deleted successfully for your account',
+      requestId,
+    };
   }
 }
 

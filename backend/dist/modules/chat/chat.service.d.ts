@@ -47,6 +47,15 @@ export declare class ChatService {
         messageId: string;
         message?: undefined;
     }>;
+    /**
+     * Clear all messages in a conversation for the caller only ("Clear chat for me").
+     * The counterpart account retains all messages intact.
+     */
+    clearConversationMessages(user: AuthenticatedUser, requestId: string): Promise<{
+        success: boolean;
+        clearedCount: number;
+        message: string;
+    }>;
 }
 export declare const chatService: ChatService;
 export default chatService;

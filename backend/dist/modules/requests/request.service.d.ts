@@ -161,7 +161,7 @@ export declare class RequestService {
     /**
      * Get all requests for Admin with search and filters
      */
-    getAllRequestsForAdmin(query: ListRequestsQuery): Promise<{
+    getAllRequestsForAdmin(query: ListRequestsQuery, adminId?: string): Promise<{
         requests: ({
             user: {
                 fullName: string | null;
@@ -338,6 +338,16 @@ export declare class RequestService {
         category: string | null;
         priority: string;
         isDownloadUnlocked: boolean;
+    }>;
+    /**
+     * Delete request for the caller's account only ("Delete for me").
+     * Request is hidden from this account's dashboard, list, and chat,
+     * but remains completely intact in the other account.
+     */
+    deleteRequestForAccount(user: AuthenticatedUser, requestId: string): Promise<{
+        success: boolean;
+        message: string;
+        requestId: string;
     }>;
 }
 export declare const requestService: RequestService;

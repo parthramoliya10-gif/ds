@@ -47,7 +47,7 @@ export class RequestController {
       };
 
       if (req.user.role === Role.ADMIN) {
-        const result = await requestService.getAllRequestsForAdmin(query);
+        const result = await requestService.getAllRequestsForAdmin(query, req.user.id);
         sendResponse({
           res,
           statusCode: 200,
@@ -120,6 +120,30 @@ export class RequestController {
 
   /**
    * DELETE /api/v1/requests/:id
+   * User or Admin can delete request for their own account only ("Delete for me")
+   */
+  async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new ApiError(401, 'Unauthorized');
+      }
+
+      const requestId = req.params.id as string;
+      const result = await requestService.deleteRequestForAccount(req.user, requestId);
+
+      sendResponse({
+        res,
+        statusCode: 200,
+        message: 'Request deleted successfully for your account',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PATCH /api/v1/requests/:id/cancel
    * User can cancel their own PENDING request
    */
   async cancel(req: Request, res: Response, next: NextFunction): Promise<void> {

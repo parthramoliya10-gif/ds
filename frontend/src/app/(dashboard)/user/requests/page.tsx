@@ -12,12 +12,28 @@ import { Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
 import { formatDate, isDeadlineUrgent } from "@/lib/utils";
-import { Plus, MessageSquare, Eye, FileText, Search } from "lucide-react";
+import { Plus, MessageSquare, Eye, FileText, Search, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { toast } from "sonner";
 
 export default function UserRequestsListPage() {
   const [activeTab, setActiveTab] = React.useState("all");
   const [requests, setRequests] = React.useState<Request[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [deleteRequestId, setDeleteRequestId] = React.useState<string | null>(null);
+
+  const confirmDeleteRequest = async () => {
+    if (!deleteRequestId) return;
+    try {
+      await api.requests.delete(deleteRequestId);
+      setRequests((prev) => prev.filter((r) => r.id !== deleteRequestId));
+      toast.success("Request deleted from your account");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete request");
+    } finally {
+      setDeleteRequestId(null);
+    }
+  };
 
   React.useEffect(() => {
     let mounted = true;
@@ -120,9 +136,9 @@ export default function UserRequestsListPage() {
     },
     {
       header: "Actions",
-      className: "text-right w-44",
+      className: "text-right w-48",
       cell: (req) => (
-        <div className="flex items-center justify-end space-x-1.5">
+        <div className="flex items-center justify-end space-x-1.5" onClick={(e) => e.stopPropagation()}>
           <Link href={`/user/chat/${req.id}`}>
             <Button
               variant="outline"
@@ -144,6 +160,15 @@ export default function UserRequestsListPage() {
               Details
             </Button>
           </Link>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 w-8 p-0 border-border text-muted-foreground hover:text-red-500 hover:border-red-500"
+            onClick={() => setDeleteRequestId(req.id)}
+            title="Delete request from my account"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
         </div>
       ),
     },
@@ -201,6 +226,17 @@ export default function UserRequestsListPage() {
           pageSize={6}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteRequestId)}
+        onClose={() => setDeleteRequestId(null)}
+        onConfirm={confirmDeleteRequest}
+        title="Delete Request?"
+        description="This will permanently delete and remove this request from your account. The specialist desk record will not be affected."
+        confirmLabel="Delete Request"
+        cancelLabel="Keep Request"
+        isDestructive={true}
+      />
     </div>
   );
 }

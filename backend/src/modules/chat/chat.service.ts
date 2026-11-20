@@ -48,6 +48,16 @@ export class ChatService {
         where: {
           senderRole: Role.USER,
           status: { in: [MessageStatus.SENT, MessageStatus.DELIVERED] },
+          conversation: {
+            request: {
+              auditLogs: {
+                none: {
+                  action: 'REQUEST_DELETED_FOR_ADMIN',
+                  actorId: user.id,
+                },
+              },
+            },
+          },
         },
       });
       return { unreadCount: count };
@@ -60,6 +70,12 @@ export class ChatService {
         conversation: {
           request: {
             userId: user.id,
+            auditLogs: {
+              none: {
+                action: 'REQUEST_DELETED_FOR_USER',
+                actorId: user.id,
+              },
+            },
           },
         },
       },
@@ -387,6 +403,62 @@ export class ChatService {
         messageId,
       };
     }
+  }
+
+  /**
+   * Clear all messages in a conversation for the caller only ("Clear chat for me").
+   * The counterpart account retains all messages intact.
+   */
+  async clearConversationMessages(user: AuthenticatedUser, requestId: string) {
+    const conversation = await prisma.conversation.findUnique({
+      where: { requestId },
+      include: {
+        request: { select: { id: true, userId: true } },
+      },
+    });
+
+    if (!conversation || !conversation.request) {
+      throw new ApiError(404, 'Conversation or request not found.');
+    }
+
+    if (user.role !== Role.ADMIN && conversation.request.userId !== user.id) {
+      throw new ApiError(403, 'Forbidden: You do not have permission to clear this chat.');
+    }
+
+    // Fetch all existing messages in this conversation
+    const messages = await prisma.message.findMany({
+      where: { conversationId: conversation.id },
+      select: { id: true, metadata: true },
+    });
+
+    if (messages.length > 0) {
+      const updates = messages.map((msg) => {
+        const currentMeta = (msg.metadata as any) || {};
+        const deletedFor = Array.isArray(currentMeta.deletedFor)
+          ? [...currentMeta.deletedFor]
+          : [];
+        if (!deletedFor.includes(user.id)) {
+          deletedFor.push(user.id);
+        }
+        return prisma.message.update({
+          where: { id: msg.id },
+          data: {
+            metadata: {
+              ...currentMeta,
+              deletedFor,
+            },
+          },
+        });
+      });
+
+      await prisma.$transaction(updates);
+    }
+
+    return {
+      success: true,
+      clearedCount: messages.length,
+      message: 'Chat cleared successfully for your account',
+    };
   }
 }
 

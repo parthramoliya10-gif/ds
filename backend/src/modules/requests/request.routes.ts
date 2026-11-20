@@ -37,6 +37,9 @@ router.patch(
 );
 
 // 5. User cancels their own PENDING request
-router.delete('/:id', requestController.cancel);
+router.patch('/:id/cancel', requestController.cancel);
+
+// 6. User or Admin deletes request for their own account only ("Delete for me")
+router.delete('/:id', requestController.delete);
 
 export default router;

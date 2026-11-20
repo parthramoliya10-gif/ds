@@ -181,7 +181,8 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ status }),
       }),
-    cancel: (id: string) => apiRequest(`/requests/${id}`, { method: "DELETE" }),
+    cancel: (id: string) => apiRequest(`/requests/${id}/cancel`, { method: "PATCH" }),
+    delete: (id: string) => apiRequest(`/requests/${id}`, { method: "DELETE" }),
   },
 
   quotations: {
@@ -273,6 +274,8 @@ export const api = {
       apiRequest(`/chat/${requestId}/messages/${messageId}?type=${type}`, {
         method: "DELETE",
       }),
+    clearChat: (requestId: string) =>
+      apiRequest(`/chat/${requestId}/clear`, { method: "POST" }),
   },
 
   admin: {

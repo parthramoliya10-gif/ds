@@ -22,7 +22,8 @@ import {
   adaptQuotationToFrontend,
 } from "@/lib/api/adapters";
 import { SOCKET_EVENTS } from "@/lib/socket/socketClient";
-import { ArrowLeft, MoreVertical, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, MoreVertical, ShieldCheck, CheckCircle2, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -51,6 +52,30 @@ export default function UserChatConversationPage() {
   const [isChangeModalOpen, setIsChangeModalOpen] = React.useState(false);
   const [changeReason, setChangeReason] = React.useState("");
   const [loading, setLoading] = React.useState(true);
+  const [isClearChatOpen, setIsClearChatOpen] = React.useState(false);
+  const [isDeleteRequestOpen, setIsDeleteRequestOpen] = React.useState(false);
+
+  const handleClearChat = async () => {
+    if (!requestId) return;
+    try {
+      await api.chat.clearChat(requestId);
+      setMessages([]);
+      toast.success("Chat cleared for your account");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to clear chat");
+    }
+  };
+
+  const handleDeleteRequest = async () => {
+    if (!requestId) return;
+    try {
+      await api.requests.delete(requestId);
+      toast.success("Request removed from your account");
+      router.push("/user/chat");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete request");
+    }
+  };
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
@@ -506,12 +531,30 @@ export default function UserChatConversationPage() {
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 shrink-0">
+        <div className="flex items-center space-x-1.5 shrink-0">
           <Link href={`/user/requests/${request.id}`}>
             <Button variant="outline" size="sm" className="h-8 text-[12px] border-border">
               Task Details
             </Button>
           </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsClearChatOpen(true)}
+            className="h-8 text-[12px] border-border text-muted-foreground hover:text-foreground"
+            title="Clear chat messages for my account"
+          >
+            Clear Chat
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setIsDeleteRequestOpen(true)}
+            className="h-8 w-8 border-border text-muted-foreground hover:text-red-500 hover:border-red-500"
+            title="Delete this task request from my account"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
         </div>
       </div>
 
@@ -648,6 +691,28 @@ export default function UserChatConversationPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={isClearChatOpen}
+        onClose={() => setIsClearChatOpen(false)}
+        onConfirm={handleClearChat}
+        title="Clear Chat for Your Account?"
+        description="All existing messages in this chat will be cleared from your view. The specialist desk record will not be affected."
+        confirmLabel="Clear Chat"
+        cancelLabel="Keep Messages"
+        isDestructive={true}
+      />
+
+      <ConfirmDialog
+        isOpen={isDeleteRequestOpen}
+        onClose={() => setIsDeleteRequestOpen(false)}
+        onConfirm={handleDeleteRequest}
+        title="Delete Request from Your Account?"
+        description="This will remove this request and chat thread from your account. The specialist desk record will remain unaffected."
+        confirmLabel="Delete Request"
+        cancelLabel="Keep Request"
+        isDestructive={true}
+      />
     </div>
   );
 }

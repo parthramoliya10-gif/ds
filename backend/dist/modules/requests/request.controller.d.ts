@@ -22,6 +22,11 @@ export declare class RequestController {
     updateStatus(req: Request, res: Response, next: NextFunction): Promise<void>;
     /**
      * DELETE /api/v1/requests/:id
+     * User or Admin can delete request for their own account only ("Delete for me")
+     */
+    delete(req: Request, res: Response, next: NextFunction): Promise<void>;
+    /**
+     * PATCH /api/v1/requests/:id/cancel
      * User can cancel their own PENDING request
      */
     cancel(req: Request, res: Response, next: NextFunction): Promise<void>;

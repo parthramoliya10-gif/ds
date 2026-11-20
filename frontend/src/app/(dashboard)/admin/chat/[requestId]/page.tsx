@@ -22,7 +22,8 @@ import {
   adaptQuotationToFrontend,
 } from "@/lib/api/adapters";
 import { SOCKET_EVENTS } from "@/lib/socket/socketClient";
-import { ArrowLeft, ShieldCheck, Plus, ExternalLink } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Plus, ExternalLink, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,30 @@ export default function AdminChatConversationPage() {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [currentQuotation, setCurrentQuotation] = React.useState<Quotation | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [isClearChatOpen, setIsClearChatOpen] = React.useState(false);
+  const [isDeleteRequestOpen, setIsDeleteRequestOpen] = React.useState(false);
+
+  const handleClearChat = async () => {
+    if (!requestId) return;
+    try {
+      await api.chat.clearChat(requestId);
+      setMessages([]);
+      toast.success("Chat cleared for admin portal");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to clear chat");
+    }
+  };
+
+  const handleDeleteRequest = async () => {
+    if (!requestId) return;
+    try {
+      await api.requests.delete(requestId);
+      toast.success("Request removed from admin portal");
+      router.push("/admin/chat");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete request");
+    }
+  };
   const [isQuotationModalOpen, setIsQuotationModalOpen] = React.useState(false);
   const [isTyping, setIsTyping] = React.useState(false);
   const [isCounterpartOnline, setIsCounterpartOnline] = React.useState(false);
@@ -471,7 +496,7 @@ export default function AdminChatConversationPage() {
         </div>
 
         {/* Admin Action Buttons */}
-        <div className="flex items-center space-x-2 shrink-0">
+        <div className="flex items-center space-x-1.5 shrink-0">
           <Button
             size="sm"
             onClick={() => setIsQuotationModalOpen(true)}
@@ -486,6 +511,26 @@ export default function AdminChatConversationPage() {
               Task Details
             </Button>
           </Link>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsClearChatOpen(true)}
+            className="h-8 text-[12px] border-border text-muted-foreground hover:text-foreground"
+            title="Clear chat messages for admin portal"
+          >
+            Clear Chat
+          </Button>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setIsDeleteRequestOpen(true)}
+            className="h-8 w-8 border-border text-muted-foreground hover:text-red-500 hover:border-red-500"
+            title="Delete this task request from admin portal"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
         </div>
       </div>
 
@@ -559,6 +604,28 @@ export default function AdminChatConversationPage() {
         requestTitle={request.title}
         defaultAmount={request.totalAmount || 1400}
         onSubmitQuotation={handleCreateQuotation}
+      />
+
+      <ConfirmDialog
+        isOpen={isClearChatOpen}
+        onClose={() => setIsClearChatOpen(false)}
+        onConfirm={handleClearChat}
+        title="Clear Chat for Admin Portal?"
+        description="All existing messages in this chat will be cleared from the admin portal view. The student's chat record will not be affected."
+        confirmLabel="Clear Chat"
+        cancelLabel="Keep Messages"
+        isDestructive={true}
+      />
+
+      <ConfirmDialog
+        isOpen={isDeleteRequestOpen}
+        onClose={() => setIsDeleteRequestOpen(false)}
+        onConfirm={handleDeleteRequest}
+        title="Delete Request from Admin Portal?"
+        description="This will remove this request and chat thread from the admin portal. The student's portal record will remain unaffected."
+        confirmLabel="Delete Request"
+        cancelLabel="Keep Request"
+        isDestructive={true}
       />
     </div>
   );

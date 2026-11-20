@@ -2,15 +2,17 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { Search } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import { useSocket } from "@/context/SocketContext";
 import { SOCKET_EVENTS } from "@/lib/socket/socketClient";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { toast } from "sonner";
 
 function formatChatTime(dateString?: string): string {
   if (!dateString) return "";
@@ -47,10 +49,29 @@ export default function UserChatLayout({
   children: React.ReactNode;
 }) {
   const params = useParams();
+  const router = useRouter();
   const activeRequestId = params?.requestId as string | undefined;
   const [search, setSearch] = React.useState("");
   const [requests, setRequests] = React.useState<Request[]>([]);
+  const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(null);
   const { socket, refreshUnreadCount } = useSocket();
+
+  const confirmDeleteChat = async () => {
+    if (!deleteTargetId) return;
+    try {
+      await api.requests.delete(deleteTargetId);
+      setRequests((prev) => prev.filter((r) => r.id !== deleteTargetId));
+      refreshUnreadCount();
+      toast.success("Chat removed from your account");
+      if (activeRequestId === deleteTargetId) {
+        router.push("/user/chat");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete chat");
+    } finally {
+      setDeleteTargetId(null);
+    }
+  };
 
   // Load chat requests on mount
   React.useEffect(() => {
@@ -225,7 +246,7 @@ export default function UserChatLayout({
                   key={req.id}
                   href={`/user/chat/${req.id}`}
                   className={cn(
-                    "flex flex-col p-3.5 transition-colors hover:bg-surface text-left relative",
+                    "flex flex-col p-3.5 transition-colors hover:bg-surface text-left relative group",
                     isActive
                       ? "bg-surface border-l-2 border-foreground"
                       : "bg-background"
@@ -291,11 +312,25 @@ export default function UserChatLayout({
                       {snippet}
                     </p>
 
-                    {hasUnread && (
-                      <span className="bg-emerald-500 text-white rounded-full text-[11px] font-bold h-5 min-w-[20px] px-1.5 flex items-center justify-center shrink-0 shadow-sm ml-2 animate-in zoom-in-50 duration-200">
-                        {req.unreadCount! > 99 ? "99+" : req.unreadCount}
-                      </span>
-                    )}
+                    <div className="flex items-center space-x-1.5 shrink-0 ml-2">
+                      {hasUnread && (
+                        <span className="bg-emerald-500 text-white rounded-full text-[11px] font-bold h-5 min-w-[20px] px-1.5 flex items-center justify-center shrink-0 shadow-sm animate-in zoom-in-50 duration-200">
+                          {req.unreadCount! > 99 ? "99+" : req.unreadCount}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDeleteTargetId(req.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted text-muted-foreground hover:text-red-500"
+                        title="Delete chat from my account"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </Link>
               );
@@ -313,6 +348,17 @@ export default function UserChatLayout({
       >
         {children}
       </div>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteTargetId)}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={confirmDeleteChat}
+        title="Delete Chat from Your Account?"
+        description="This will remove this conversation from your chat list. The specialist desk record will not be affected."
+        confirmLabel="Delete Chat"
+        cancelLabel="Keep Chat"
+        isDestructive={true}
+      />
     </div>
   );
 }
