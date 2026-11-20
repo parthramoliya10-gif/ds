@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { ArrowRight, RotateCw, AlertCircle, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api/client";
+import supabase from "@/lib/supabase/client";
 
 export default function VerifyOtpPage() {
   const router = useRouter();
@@ -124,19 +125,68 @@ export default function VerifyOtpPage() {
     setErrorMessage(null);
 
     try {
-      const res = await api.auth.verifyOtp({
+      // 1. Verify OTP with Backend
+      const res = (await api.auth.verifyOtp({
         email,
         token: fullCode,
-      });
+      })) as any;
 
-      if (res && res.accessToken && typeof window !== "undefined") {
-        localStorage.setItem("dsms_auth_token", res.accessToken);
-        sessionStorage.removeItem("dsms_pending_email");
-        sessionStorage.removeItem("dsms_pending_name");
+      // 2. Establish client-side Supabase session & cookies so middleware allows dashboard access
+      const pendingPassword =
+        typeof window !== "undefined"
+          ? sessionStorage.getItem("dsms_pending_password")
+          : null;
+
+      let sessionEstablished = false;
+
+      // Primary strategy: native Supabase password sign-in (sets all @supabase/ssr cookies)
+      if (pendingPassword) {
+        try {
+          const { error: signInErr } = await supabase.auth.signInWithPassword({
+            email,
+            password: pendingPassword,
+          });
+          if (!signInErr) {
+            sessionEstablished = true;
+          }
+        } catch (authErr) {
+          console.warn("Client signInWithPassword failed:", authErr);
+        }
       }
 
-      toast.success("College email verified successfully!");
-      window.location.href = "/user/dashboard";
+      // Fallback strategy: setSession using tokens returned by backend
+      if (!sessionEstablished && res?.accessToken && res?.refreshToken) {
+        try {
+          const { error: setErr } = await supabase.auth.setSession({
+            access_token: res.accessToken,
+            refresh_token: res.refreshToken,
+          });
+          if (!setErr) {
+            sessionEstablished = true;
+          }
+        } catch (setErr) {
+          console.warn("Client setSession failed:", setErr);
+        }
+      }
+
+      // Store backend JWT for API calls and clean up temporary storage
+      if (typeof window !== "undefined") {
+        if (res?.accessToken) {
+          localStorage.setItem("dsms_auth_token", res.accessToken);
+        }
+        sessionStorage.removeItem("dsms_pending_email");
+        sessionStorage.removeItem("dsms_pending_name");
+        sessionStorage.removeItem("dsms_pending_password");
+        sessionStorage.removeItem("dsms_dev_otp");
+      }
+
+      toast.success("College email verified successfully! Redirecting to dashboard...");
+
+      const role = (res?.user?.role || "").toLowerCase();
+      const targetDashboard = role === "admin" ? "/admin/dashboard" : "/user/dashboard";
+
+      // Redirect immediately to dashboard
+      window.location.href = targetDashboard;
     } catch (err: any) {
       setIsShaking(true);
       setErrorMessage(err.message || "Invalid or expired verification code. Please try again.");

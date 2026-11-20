@@ -127,6 +127,7 @@ export class AuthController {
         data: {
           user: result.profile,
           accessToken: result.session.accessToken,
+          refreshToken: result.session.refreshToken,
         },
       });
     } catch (error) {

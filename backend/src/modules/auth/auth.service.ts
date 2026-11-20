@@ -7,6 +7,7 @@ import { supabaseAdmin, supabaseClient } from '../../config/supabase.js';
 import { ApiError } from '../../utils/apiError.js';
 import otpStore from './otp.store.js';
 import { sendOtpEmail } from '../../utils/email.js';
+import logger from '../../utils/logger.js';
 
 export class AuthService {
   /**
@@ -236,11 +237,13 @@ export class AuthService {
       }
       authUser = newUser.user;
     } else {
-      if (!foundUser.email_confirmed_at) {
-        await supabaseAdmin.auth.admin.updateUserById(foundUser.id, {
-          email_confirm: true,
-        });
+      const updatePayload: { email_confirm: boolean; password?: string } = {
+        email_confirm: true,
+      };
+      if (regData.password) {
+        updatePayload.password = regData.password;
       }
+      await supabaseAdmin.auth.admin.updateUserById(foundUser.id, updatePayload);
       authUser = foundUser;
     }
 
@@ -252,7 +255,7 @@ export class AuthService {
     let refreshToken: string = '';
 
     if (regData.password) {
-      const { data: signInRes } = await supabaseClient.auth.signInWithPassword({
+      const { data: signInRes, error: signInErr } = await supabaseClient.auth.signInWithPassword({
         email: normalizedEmail,
         password: regData.password,
       });
@@ -260,6 +263,7 @@ export class AuthService {
         accessToken = signInRes.session.access_token;
         refreshToken = signInRes.session.refresh_token;
       } else {
+        logger.warn(`[OTP] Supabase signInWithPassword fallback for ${normalizedEmail}: ${signInErr?.message}`);
         accessToken = this.generateCustomJwtToken(authUser);
       }
     } else {

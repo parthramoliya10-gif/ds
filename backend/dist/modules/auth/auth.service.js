@@ -13,6 +13,7 @@ const supabase_js_1 = require("../../config/supabase.js");
 const apiError_js_1 = require("../../utils/apiError.js");
 const otp_store_js_1 = __importDefault(require("./otp.store.js"));
 const email_js_1 = require("../../utils/email.js");
+const logger_js_1 = __importDefault(require("../../utils/logger.js"));
 class AuthService {
     /**
      * Internal helper: Sync Supabase Auth user with separate admins / users tables
@@ -211,11 +212,13 @@ class AuthService {
             authUser = newUser.user;
         }
         else {
-            if (!foundUser.email_confirmed_at) {
-                await supabase_js_1.supabaseAdmin.auth.admin.updateUserById(foundUser.id, {
-                    email_confirm: true,
-                });
+            const updatePayload = {
+                email_confirm: true,
+            };
+            if (regData.password) {
+                updatePayload.password = regData.password;
             }
+            await supabase_js_1.supabaseAdmin.auth.admin.updateUserById(foundUser.id, updatePayload);
             authUser = foundUser;
         }
         // Ensure user record is synced into PostgreSQL users / admins table
@@ -224,7 +227,7 @@ class AuthService {
         let accessToken;
         let refreshToken = '';
         if (regData.password) {
-            const { data: signInRes } = await supabase_js_1.supabaseClient.auth.signInWithPassword({
+            const { data: signInRes, error: signInErr } = await supabase_js_1.supabaseClient.auth.signInWithPassword({
                 email: normalizedEmail,
                 password: regData.password,
             });
@@ -233,6 +236,7 @@ class AuthService {
                 refreshToken = signInRes.session.refresh_token;
             }
             else {
+                logger_js_1.default.warn(`[OTP] Supabase signInWithPassword fallback for ${normalizedEmail}: ${signInErr?.message}`);
                 accessToken = this.generateCustomJwtToken(authUser);
             }
         }
