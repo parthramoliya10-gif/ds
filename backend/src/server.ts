@@ -4,6 +4,7 @@ import env from './config/env.js';
 import logger from './utils/logger.js';
 import prisma from './config/prisma.js';
 import { initSocketServer } from './sockets/socket.server.js';
+import cacheService from './services/cache.service.js';
 
 const app = createApp();
 const server = http.createServer({ maxHeaderSize: 1048576 }, app);

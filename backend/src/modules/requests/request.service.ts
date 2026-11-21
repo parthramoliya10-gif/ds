@@ -5,6 +5,7 @@ import { uploadBufferToCloudinary } from '../../utils/cloudinary.js';
 import { AuthenticatedUser } from '../../types/express.js';
 import logger from '../../utils/logger.js';
 import { isUserOnline, isAnyAdminOnline } from '../../sockets/socket.server.js';
+import cacheService, { CACHE_KEYS, CACHE_TTL } from '../../services/cache.service.js';
 
 export interface CreateRequestInput {
   title: string;
@@ -126,6 +127,9 @@ export class RequestService {
       timeout: 20000,
     });
 
+    // Invalidate request cache and stats
+    await cacheService.invalidateRequest(newRequest.id, userId);
+
     // Fetch complete request with files and conversation
     return this.getRequestById(newRequest.id, {
       id: userId,
@@ -136,25 +140,30 @@ export class RequestService {
   }
 
   /**
-   * Get requests for the logged-in User
+   * Get requests for the logged-in User (Cached via Upstash Redis)
    */
   async getUserRequests(userId: string, query: ListRequestsQuery) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 10;
-    const skip = (page - 1) * limit;
 
-    const where: any = {
-      userId,
-      auditLogs: {
-        none: {
-          action: 'REQUEST_DELETED_FOR_USER',
-          actorId: userId,
-        },
-      },
-    };
-    if (query.status) {
-      where.status = query.status;
-    }
+    return cacheService.wrap(
+      CACHE_KEYS.USER_REQUESTS(userId, `${page}_${limit}_${query.status || 'all'}`),
+      CACHE_TTL.USER_REQUESTS,
+      async () => {
+        const skip = (page - 1) * limit;
+
+        const where: any = {
+          userId,
+          auditLogs: {
+            none: {
+              action: 'REQUEST_DELETED_FOR_USER',
+              actorId: userId,
+            },
+          },
+        };
+        if (query.status) {
+          where.status = query.status;
+        }
 
     const [total, requests] = await Promise.all([
       prisma.documentRequest.count({ where }),
@@ -263,6 +272,7 @@ export class RequestService {
         totalPages: Math.ceil(total / limit),
       },
     };
+    });
   }
 
   /**
@@ -512,6 +522,7 @@ export class RequestService {
       },
     });
 
+    await cacheService.invalidateRequest(requestId, existing.userId);
     return updated;
   }
 
@@ -553,6 +564,7 @@ export class RequestService {
       },
     });
 
+    await cacheService.invalidateRequest(requestId, userId);
     return cancelled;
   }
 
@@ -605,6 +617,7 @@ export class RequestService {
       });
     }
 
+    await cacheService.invalidateRequest(requestId, user.id);
     return {
       success: true,
       message: 'Request deleted successfully for your account',

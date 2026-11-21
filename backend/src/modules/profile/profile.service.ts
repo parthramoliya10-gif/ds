@@ -7,6 +7,7 @@ import {
   deleteFromCloudinary,
 } from '../../utils/cloudinary.js';
 import logger from '../../utils/logger.js';
+import cacheService, { CACHE_KEYS, CACHE_TTL } from '../../services/cache.service.js';
 
 export interface UpdateProfileInput {
   fullName?: string;
@@ -35,76 +36,78 @@ const calculateCompletionPercent = (fields: Array<unknown>): number => {
 
 export class ProfileService {
   /**
-   * 1. Get complete profile for logged-in User or Admin
+   * 1. Get complete profile for logged-in User or Admin (Cached via Upstash Redis)
    */
   async getMyProfile(userId: string, role: Role) {
-    if (role === Role.ADMIN) {
-      const admin = await prisma.admin.findUnique({
+    return cacheService.wrap(CACHE_KEYS.USER_PROFILE(userId), CACHE_TTL.USER_PROFILE, async () => {
+      if (role === Role.ADMIN) {
+        const admin = await prisma.admin.findUnique({
+          where: { id: userId },
+          include: {
+            _count: {
+              select: {
+                quotations: true,
+                uploadedDocuments: true,
+              },
+            },
+          },
+        });
+
+        if (!admin) {
+          throw new ApiError(404, 'Admin profile not found.');
+        }
+
+        const profileCompletion = calculateCompletionPercent([
+          admin.fullName,
+          admin.phone,
+          admin.avatarUrl,
+          admin.department,
+          admin.designation,
+          admin.bio,
+          admin.specializations,
+          admin.country,
+        ]);
+
+        return {
+          ...admin,
+          role: Role.ADMIN,
+          profileCompletion,
+        };
+      }
+
+      const user = await prisma.user.findUnique({
         where: { id: userId },
         include: {
           _count: {
             select: {
-              quotations: true,
-              uploadedDocuments: true,
+              requests: true,
+              payments: true,
             },
           },
         },
       });
 
-      if (!admin) {
-        throw new ApiError(404, 'Admin profile not found.');
+      if (!user) {
+        throw new ApiError(404, 'User profile not found.');
       }
 
       const profileCompletion = calculateCompletionPercent([
-        admin.fullName,
-        admin.phone,
-        admin.avatarUrl,
-        admin.department,
-        admin.designation,
-        admin.bio,
-        admin.specializations,
-        admin.country,
+        user.fullName,
+        user.phone,
+        user.avatarUrl,
+        user.bio,
+        user.organization,
+        user.country,
+        user.city,
+        user.address,
       ]);
 
       return {
-        ...admin,
-        role: Role.ADMIN,
+        ...user,
+        role: Role.USER,
         profileCompletion,
       };
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        _count: {
-          select: {
-            requests: true,
-            payments: true,
-          },
-        },
-      },
     });
-
-    if (!user) {
-      throw new ApiError(404, 'User profile not found.');
-    }
-
-    const profileCompletion = calculateCompletionPercent([
-      user.fullName,
-      user.phone,
-      user.avatarUrl,
-      user.bio,
-      user.organization,
-      user.country,
-      user.city,
-      user.address,
-    ]);
-
-    return {
-      ...user,
-      role: Role.USER,
-      profileCompletion,
-    };
   }
 
   /**
@@ -151,6 +154,7 @@ export class ProfileService {
           .catch((err) => logger.warn('Supabase metadata sync skipped:', err?.message));
       }
 
+      await cacheService.invalidateProfile(userId);
       return this.getMyProfile(updated.id, Role.ADMIN);
     }
 
@@ -192,6 +196,7 @@ export class ProfileService {
         .catch((err) => logger.warn('Supabase metadata sync skipped:', err?.message));
     }
 
+    await cacheService.invalidateProfile(userId);
     return this.getMyProfile(updated.id, Role.USER);
   }
 
@@ -261,6 +266,8 @@ export class ProfileService {
       },
     });
 
+    await cacheService.invalidateProfile(userId);
+
     return {
       avatarUrl: uploadRes.secureUrl,
       avatarPublicId: uploadRes.publicId,
@@ -310,6 +317,8 @@ export class ProfileService {
         action: 'PROFILE_AVATAR_REMOVED',
       },
     });
+
+    await cacheService.invalidateProfile(userId);
 
     return { avatarUrl: null };
   }

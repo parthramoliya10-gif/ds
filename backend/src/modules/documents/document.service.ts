@@ -9,6 +9,7 @@ import {
 import { emitToRequestRoom } from '../../sockets/socket.server.js';
 import SOCKET_EVENTS from '../../constants/socketEvents.js';
 import logger from '../../utils/logger.js';
+import cacheService from '../../services/cache.service.js';
 
 export interface UploadDocumentInput {
   title: string;
@@ -128,6 +129,8 @@ export class DocumentService {
     if (finalDoc.systemMessage) {
       emitToRequestRoom(requestId, SOCKET_EVENTS.NEW_MESSAGE, finalDoc.systemMessage);
     }
+
+    await cacheService.invalidateRequest(requestId);
 
     return finalDoc.document;
   }

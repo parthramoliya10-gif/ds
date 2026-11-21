@@ -54,6 +54,27 @@ export class AdminController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/v1/admin/cache/flush
+   * Flush all Redis cache
+   */
+  async flushCache(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new ApiError(401, 'Unauthorized');
+      }
+      const { cacheService } = await import('../../services/cache.service.js');
+      await cacheService.delPattern('dsms:*');
+      sendResponse({
+        res,
+        statusCode: 200,
+        message: 'All application caches flushed successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const adminController = new AdminController();

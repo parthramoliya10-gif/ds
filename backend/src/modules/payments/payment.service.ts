@@ -7,6 +7,7 @@ import { verifyRazorpaySignature, verifyRazorpayWebhookSignature } from '../../u
 import { emitToRequestRoom } from '../../sockets/socket.server.js';
 import SOCKET_EVENTS from '../../constants/socketEvents.js';
 import logger from '../../utils/logger.js';
+import cacheService from '../../services/cache.service.js';
 
 export class PaymentService {
   /**
@@ -218,6 +219,8 @@ export class PaymentService {
       requestStatus: updatedState.requestStatus,
       isDownloadUnlocked: updatedState.isDownloadUnlocked,
     });
+
+    await cacheService.invalidateRequest(payment.requestId, userId);
 
     return {
       payment: updatedState.payment,
@@ -470,6 +473,8 @@ export class PaymentService {
       requestStatus: updatedRequest.status,
       isDownloadUnlocked: updatedRequest.isDownloadUnlocked,
     });
+
+    await cacheService.invalidateRequest(requestId, payment.userId);
 
     return {
       payment,

@@ -1,5 +1,6 @@
 import { PaymentStatus, RequestStatus, Role } from '@prisma/client';
 import prisma from '../../config/prisma.js';
+import cacheService, { CACHE_KEYS, CACHE_TTL } from '../../services/cache.service.js';
 
 export interface AuditLogQueryOptions {
   page?: number;
@@ -10,10 +11,11 @@ export interface AuditLogQueryOptions {
 
 export class AdminService {
   /**
-   * Aggregate complete dashboard metrics for Admin Portal
+   * Aggregate complete dashboard metrics for Admin Portal (Cached via Upstash Redis)
    */
   async getDashboardStats() {
-    const [
+    return cacheService.wrap(CACHE_KEYS.ADMIN_STATS, CACHE_TTL.ADMIN_STATS, async () => {
+      const [
       totalRequests,
       pendingRequests,
       quotedRequests,
@@ -137,30 +139,36 @@ export class AdminService {
       recentRequests,
       recentPayments,
     };
+    });
   }
 
   /**
-   * Retrieve paginated security and action audit logs
+   * Retrieve paginated security and action audit logs (Cached via Upstash Redis)
    */
   async getAuditLogs(options: AuditLogQueryOptions = {}) {
     const page = Number(options.page) || 1;
     const limit = Math.min(Number(options.limit) || 20, 100);
-    const skip = (page - 1) * limit;
 
-    const where: any = {};
-    if (options.action) {
-      where.action = { contains: options.action, mode: 'insensitive' };
-    }
-    if (options.actorId) {
-      where.actorId = options.actorId;
-    }
+    return cacheService.wrap(
+      CACHE_KEYS.ADMIN_AUDIT_LOGS(page, limit, options.action),
+      CACHE_TTL.AUDIT_LOGS,
+      async () => {
+        const skip = (page - 1) * limit;
 
-    const [total, logs] = await Promise.all([
-      prisma.auditLog.count({ where }),
-      prisma.auditLog.findMany({
-        where,
-        skip,
-        take: limit,
+        const where: any = {};
+        if (options.action) {
+          where.action = { contains: options.action, mode: 'insensitive' };
+        }
+        if (options.actorId) {
+          where.actorId = options.actorId;
+        }
+
+        const [total, logs] = await Promise.all([
+          prisma.auditLog.count({ where }),
+          prisma.auditLog.findMany({
+            where,
+            skip,
+            take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
           userActor: {
@@ -213,6 +221,7 @@ export class AdminService {
         totalPages: Math.ceil(total / limit),
       },
     };
+    });
   }
 }
 

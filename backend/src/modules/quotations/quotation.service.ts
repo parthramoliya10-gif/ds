@@ -6,6 +6,7 @@ import razorpay from '../../config/razorpay.js';
 import env from '../../config/env.js';
 import { emitToRequestRoom } from '../../sockets/socket.server.js';
 import SOCKET_EVENTS from '../../constants/socketEvents.js';
+import cacheService from '../../services/cache.service.js';
 
 export interface CreateQuotationInput {
   requestId: string;
@@ -138,6 +139,8 @@ export class QuotationService {
     }
     emitToRequestRoom(data.requestId, SOCKET_EVENTS.QUOTATION_RECEIVED, newQuotation.quotation);
 
+    await cacheService.invalidateRequest(data.requestId);
+
     return newQuotation.quotation;
   }
 
@@ -267,6 +270,8 @@ export class QuotationService {
       emitToRequestRoom(quotation.requestId, SOCKET_EVENTS.NEW_MESSAGE, systemMessage);
     }
 
+    await cacheService.invalidateRequest(quotation.requestId, userId);
+
     return {
       quotation: acceptedQuotation,
       paymentOrder: {
@@ -334,6 +339,8 @@ export class QuotationService {
         metadata: { quotationId: quotation.id, reason },
       },
     });
+
+    await cacheService.invalidateRequest(quotation.requestId, userId);
 
     return rejectedQuotation;
   }

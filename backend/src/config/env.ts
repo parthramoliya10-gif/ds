@@ -23,6 +23,7 @@ const envSchema = z.object({
 
   UPSTASH_REDIS_REST_URL: z.string().optional().default(''),
   UPSTASH_REDIS_REST_TOKEN: z.string().optional().default(''),
+  REDIS_URL: z.string().optional().default(''),
 
   CLOUDINARY_CLOUD_NAME: z.string().optional().default(''),
   CLOUDINARY_API_KEY: z.string().optional().default(''),
