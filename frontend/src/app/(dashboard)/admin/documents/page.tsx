@@ -228,7 +228,7 @@ export default function AdminDocumentsPage() {
         )
       );
       toast.success(
-        `Request ${selectedRequestId.slice(0, 8)}... marked as READY. Student ${currentRequest.studentName} has been notified to complete the 50% milestone balance.`
+        `Request ${formatShortId(selectedRequestId, "REQ")} marked as READY. Student ${currentRequest.studentName} has been notified to complete the 50% milestone balance.`
       );
     } catch (err: any) {
       toast.error(err.message || "Failed to update status");
