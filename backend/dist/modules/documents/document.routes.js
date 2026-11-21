@@ -19,5 +19,7 @@ router.post('/:requestId/upload', rbac_middleware_js_1.requireAdmin, upload_midd
 router.get('/request/:requestId', document_controller_js_1.default.getByRequest);
 // 3. SECURE GATEKEEPER: Download completed document (unlocked ONLY after 100% payment)
 router.get('/:documentId/download', document_controller_js_1.default.download);
+// 4. Admin deletes final document version
+router.delete('/:documentId', rbac_middleware_js_1.requireAdmin, document_controller_js_1.default.delete);
 exports.default = router;
 //# sourceMappingURL=document.routes.js.map

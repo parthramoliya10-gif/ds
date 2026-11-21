@@ -139,6 +139,17 @@ export declare class RequestService {
                 referenceFiles: number;
                 finalDocuments: number;
             };
+            finalDocuments: {
+                id: string;
+                createdAt: Date;
+                secureUrl: string;
+                title: string;
+                version: number;
+                fileName: string;
+                fileSize: number;
+                mimeType: string;
+                downloadCount: number;
+            }[];
         } & {
             status: import(".prisma/client").$Enums.RequestStatus;
             id: string;
@@ -211,6 +222,17 @@ export declare class RequestService {
                 referenceFiles: number;
                 finalDocuments: number;
             };
+            finalDocuments: {
+                id: string;
+                createdAt: Date;
+                secureUrl: string;
+                title: string;
+                version: number;
+                fileName: string;
+                fileSize: number;
+                mimeType: string;
+                downloadCount: number;
+            }[];
         } & {
             status: import(".prisma/client").$Enums.RequestStatus;
             id: string;

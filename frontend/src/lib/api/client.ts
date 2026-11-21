@@ -250,6 +250,8 @@ export const api = {
         `/documents/${documentId}/download`,
         { method: "GET" }
       ),
+    delete: (documentId: string) =>
+      apiRequest(`/documents/${documentId}`, { method: "DELETE" }),
   },
 
   chat: {

@@ -55,6 +55,12 @@ export declare class DocumentService {
         fileSize: number;
         expiresInSeconds: number;
     }>;
+    /**
+     * Admin-only: Delete final document version
+     */
+    deleteFinalDocument(documentId: string, adminId: string): Promise<{
+        success: boolean;
+    }>;
 }
 export declare const documentService: DocumentService;
 export default documentService;

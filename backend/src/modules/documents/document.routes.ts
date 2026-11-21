@@ -26,4 +26,7 @@ router.get('/request/:requestId', documentController.getByRequest);
 // 3. SECURE GATEKEEPER: Download completed document (unlocked ONLY after 100% payment)
 router.get('/:documentId/download', documentController.download);
 
+// 4. Admin deletes final document version
+router.delete('/:documentId', requireAdmin, documentController.delete);
+
 export default router;

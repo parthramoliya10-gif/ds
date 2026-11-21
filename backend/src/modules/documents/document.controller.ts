@@ -95,6 +95,29 @@ export class DocumentController {
       next(error);
     }
   }
+
+  /**
+   * DELETE /api/v1/documents/:documentId
+   * Admin-only: Delete final document version
+   */
+  async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new ApiError(401, 'Unauthorized');
+      }
+
+      const documentId = req.params.documentId as string;
+      await documentService.deleteFinalDocument(documentId, req.user.id);
+
+      sendResponse({
+        res,
+        statusCode: 200,
+        message: 'Final document version deleted successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const documentController = new DocumentController();

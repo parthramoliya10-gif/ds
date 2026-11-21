@@ -273,6 +273,25 @@ export class DocumentService {
       expiresInSeconds: 120,
     };
   }
+
+  /**
+   * Admin-only: Delete final document version
+   */
+  async deleteFinalDocument(documentId: string, adminId: string) {
+    const document = await prisma.finalDocument.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new ApiError(404, 'Document record not found.');
+    }
+
+    await prisma.finalDocument.delete({
+      where: { id: documentId },
+    });
+
+    return { success: true };
+  }
 }
 
 export const documentService = new DocumentService();

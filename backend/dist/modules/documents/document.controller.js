@@ -81,6 +81,27 @@ class DocumentController {
             next(error);
         }
     }
+    /**
+     * DELETE /api/v1/documents/:documentId
+     * Admin-only: Delete final document version
+     */
+    async delete(req, res, next) {
+        try {
+            if (!req.user) {
+                throw new apiError_js_1.ApiError(401, 'Unauthorized');
+            }
+            const documentId = req.params.documentId;
+            await document_service_js_1.default.deleteFinalDocument(documentId, req.user.id);
+            (0, apiResponse_js_1.sendResponse)({
+                res,
+                statusCode: 200,
+                message: 'Final document version deleted successfully',
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
 }
 exports.DocumentController = DocumentController;
 exports.documentController = new DocumentController();

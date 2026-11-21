@@ -15,6 +15,11 @@ export declare class DocumentController {
      * Secure Gatekeeper: Generate signed download URL (strictly locked until 100% payment)
      */
     download(req: Request, res: Response, next: NextFunction): Promise<void>;
+    /**
+     * DELETE /api/v1/documents/:documentId
+     * Admin-only: Delete final document version
+     */
+    delete(req: Request, res: Response, next: NextFunction): Promise<void>;
 }
 export declare const documentController: DocumentController;
 export default documentController;

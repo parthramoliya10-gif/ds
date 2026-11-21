@@ -29,6 +29,7 @@ import { Request, FinalDocument } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
 import { formatCurrencyINR, formatDate } from "@/lib/utils";
+import { downloadFile } from "@/lib/download";
 import {
   FileText,
   Lock,
@@ -56,6 +57,7 @@ interface DocumentVersion {
   uploadedAt: string;
   versionNote: string;
   isLocked: boolean;
+  fileUrl?: string;
 }
 
 export default function AdminDocumentsPage() {
@@ -84,13 +86,14 @@ export default function AdminDocumentsPage() {
               versionsMap[r.id] = r.finalDocuments.map((fd: any, idx: number) => ({
                 id: fd.id,
                 requestId: r.id,
-                versionTag: `v1.${r.finalDocuments.length - 1 - idx}`,
+                versionTag: `v${fd.version || r.finalDocuments.length - idx}.0`,
                 fileName: fd.fileName || `${r.title}.pdf`,
                 fileSize: fd.fileSize ? `${(fd.fileSize / (1024 * 1024)).toFixed(1)} MB` : "2.5 MB",
                 pageCount: fd.pageCount || 20,
                 uploadedAt: fd.uploadedAt || fd.createdAt || new Date().toISOString(),
-                versionNote: fd.notes || "Final verified deliverable",
+                versionNote: fd.title || fd.notes || "Final verified deliverable",
                 isLocked: !Boolean(r.isDownloadUnlocked),
+                fileUrl: fd.secureUrl,
               }));
             }
           });
@@ -117,6 +120,41 @@ export default function AdminDocumentsPage() {
   const balanceDue = currentRequest?.balanceAmount || 0;
   const isUnlocked = Boolean(currentRequest?.balancePaid || currentRequest?.isDownloadUnlocked);
 
+  // Sync documents from backend whenever selectedRequestId changes
+  React.useEffect(() => {
+    if (!selectedRequestId) return;
+    let mounted = true;
+    async function loadRequestDocuments() {
+      try {
+        const docs = await api.documents.getByRequest(selectedRequestId);
+        if (mounted && Array.isArray(docs)) {
+          const mapped: DocumentVersion[] = docs.map((fd: any, idx: number) => ({
+            id: fd.id,
+            requestId: selectedRequestId,
+            versionTag: `v${fd.version || docs.length - idx}.0`,
+            fileName: fd.fileName || "Deliverable.pdf",
+            fileSize: fd.fileSize ? `${(fd.fileSize / (1024 * 1024)).toFixed(1)} MB` : "1.0 MB",
+            pageCount: currentRequest?.pages || 10,
+            uploadedAt: fd.createdAt || new Date().toISOString(),
+            versionNote: fd.title || "Final deliverable file",
+            isLocked: !isUnlocked,
+            fileUrl: fd.secureUrl,
+          }));
+          setVersions((prev) => ({
+            ...prev,
+            [selectedRequestId]: mapped,
+          }));
+        }
+      } catch (err) {
+        console.warn("Could not load documents for request:", err);
+      }
+    }
+    loadRequestDocuments();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedRequestId, isUnlocked, currentRequest?.pages]);
+
   const handleUploadDeliverable = async (e: React.FormEvent) => {
     e.preventDefault();
     if (uploadedFiles.length === 0) {
@@ -136,46 +174,87 @@ export default function AdminDocumentsPage() {
         formData.append("title", `${currentRequest.title} - ${versionTag}`);
         await api.documents.upload(selectedRequestId, formData);
         toast.success(`Final deliverable uploaded successfully!`);
+
+        // Refresh documents from backend
+        const docsRes = await api.documents.getByRequest(selectedRequestId);
+        if (docsRes && Array.isArray(docsRes)) {
+          const mapped: DocumentVersion[] = docsRes.map((fd: any, idx: number) => ({
+            id: fd.id,
+            requestId: selectedRequestId,
+            versionTag: `v${fd.version || docsRes.length - idx}.0`,
+            fileName: fd.fileName || fileItem.name,
+            fileSize: fd.fileSize ? `${(fd.fileSize / (1024 * 1024)).toFixed(1)} MB` : fileItem.size,
+            pageCount: currentRequest.pages,
+            uploadedAt: fd.createdAt || new Date().toISOString(),
+            versionNote: fd.title || versionNote.trim() || `Uploaded ${versionTag} deliverable file.`,
+            isLocked: !isUnlocked,
+            fileUrl: fd.secureUrl,
+          }));
+          setVersions((prev) => ({
+            ...prev,
+            [selectedRequestId]: mapped,
+          }));
+        }
+
+        // Update current request status to ready / document_uploaded in UI
+        setRequests((prev) =>
+          prev.map((r) =>
+            r.id === selectedRequestId ? { ...r, status: "ready" } : r
+          )
+        );
       }
     } catch (err: any) {
       console.warn("Backend document upload warning:", err);
+      toast.error(err.message || "Document upload failed");
+    } finally {
+      setUploadedFiles([]);
+      setVersionNote("");
+      setIsUploading(false);
     }
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    const newVersion: DocumentVersion = {
-      id: "ver_" + Math.random().toString(36).substring(2, 9),
-      requestId: selectedRequestId,
-      versionTag: versionTag || "v1.0",
-      fileName: fileItem.name,
-      fileSize: fileItem.size,
-      pageCount: currentRequest.pages,
-      uploadedAt: new Date().toISOString(),
-      versionNote: versionNote.trim() || `Uploaded ${versionTag} deliverable file.`,
-      isLocked: !currentRequest.balancePaid,
-    };
-
-    setVersions((prev) => ({
-      ...prev,
-      [selectedRequestId]: [newVersion, ...(prev[selectedRequestId] || [])],
-    }));
-
-    setUploadedFiles([]);
-    setVersionNote("");
-    setIsUploading(false);
-    toast.success(`Successfully uploaded ${newVersion.fileName} (${newVersion.versionTag})`);
   };
 
-  const handleMarkAsReady = () => {
+  const handleMarkAsReady = async () => {
     if (!currentRequest) return;
-    setRequests((prev) =>
-      prev.map((r) =>
-        r.id === selectedRequestId ? { ...r, status: "ready" } : r
-      )
-    );
-    toast.success(
-      `Request ${selectedRequestId} marked as READY. Student ${currentRequest.studentName} has been notified to complete the 50% milestone balance.`
-    );
+    try {
+      await api.requests.updateStatus(selectedRequestId, "DOCUMENT_UPLOADED");
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === selectedRequestId ? { ...r, status: "ready" } : r
+        )
+      );
+      toast.success(
+        `Request ${selectedRequestId.slice(0, 8)}... marked as READY. Student ${currentRequest.studentName} has been notified to complete the 50% milestone balance.`
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update status");
+    }
+  };
+
+  const handleDownloadDeliverable = async (version: DocumentVersion) => {
+    try {
+      if (version.fileUrl) {
+        downloadFile(version.fileUrl, version.fileName);
+        toast.success(`Downloading ${version.fileName}...`);
+      } else {
+        const info = await api.documents.getDownloadInfo(version.id);
+        if (info?.downloadUrl) {
+          downloadFile(info.downloadUrl, info.fileName || version.fileName);
+          toast.success(`Downloading ${version.fileName}...`);
+        } else {
+          toast.error("Download link unavailable");
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Download failed");
+    }
+  };
+
+  const handlePreview = (version: DocumentVersion) => {
+    if (version.fileUrl) {
+      window.open(version.fileUrl, "_blank");
+    } else {
+      setPreviewDoc(version);
+    }
   };
 
   const handleToggleStudentPayment = () => {
@@ -211,14 +290,19 @@ export default function AdminDocumentsPage() {
     }
   };
 
-  const handleDeleteVersion = (versionId: string) => {
-    setVersions((prev) => ({
-      ...prev,
-      [selectedRequestId]: (prev[selectedRequestId] || []).filter(
-        (v) => v.id !== versionId
-      ),
-    }));
-    toast.success("Document version removed.");
+  const handleDeleteVersion = async (versionId: string) => {
+    try {
+      await api.documents.delete(versionId);
+      setVersions((prev) => ({
+        ...prev,
+        [selectedRequestId]: (prev[selectedRequestId] || []).filter(
+          (v) => v.id !== versionId
+        ),
+      }));
+      toast.success("Document version removed from storage.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete document version");
+    }
   };
 
   if (requests.length === 0 || !currentRequest) {
@@ -425,11 +509,19 @@ export default function AdminDocumentsPage() {
               <div className="space-y-2 pt-1">
                 <Button
                   onClick={handleMarkAsReady}
-                  disabled={currentRequest.status === "ready" || currentRequest.status === "delivered"}
+                  disabled={
+                    currentRequest.status === "ready" ||
+                    currentRequest.status === "document_uploaded" ||
+                    currentRequest.status === "delivered" ||
+                    currentRequest.status === "completed"
+                  }
                   className="w-full h-10 text-[13px] font-semibold"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-2" />
-                  {currentRequest.status === "ready" || currentRequest.status === "delivered"
+                  {currentRequest.status === "ready" ||
+                  currentRequest.status === "document_uploaded" ||
+                  currentRequest.status === "delivered" ||
+                  currentRequest.status === "completed"
                     ? "Task Already Marked as Ready"
                     : "Mark as Ready & Notify Student"}
                 </Button>
@@ -526,7 +618,7 @@ export default function AdminDocumentsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPreviewDoc(version)}
+                      onClick={() => handlePreview(version)}
                       className="h-8 text-[12px] border-border"
                     >
                       <Eye className="h-3.5 w-3.5 mr-1" />
@@ -536,7 +628,7 @@ export default function AdminDocumentsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => toast.success(`Downloading ${version.fileName}...`)}
+                      onClick={() => handleDownloadDeliverable(version)}
                       className="h-8 text-[12px] border-border"
                     >
                       <Download className="h-3.5 w-3.5 mr-1" />
@@ -603,7 +695,7 @@ export default function AdminDocumentsPage() {
             <Button
               size="sm"
               onClick={() => {
-                toast.success(`Downloading ${previewDoc?.fileName}`);
+                if (previewDoc) handleDownloadDeliverable(previewDoc);
                 setPreviewDoc(null);
               }}
               className="text-[13px]"
