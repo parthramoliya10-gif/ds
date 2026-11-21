@@ -76,7 +76,7 @@ export default function LoginPage() {
 
       <CardContent className="space-y-4">
         {/* Google Authentication Button */}
-        <GoogleAuthButton label="Sign in with Google" />
+        <GoogleAuthButton label="Continue with Google" />
 
         <div className="relative flex items-center justify-center my-4">
           <div className="absolute inset-0 flex items-center">

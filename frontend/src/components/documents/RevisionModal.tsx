@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { formatShortId } from "@/lib/utils";
 
 export interface RevisionModalProps {
   isOpen: boolean;
@@ -54,7 +55,7 @@ export function RevisionModal({
             Request Task Revision
           </DialogTitle>
           <DialogDescription className="text-[13px] text-muted-foreground">
-            {requestId} • {requestTitle}
+            {formatShortId(requestId, "REQ")} • {requestTitle}
           </DialogDescription>
         </DialogHeader>
 

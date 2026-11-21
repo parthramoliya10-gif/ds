@@ -28,7 +28,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Request, FinalDocument } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
-import { formatCurrencyINR, formatDate } from "@/lib/utils";
+import { formatCurrencyINR, formatDate, formatShortId } from "@/lib/utils";
 import { downloadFile } from "@/lib/download";
 import {
   FileText,
@@ -354,7 +354,7 @@ export default function AdminDocumentsPage() {
               <SelectContent className="border-border bg-background">
                 {requests.map((r) => (
                   <SelectItem key={r.id} value={r.id}>
-                    {r.id} — {r.studentName} ({r.title})
+                    {formatShortId(r.id, "REQ")} — {r.studentName} ({r.title})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -568,7 +568,7 @@ export default function AdminDocumentsPage() {
               </CardTitle>
             </div>
             <span className="text-[12px] text-muted-foreground">
-              {currentRequest.id} • {currentRequest.title}
+              {formatShortId(currentRequest.id, "REQ")} • {currentRequest.title}
             </span>
           </div>
         </CardHeader>

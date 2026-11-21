@@ -41,3 +41,22 @@ export function isDeadlineUrgent(deadlineDateString: string): boolean {
   const diffHours = (deadline - now) / (1000 * 60 * 60);
   return diffHours > 0 && diffHours <= 24;
 }
+
+/**
+ * Format any long UUID or ID into a clean, short human-readable identifier
+ * e.g. "c83b8e4e-0a5d-4f11-9a72-132d729db50a" -> "REQ-C83B8E"
+ * or "REQ-1003" -> "REQ-1003"
+ */
+export function formatShortId(id?: string, prefix: string = "REQ"): string {
+  if (!id) return `${prefix}-0000`;
+  const clean = id.trim();
+  // If already in short standard format like REQ-1003, REQ-101, QT-101, TXN-998
+  if (/^[A-Z]{2,4}-[A-Z0-9]{3,8}$/i.test(clean)) {
+    return clean.toUpperCase();
+  }
+  // Strip non-alphanumeric chars (like hyphens from UUIDs)
+  const hex = clean.replace(/[^A-Za-z0-9]/g, "");
+  // Take first 6 characters uppercase
+  const shortCode = (hex.length >= 6 ? hex.slice(0, 6) : hex.padEnd(6, "0")).toUpperCase();
+  return `${prefix}-${shortCode}`;
+}

@@ -20,7 +20,7 @@ import {
   adaptQuotationToFrontend,
   adaptFinalDocumentToFrontend,
 } from "@/lib/api/adapters";
-import { formatCurrencyINR, formatDate, isDeadlineUrgent } from "@/lib/utils";
+import { formatCurrencyINR, formatDate, isDeadlineUrgent, formatShortId } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -204,7 +204,7 @@ export default function UserRequestDetailPage() {
         <div className="space-y-1">
           <div className="flex items-center space-x-2">
             <span className="font-mono text-[12px] font-semibold text-muted-foreground">
-              {request.id}
+              {formatShortId(request.id, "REQ")}
             </span>
             <StatusBadge status={request.status} />
             {(request.urgent || isDeadlineUrgent(request.deadline)) && (

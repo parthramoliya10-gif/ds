@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatShortId } from "@/lib/utils";
 import {
   ShieldCheck,
   CheckCircle2,
@@ -258,7 +258,7 @@ export function RazorpayModal({
                   : "Final balance milestone settled. Final download unlocked!"}
               </p>
               <p className="text-[11px] font-mono text-muted-foreground pt-1">
-                Ref ID: {transactionId}
+                Ref ID: {formatShortId(transactionId, "TXN")}
               </p>
             </div>
 

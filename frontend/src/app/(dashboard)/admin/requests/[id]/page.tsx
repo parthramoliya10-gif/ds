@@ -29,7 +29,7 @@ import {
   adaptQuotationToFrontend,
   adaptMessageToFrontend,
 } from "@/lib/api/adapters";
-import { formatCurrencyINR, formatDate, isDeadlineUrgent } from "@/lib/utils";
+import { formatCurrencyINR, formatDate, isDeadlineUrgent, formatShortId } from "@/lib/utils";
 import {
   ArrowLeft,
   MessageSquare,
@@ -248,7 +248,7 @@ export default function AdminRequestDetailPage() {
         <Card className="p-8 text-center border border-border">
           <h2 className="text-xl font-bold">Request Not Found</h2>
           <p className="text-sm text-muted-foreground mt-2">
-            The request with ID &quot;{requestId}&quot; does not exist or you do not have permission to view it.
+            The request with ID &quot;{formatShortId(requestId, "REQ")}&quot; does not exist or you do not have permission to view it.
           </p>
         </Card>
       </div>
@@ -285,7 +285,7 @@ export default function AdminRequestDetailPage() {
         <div className="space-y-1">
           <div className="flex items-center space-x-2">
             <span className="font-mono text-[14px] font-semibold text-muted-foreground">
-              {request.id}
+              {formatShortId(request.id, "REQ")}
             </span>
             <StatusBadge status={request.status} />
             {isUrgent && (

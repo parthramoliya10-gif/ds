@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, formatShortId } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -509,7 +509,7 @@ export default function UserChatConversationPage() {
           <div className="truncate">
             <div className="flex items-center space-x-2">
               <span className="font-mono text-[12px] font-semibold text-muted-foreground">
-                {request.id.slice(0, 8)}...
+                {formatShortId(request.id, "REQ")}
               </span>
               <StatusBadge status={request.status} className="text-[10px] py-0 px-1.5 h-4" />
             </div>

@@ -22,7 +22,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
-import { formatCurrencyINR, formatDate, isDeadlineUrgent } from "@/lib/utils";
+import { formatCurrencyINR, formatDate, isDeadlineUrgent, formatShortId } from "@/lib/utils";
 import {
   Clock,
   CheckCircle2,
@@ -144,7 +144,7 @@ export default function UserDashboardPage() {
           href={`/user/requests/${req.id}`}
           className="hover:underline font-mono font-medium text-foreground"
         >
-          {req.id}
+          {formatShortId(req.id, "REQ")}
         </Link>
       ),
     },
@@ -444,7 +444,7 @@ export default function UserDashboardPage() {
               {/* Header badges */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-                  Active Task • #{activeRequest.id.slice(0, 8)}
+                  Active Task • #{formatShortId(activeRequest.id, "REQ")}
                 </span>
                 <StatusBadge status={activeRequest.status} />
                 {activeRequest.urgent && (
@@ -640,7 +640,7 @@ export default function UserDashboardPage() {
                     {/* Top status & ID */}
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-[11px] text-muted-foreground">
-                        {req.id}
+                        {formatShortId(req.id, "REQ")}
                       </span>
                       <StatusBadge status={req.status} />
                     </div>
