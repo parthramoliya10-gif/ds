@@ -12,6 +12,7 @@ interface AuthContextType {
   role: Role;
   login: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  loginWithGoogleIdToken: (idToken: string) => Promise<void>;
   registerUser: (data: { email: string; password: string; fullName: string }) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
@@ -194,6 +195,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginWithGoogleIdToken = async (idToken: string) => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token: idToken,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      let session: any = data.session;
+      if (!session) {
+        const res = await supabase.auth.getSession();
+        session = res.data.session;
+      }
+
+      if (session) {
+        // Sync session with backend to set HttpOnly cookies and sync PostgreSQL profile
+        try {
+          await api.auth.establishSession({
+            accessToken: session.access_token,
+            refreshToken: session.refresh_token,
+          });
+        } catch (apiErr) {
+          console.warn("Backend establishSession fallback:", apiErr);
+        }
+
+        let role = "student";
+        try {
+          const profile = await api.auth.getMe();
+          if (profile?.role?.toUpperCase() === "ADMIN") {
+            role = "admin";
+          }
+        } catch {
+          const metaRole = (
+            session.user?.user_metadata?.role ||
+            session.user?.app_metadata?.role ||
+            ""
+          ).toLowerCase();
+          if (metaRole === "admin") role = "admin";
+        }
+
+        const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+        const redirectParam = urlParams?.get("redirect");
+        let target = role === "admin" ? "/admin/dashboard" : "/user/dashboard";
+
+        if (
+          redirectParam &&
+          redirectParam.startsWith("/") &&
+          !redirectParam.startsWith("//")
+        ) {
+          if (role === "admin" && redirectParam.startsWith("/admin")) {
+            target = redirectParam;
+          } else if (role !== "admin" && redirectParam.startsWith("/user")) {
+            target = redirectParam;
+          }
+        }
+
+        window.location.href = target;
+      }
+    } catch (err: any) {
+      console.error("Google ID Token login error:", err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const registerUser = async (data: { email: string; password: string; fullName: string }) => {
     setIsLoading(true);
     try {
@@ -322,6 +393,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: (user?.role?.toLowerCase() as Role) || "student",
         login,
         signInWithGoogle,
+        loginWithGoogleIdToken,
         registerUser,
         logout,
         isLoading,

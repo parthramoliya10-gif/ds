@@ -155,6 +155,11 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ isBlocked }),
       }),
+    establishSession: (data: { code?: string; accessToken?: string; refreshToken?: string }) =>
+      apiRequest("/auth/session", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
   },
 
   profile: {
