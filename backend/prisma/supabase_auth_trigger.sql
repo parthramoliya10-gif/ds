@@ -6,14 +6,14 @@
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.admins WHERE id = new.id) THEN
+  IF EXISTS (SELECT 1 FROM public.admins WHERE id = new.id::text) THEN
     UPDATE public.admins
     SET
       email = new.email,
       "fullName" = COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', public.admins."fullName"),
       "avatarUrl" = COALESCE(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture', public.admins."avatarUrl"),
       "updatedAt" = NOW()
-    WHERE id = new.id;
+    WHERE id = new.id::text;
   ELSE
     INSERT INTO public.users (
       id,
@@ -25,7 +25,7 @@ BEGIN
       "updatedAt"
     )
     VALUES (
-      new.id,
+      new.id::text,
       new.email,
       COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', ''),
       COALESCE(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture'),
