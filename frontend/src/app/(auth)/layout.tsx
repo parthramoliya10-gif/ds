@@ -23,7 +23,7 @@ export default function AuthLayout({
                 DSMS
               </span>
               <span className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">
-                College Portal
+                Organization Portal
               </span>
             </div>
           </Link>

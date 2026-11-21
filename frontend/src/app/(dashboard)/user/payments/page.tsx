@@ -155,7 +155,7 @@ export default function UserPaymentsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Payments & Milestones"
-        description="Review transaction receipts, university escrow milestone progress, and tax invoices."
+        description="Review transaction receipts, organization escrow milestone progress, and tax invoices."
       />
 
       {/* Financial Summary Cards */}

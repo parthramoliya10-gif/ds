@@ -365,7 +365,7 @@ export default function AdminRequestDetailPage() {
 
                 <div className="space-y-1">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
-                    College / University
+                    Organization Name
                   </span>
                   <span className="font-medium text-foreground flex items-center">
                     <School className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
@@ -437,7 +437,7 @@ export default function AdminRequestDetailPage() {
                 </span>
                 <p className="text-[14px] leading-relaxed text-foreground whitespace-pre-wrap bg-background p-3 rounded-[6px] border border-border">
                   {request.description ||
-                    "Complete academic submission adhering strictly to the university formatting rubric and laboratory manual guidelines."}
+                    "Complete task submission adhering strictly to the organization formatting rubric and guidelines."}
                 </p>
               </div>
             </CardContent>

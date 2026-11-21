@@ -19,8 +19,8 @@ import { toast } from "sonner";
 const loginSchema = z.object({
   email: z
     .string()
-    .min(1, "College email is required")
-    .email("Please enter a valid college email address"),
+    .min(1, "Mail ID is required")
+    .email("Please enter a valid email address"),
   password: z
     .string()
     .min(6, "Password must be at least 6 characters"),
@@ -68,7 +68,7 @@ export default function LoginPage() {
           Welcome back
         </CardTitle>
         <CardDescription className="text-[14px] text-muted-foreground">
-          Sign in to access your college tasks, milestones, and chat
+          Sign in to access your organization tasks, milestones, and chat
         </CardDescription>
       </CardHeader>
 
@@ -77,8 +77,10 @@ export default function LoginPage() {
         <GoogleAuthButton label="Sign in with Google" />
 
         <div className="relative flex items-center justify-center my-4">
-          <div className="border-t border-border w-full" />
-          <span className="bg-background px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider relative z-10">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border" />
+          </div>
+          <span className="relative z-10 bg-background px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
             or continue with email
           </span>
         </div>
@@ -87,12 +89,12 @@ export default function LoginPage() {
           {/* Email Field */}
           <div className="space-y-1.5">
             <Label htmlFor="email" className="text-[13px] font-medium">
-              College Email ID
+              Mail ID
             </Label>
             <Input
               id="email"
               type="email"
-              placeholder="name@university.edu"
+              placeholder="Enter Mail ID"
               {...register("email")}
               className={errors.email ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.email)}

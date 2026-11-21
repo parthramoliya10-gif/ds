@@ -178,7 +178,7 @@ export default function UserRequestsListPage() {
     <div className="space-y-6">
       <PageHeader
         title="My Requests"
-        description="Track all your university assignments, lab manuals, and reports from submission to download unlock."
+        description="Track all your organization assignments, lab manuals, and reports from submission to download unlock."
         action={
           <Link href="/user/requests/new">
             <Button size="sm" className="h-9">
@@ -207,7 +207,7 @@ export default function UserRequestsListPage() {
         <EmptyState
           icon={<FileText className="h-6 w-6 stroke-[1.5]" />}
           title="No requests found"
-          description={`There are currently no tasks in the '${activeTab}' category. Click below to submit a new college task.`}
+          description={`There are currently no tasks in the '${activeTab}' category. Click below to submit a new task.`}
           action={
             <Link href="/user/requests/new">
               <Button size="sm" className="h-9">

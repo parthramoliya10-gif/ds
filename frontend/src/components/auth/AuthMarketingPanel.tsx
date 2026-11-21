@@ -12,14 +12,14 @@ export function AuthMarketingPanel() {
       <div className="relative z-10 space-y-2">
         <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full border border-white/20 bg-white/5 text-[12px] font-medium tracking-wide">
           <ShieldCheck className="h-3.5 w-3.5 text-white" />
-          <span>College Academic Support</span>
+          <span>Organization Support</span>
         </div>
         <h2 className="text-[26px] font-semibold tracking-tight text-white leading-tight">
           Reliable document completion <br />
           with guaranteed milestones.
         </h2>
         <p className="text-[14px] text-[#A3A3A3] max-w-md leading-relaxed">
-          From practical files to complex lab manuals, have your university tasks solved by verified specialists with complete confidentiality.
+          From practical files to complex reports, have your organization tasks solved by verified specialists with complete confidentiality.
         </p>
       </div>
 
@@ -83,7 +83,7 @@ export function AuthMarketingPanel() {
 
       {/* Bottom Footer Quote */}
       <div className="relative z-10 pt-4 border-t border-white/10 flex items-center justify-between text-[12px] text-[#A3A3A3]">
-        <span>Delhi Tech University & 40+ Colleges</span>
+        <span>40+ Organizations &amp; Institutes</span>
         <span>100% On-Time Delivery Guarantee</span>
       </div>
     </div>

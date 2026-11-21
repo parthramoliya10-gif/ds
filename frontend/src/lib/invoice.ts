@@ -35,8 +35,8 @@ export function downloadTaxInvoice(
       : "50% Final Milestone Balance";
 
   const taskTitle = details.taskTitle || payment.requestTitle || "Academic Document Service";
-  const studentName = details.studentName || "University Student";
-  const college = details.college || "University Student";
+  const studentName = details.studentName || "Client / Student";
+  const college = details.college || "Organization Member";
   const amountFormatted = formatCurrencyINR(payment.amount);
   const txnId = payment.transactionId || payment.id;
 
@@ -53,7 +53,7 @@ export function downloadTaxInvoice(
   doc.setFontSize(8.5);
   doc.setTextColor(100, 116, 139); // slate-500
   doc.text("Document Service Management System", 20, 28);
-  doc.text("Secure University Academic Escrow Gateway", 20, 33);
+  doc.text("Secure Organization Escrow Gateway", 20, 33);
 
   // Invoice Title & Meta (Right aligned)
   doc.setFont("helvetica", "bold");
@@ -230,13 +230,13 @@ export function downloadTaxInvoice(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("DSMS University Milestone Escrow Policy:", 25, noticeY + 6);
+  doc.text("DSMS Organization Milestone Escrow Policy:", 25, noticeY + 6);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
   const noticeText =
-    "This payment was processed via secure university milestone escrow. Advance milestone payments remain protected until deliverable inspection, and final milestone payments unlock full verified document downloads. All transactions are logged with cryptographic verification.";
+    "This payment was processed via secure organization milestone escrow. Advance milestone payments remain protected until deliverable inspection, and final milestone payments unlock full verified document downloads. All transactions are logged with cryptographic verification.";
   const splitNotice = doc.splitTextToSize(noticeText, 160);
   doc.text(splitNotice, 25, noticeY + 11);
 

@@ -95,7 +95,7 @@ export default function AuthCallbackPage() {
             Signing you in...
           </h3>
           <p className="text-[13px] text-muted-foreground">
-            Verifying your university credentials and establishing session
+            Verifying your credentials and establishing session
           </p>
         </div>
       </CardContent>

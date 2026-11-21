@@ -246,7 +246,7 @@ export default function UserDashboardPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <span className="text-[12px] text-muted-foreground font-mono block">
-              {user?.college || "University Student Portal"}
+              {user?.college || "Organization Portal"}
             </span>
 
             <h1 className="text-[26px] font-bold tracking-tight text-foreground">

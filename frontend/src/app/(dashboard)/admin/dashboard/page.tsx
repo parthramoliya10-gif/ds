@@ -107,7 +107,7 @@ export default function AdminDashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Admin Operations Command"
-        description="Monitor university task submissions, turnaround metrics, 50-50 milestone revenue, and active student inquiries."
+        description="Monitor organization task submissions, turnaround metrics, 50-50 milestone revenue, and active inquiries."
         action={
           <Link href="/admin/requests">
             <Button size="sm" className="h-9">
@@ -124,7 +124,7 @@ export default function AdminDashboardPage() {
           label="Total Requests"
           value={totalRequests}
           icon={<FileText className="h-4 w-4" />}
-          helperText="All university tasks received to date"
+          helperText="All organization tasks received to date"
         />
         <StatCard
           label="New Submissions"
@@ -178,7 +178,7 @@ export default function AdminDashboardPage() {
                 Weekly Request Inflow
               </CardTitle>
               <CardDescription className="text-[12px] text-muted-foreground mt-0.5">
-                Daily student assignment submissions across colleges
+                Daily task submissions across organizations
               </CardDescription>
             </div>
             <span className="text-[14px] font-bold text-foreground">

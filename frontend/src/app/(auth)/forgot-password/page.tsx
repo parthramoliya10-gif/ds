@@ -17,8 +17,8 @@ import api from "@/lib/api/client";
 const forgotSchema = z.object({
   email: z
     .string()
-    .min(1, "College email is required")
-    .email("Please enter a valid college email address"),
+    .min(1, "Mail ID is required")
+    .email("Please enter a valid email address"),
 });
 
 type ForgotFormValues = z.infer<typeof forgotSchema>;
@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
           Forgot password?
         </CardTitle>
         <CardDescription className="text-[14px] text-muted-foreground">
-          Enter your registered college email and we will send a 6-digit verification code to reset your password.
+          Enter your registered mail ID and we will send a 6-digit verification code to reset your password.
         </CardDescription>
       </CardHeader>
 
@@ -69,12 +69,12 @@ export default function ForgotPasswordPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <div className="space-y-1.5">
             <Label htmlFor="email" className="text-[13px] font-medium">
-              College Email ID
+              Mail ID
             </Label>
             <Input
               id="email"
               type="email"
-              placeholder="name@university.edu"
+              placeholder="Enter Mail ID"
               {...register("email")}
               className={errors.email ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.email)}

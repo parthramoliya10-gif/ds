@@ -175,7 +175,7 @@ export default function VerifyOtpPage() {
         sessionStorage.removeItem("dsms_dev_otp");
       }
 
-      toast.success("College email verified successfully! Redirecting to dashboard...");
+      toast.success("Mail ID verified successfully! Redirecting to dashboard...");
 
       const role = (res?.user?.role || "").toLowerCase();
       const targetDashboard = role === "admin" ? "/admin/dashboard" : "/user/dashboard";

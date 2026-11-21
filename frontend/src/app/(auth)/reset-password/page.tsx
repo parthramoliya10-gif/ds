@@ -20,7 +20,7 @@ const resetPasswordSchema = z
   .object({
     email: z
       .string()
-      .min(1, "College email is required")
+      .min(1, "Mail ID is required")
       .email("Please enter a valid email address"),
     otp: z
       .string()
@@ -89,7 +89,7 @@ export default function ResetPasswordPage() {
   const handleResendOtp = async () => {
     if (resendTimer > 0 || isResending) return;
     if (!emailValue) {
-      toast.error("Please enter your college email first.");
+      toast.error("Please enter your mail ID first.");
       return;
     }
 
@@ -146,15 +146,15 @@ export default function ResetPasswordPage() {
 
           <CardContent className="space-y-4">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-              {/* College Email */}
+              {/* Mail ID */}
               <div className="space-y-1.5">
                 <Label htmlFor="email" className="text-[13px] font-medium">
-                  Registered Email ID
+                  Mail ID
                 </Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="name@university.edu"
+                  placeholder="Enter Mail ID"
                   {...register("email")}
                   className={errors.email ? "border-foreground" : ""}
                   aria-invalid={Boolean(errors.email)}
