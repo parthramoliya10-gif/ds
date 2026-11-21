@@ -9,7 +9,6 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrengthMeter } from "@/components/auth/PasswordStrengthMeter";
@@ -39,9 +38,6 @@ const registerSchema = z
       .regex(/[0-9]/, "Password must contain at least one number (0-9)")
       .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character (e.g. !@#$%)"),
     confirmPassword: z.string().min(1, "Please confirm your password"),
-    terms: z.boolean().refine((val) => val === true, {
-      message: "You must accept the terms of service and organization guidelines",
-    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -58,7 +54,6 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     watch,
     formState: { errors },
   } = useForm<RegisterFormValues>({
@@ -68,12 +63,10 @@ export default function RegisterPage() {
       email: "",
       password: "",
       confirmPassword: "",
-      terms: false,
     },
   });
 
   const passwordValue = watch("password") || "";
-  const termsValue = watch("terms");
 
   const hasLength = passwordValue.length >= 8;
   const hasUpper = /[A-Z]/.test(passwordValue);
@@ -206,32 +199,7 @@ export default function RegisterPage() {
             )}
           </div>
 
-          {/* Terms & Conditions Checkbox */}
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-start space-x-2">
-              <Checkbox
-                id="terms"
-                checked={termsValue}
-                onCheckedChange={(checked) => setValue("terms", checked === true)}
-                className="mt-0.5"
-              />
-              <Label
-                htmlFor="terms"
-                className="text-[12px] text-muted-foreground font-normal leading-relaxed cursor-pointer"
-              >
-                I agree to the{" "}
-                <span className="text-foreground font-medium underline underline-offset-2">
-                  Terms of Service
-                </span>{" "}
-                and confirm my submitted tasks adhere to organization guidelines.
-              </Label>
-            </div>
-            {errors.terms && (
-              <p className="text-[12px] font-medium text-foreground">
-                {errors.terms.message}
-              </p>
-            )}
-          </div>
+
 
           {/* Submit Button */}
           <Button
