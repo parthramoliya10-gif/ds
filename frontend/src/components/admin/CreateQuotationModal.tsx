@@ -54,7 +54,14 @@ export function CreateQuotationModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!numericAmount || numericAmount <= 0) return;
+    if (!numericAmount || numericAmount < 100) {
+      toast.error("Total quotation amount must be at least $100.");
+      return;
+    }
+    if (!deliveryDate.trim()) {
+      toast.error("Estimated delivery turnaround is required.");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -129,12 +136,11 @@ export function CreateQuotationModal({
                 if (val === "") {
                   setAmount("");
                 } else {
-                  // Remove leading zero when followed by other digits (e.g. "0745" -> "745")
                   const cleaned = val.replace(/^0+(?=\d)/, "");
                   setAmount(cleaned);
                 }
               }}
-              placeholder="Enter quotation amount"
+              placeholder="e.g. 500"
               className="text-[16px] font-semibold h-10 font-mono"
               required
             />
@@ -184,6 +190,7 @@ export function CreateQuotationModal({
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Includes full handwritten assignment on ruled sheets with flowcharts and verified outputs..."
               className="text-[13px]"
             />
           </div>

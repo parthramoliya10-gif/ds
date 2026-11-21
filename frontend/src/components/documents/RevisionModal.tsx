@@ -32,7 +32,10 @@ export function RevisionModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!notes.trim()) return;
+    if (!notes.trim() || notes.trim().length < 10) {
+      toast.error("Please provide at least 10 characters describing the required revisions.");
+      return;
+    }
 
     setSubmitting(true);
     await new Promise((resolve) => setTimeout(resolve, 400));

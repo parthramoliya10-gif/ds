@@ -82,6 +82,19 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
       return;
     }
 
+    if (phone.trim() && !/^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]{7,15}$/.test(phone.trim())) {
+      toast.error("Please enter a valid phone number (at least 10 digits).");
+      return;
+    }
+
+    if (role === "student" && semester.trim()) {
+      const semNum = parseInt(semester.trim(), 10);
+      if (isNaN(semNum) || semNum < 1 || semNum > 12) {
+        toast.error("Semester must be a valid number between 1 and 12.");
+        return;
+      }
+    }
+
     setSavingGeneral(true);
     try {
       await updateProfile({
@@ -413,7 +426,7 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
                 id="fullName"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Enter full name"
+                placeholder="Enter your name"
                 className="h-10 text-[14px]"
               />
               <p className="text-[11px] text-muted-foreground">
@@ -449,7 +462,7 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
                     id="college"
                     value={college}
                     onChange={(e) => setCollege(e.target.value)}
-                    placeholder="e.g. Organization Name"
+                    placeholder="e.g. Stanford University / Tech Corp"
                     className="h-10 text-[14px]"
                   />
                   <p className="text-[11px] text-muted-foreground">
@@ -583,7 +596,7 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
               id="newPassword"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Minimum 6 characters"
+              placeholder="At least 6 characters"
               className="h-10 text-[14px]"
             />
             <PasswordStrengthMeter password={newPassword} />
@@ -598,7 +611,7 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
               id="confirmPassword"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Repeat new password"
+              placeholder="Re-enter your new password"
               className="h-10 text-[14px]"
             />
           </div>
