@@ -337,6 +337,70 @@ class PaymentService {
             },
         });
     }
+    /**
+     * Complete milestone payment & unlock documents (for sandbox, simulation, and client verification)
+     */
+    async completeMilestonePayment(userId, requestId, milestone, transactionId) {
+        const request = await prisma_js_1.default.documentRequest.findUnique({
+            where: { id: requestId },
+            include: {
+                conversation: true,
+                quotations: {
+                    orderBy: { version: 'desc' },
+                },
+            },
+        });
+        if (!request) {
+            throw new apiError_js_1.ApiError(404, 'Request not found.');
+        }
+        if (request.userId !== userId) {
+            const admin = await prisma_js_1.default.admin.findFirst({ where: { id: userId } });
+            if (!admin) {
+                throw new apiError_js_1.ApiError(403, 'Forbidden: You are not authorized to update this request.');
+            }
+        }
+        const isFinal = String(milestone) === 'FINAL_50';
+        const finalAmount = request.quotations[0]?.remainingAmount || 5000;
+        const advanceAmount = request.quotations[0]?.advanceAmount || 5000;
+        const amount = isFinal ? finalAmount : advanceAmount;
+        const currency = request.quotations[0]?.currency || 'INR';
+        const txnId = transactionId || `TXN_${Date.now()}`;
+        // Create payment record marked as SUCCESS
+        const payment = await prisma_js_1.default.payment.create({
+            data: {
+                userId: request.userId,
+                requestId: request.id,
+                quotationId: request.quotations[0]?.id,
+                milestone: isFinal ? client_1.PaymentMilestone.FINAL_50 : client_1.PaymentMilestone.ADVANCE_50,
+                amount,
+                currency,
+                status: client_1.PaymentStatus.SUCCESS,
+                razorpayOrderId: txnId,
+                razorpayPaymentId: txnId,
+                paidAt: new Date(),
+            },
+        });
+        // Update request state to COMPLETED and unlock downloads
+        const updatedRequest = await prisma_js_1.default.documentRequest.update({
+            where: { id: requestId },
+            data: {
+                status: isFinal ? client_1.RequestStatus.COMPLETED : client_1.RequestStatus.IN_PROGRESS,
+                ...(isFinal ? { isDownloadUnlocked: true } : {}),
+            },
+        });
+        // Notify chat room via socket
+        (0, socket_server_js_1.emitToRequestRoom)(requestId, socketEvents_js_1.default.PAYMENT_CONFIRMED, {
+            requestId,
+            milestone,
+            requestStatus: updatedRequest.status,
+            isDownloadUnlocked: updatedRequest.isDownloadUnlocked,
+        });
+        return {
+            payment,
+            isDownloadUnlocked: updatedRequest.isDownloadUnlocked,
+            requestStatus: updatedRequest.status,
+        };
+    }
 }
 exports.PaymentService = PaymentService;
 exports.paymentService = new PaymentService();

@@ -418,16 +418,26 @@ class RequestService {
     /**
      * Admin-only: Update request status
      */
-    async updateStatus(adminId, requestId, status) {
+    async updateStatus(adminId, requestId, data) {
         const existing = await prisma_js_1.default.documentRequest.findUnique({
             where: { id: requestId },
         });
         if (!existing) {
             throw new apiError_js_1.ApiError(404, 'Document request not found.');
         }
+        const newStatus = typeof data === 'string' ? data : data.status;
+        let isDownloadUnlocked = typeof data === 'object' && typeof data.isDownloadUnlocked === 'boolean'
+            ? data.isDownloadUnlocked
+            : existing.isDownloadUnlocked;
+        if (newStatus === client_1.RequestStatus.COMPLETED) {
+            isDownloadUnlocked = true;
+        }
         const updated = await prisma_js_1.default.documentRequest.update({
             where: { id: requestId },
-            data: { status },
+            data: {
+                ...(newStatus ? { status: newStatus } : {}),
+                isDownloadUnlocked,
+            },
         });
         // Record audit log
         await prisma_js_1.default.auditLog.create({
@@ -439,7 +449,7 @@ class RequestService {
                 action: 'REQUEST_STATUS_UPDATED',
                 metadata: {
                     previousStatus: existing.status,
-                    newStatus: status,
+                    newStatus: newStatus || existing.status,
                 },
             },
         });

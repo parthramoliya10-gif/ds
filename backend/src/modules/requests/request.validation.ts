@@ -17,10 +17,13 @@ export const createRequestSchema = z.object({
 });
 
 export const updateRequestStatusSchema = z.object({
-  status: z.nativeEnum(RequestStatus, {
-    errorMap: () => ({
-      message:
-        'Invalid status. Allowed values: PENDING, QUOTED, IN_PROGRESS, DOCUMENT_UPLOADED, COMPLETED, CANCELLED',
-    }),
-  }),
+  status: z
+    .nativeEnum(RequestStatus, {
+      errorMap: () => ({
+        message:
+          'Invalid status. Allowed values: PENDING, QUOTED, IN_PROGRESS, DOCUMENT_UPLOADED, COMPLETED, CANCELLED',
+      }),
+    })
+    .optional(),
+  isDownloadUnlocked: z.boolean().optional(),
 });

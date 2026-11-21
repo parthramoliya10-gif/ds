@@ -103,9 +103,12 @@ export class RequestController {
       }
 
       const requestId = req.params.id as string;
-      const { status } = req.body;
+      const { status, isDownloadUnlocked } = req.body;
 
-      const updated = await requestService.updateStatus(req.user.id, requestId, status);
+      const updated = await requestService.updateStatus(req.user.id, requestId, {
+        status,
+        isDownloadUnlocked,
+      });
 
       sendResponse({
         res,

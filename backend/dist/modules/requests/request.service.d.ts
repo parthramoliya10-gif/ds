@@ -269,7 +269,10 @@ export declare class RequestService {
     /**
      * Admin-only: Update request status
      */
-    updateStatus(adminId: string, requestId: string, status: RequestStatus): Promise<{
+    updateStatus(adminId: string, requestId: string, data: {
+        status?: RequestStatus;
+        isDownloadUnlocked?: boolean;
+    } | RequestStatus): Promise<{
         status: import(".prisma/client").$Enums.RequestStatus;
         id: string;
         createdAt: Date;

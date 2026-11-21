@@ -52,6 +52,28 @@ class PaymentController {
         }
     }
     /**
+     * POST /api/v1/payments/complete
+     * Record or finalize milestone payment (for verified checkout & sandbox simulation)
+     */
+    async completePayment(req, res, next) {
+        try {
+            if (!req.user) {
+                throw new apiError_js_1.ApiError(401, 'Unauthorized');
+            }
+            const { requestId, milestone, transactionId } = req.body;
+            const result = await payment_service_js_1.default.completeMilestonePayment(req.user.id, requestId, milestone, transactionId);
+            (0, apiResponse_js_1.sendResponse)({
+                res,
+                statusCode: 200,
+                message: 'Payment recorded successfully! Download unlocked.',
+                data: result,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    /**
      * POST /api/v1/payments/webhook
      * Server-to-Server Razorpay Webhook receiver
      */

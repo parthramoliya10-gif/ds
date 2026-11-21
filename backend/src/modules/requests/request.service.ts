@@ -466,7 +466,11 @@ export class RequestService {
   /**
    * Admin-only: Update request status
    */
-  async updateStatus(adminId: string, requestId: string, status: RequestStatus) {
+  async updateStatus(
+    adminId: string,
+    requestId: string,
+    data: { status?: RequestStatus; isDownloadUnlocked?: boolean } | RequestStatus
+  ) {
     const existing = await prisma.documentRequest.findUnique({
       where: { id: requestId },
     });
@@ -475,9 +479,22 @@ export class RequestService {
       throw new ApiError(404, 'Document request not found.');
     }
 
+    const newStatus = typeof data === 'string' ? data : data.status;
+    let isDownloadUnlocked =
+      typeof data === 'object' && typeof data.isDownloadUnlocked === 'boolean'
+        ? data.isDownloadUnlocked
+        : existing.isDownloadUnlocked;
+
+    if (newStatus === RequestStatus.COMPLETED) {
+      isDownloadUnlocked = true;
+    }
+
     const updated = await prisma.documentRequest.update({
       where: { id: requestId },
-      data: { status },
+      data: {
+        ...(newStatus ? { status: newStatus } : {}),
+        isDownloadUnlocked,
+      },
     });
 
     // Record audit log
@@ -490,7 +507,7 @@ export class RequestService {
         action: 'REQUEST_STATUS_UPDATED',
         metadata: {
           previousStatus: existing.status,
-          newStatus: status,
+          newStatus: newStatus || existing.status,
         },
       },
     });

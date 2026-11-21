@@ -30,10 +30,13 @@ router.post(
   paymentController.verify
 );
 
-// 4. User's own payment history
+// 4. Record or complete milestone payment (for verified checkout & sandbox simulation)
+router.post('/complete', paymentController.completePayment);
+
+// 5. User's own payment history
 router.get('/my-history', paymentController.myHistory);
 
-// 5. Admin global payments list
+// 6. Admin global payments list
 router.get('/admin/all', requireAdmin, paymentController.adminList);
 
 export default router;

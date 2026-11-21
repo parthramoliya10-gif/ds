@@ -181,10 +181,15 @@ export const api = {
     getById: (id: string) => apiRequest(`/requests/${id}`, { method: "GET" }),
     create: (formData: FormData) =>
       apiRequest("/requests", { method: "POST", body: formData }),
-    updateStatus: (id: string, status: string) =>
+    updateStatus: (
+      id: string,
+      statusOrData: string | { status?: string; isDownloadUnlocked?: boolean }
+    ) =>
       apiRequest(`/requests/${id}/status`, {
         method: "PATCH",
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(
+          typeof statusOrData === "string" ? { status: statusOrData } : statusOrData
+        ),
       }),
     cancel: (id: string) => apiRequest(`/requests/${id}/cancel`, { method: "PATCH" }),
     delete: (id: string) => apiRequest(`/requests/${id}`, { method: "DELETE" }),
@@ -215,7 +220,7 @@ export const api = {
   payments: {
     createOrder: (data: {
       requestId: string;
-      quotationId: string;
+      quotationId?: string;
       milestone: "ADVANCE_50" | "FINAL_50";
     }) =>
       apiRequest("/payments/create-order", {
@@ -228,6 +233,15 @@ export const api = {
       razorpaySignature: string;
     }) =>
       apiRequest("/payments/verify", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    complete: (data: {
+      requestId: string;
+      milestone: "ADVANCE_50" | "FINAL_50";
+      transactionId?: string;
+    }) =>
+      apiRequest("/payments/complete", {
         method: "POST",
         body: JSON.stringify(data),
       }),

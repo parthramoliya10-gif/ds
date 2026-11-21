@@ -113,6 +113,30 @@ export declare class PaymentService {
         receiptUrl: string | null;
         paidAt: Date | null;
     })[]>;
+    /**
+     * Complete milestone payment & unlock documents (for sandbox, simulation, and client verification)
+     */
+    completeMilestonePayment(userId: string, requestId: string, milestone: PaymentMilestone | 'ADVANCE_50' | 'FINAL_50', transactionId?: string): Promise<{
+        payment: {
+            status: import(".prisma/client").$Enums.PaymentStatus;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            requestId: string;
+            userId: string;
+            currency: string;
+            quotationId: string;
+            milestone: import(".prisma/client").$Enums.PaymentMilestone;
+            amount: number;
+            razorpayOrderId: string;
+            razorpayPaymentId: string | null;
+            razorpaySignature: string | null;
+            receiptUrl: string | null;
+            paidAt: Date | null;
+        };
+        isDownloadUnlocked: boolean;
+        requestStatus: import(".prisma/client").$Enums.RequestStatus;
+    }>;
 }
 export declare const paymentService: PaymentService;
 export default paymentService;

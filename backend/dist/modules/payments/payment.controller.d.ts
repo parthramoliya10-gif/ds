@@ -11,6 +11,11 @@ export declare class PaymentController {
      */
     verify(req: Request, res: Response, next: NextFunction): Promise<void>;
     /**
+     * POST /api/v1/payments/complete
+     * Record or finalize milestone payment (for verified checkout & sandbox simulation)
+     */
+    completePayment(req: Request, res: Response, next: NextFunction): Promise<void>;
+    /**
      * POST /api/v1/payments/webhook
      * Server-to-Server Razorpay Webhook receiver
      */

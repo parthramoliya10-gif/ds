@@ -101,8 +101,11 @@ class RequestController {
                 throw new apiError_js_1.ApiError(401, 'Unauthorized');
             }
             const requestId = req.params.id;
-            const { status } = req.body;
-            const updated = await request_service_js_1.default.updateStatus(req.user.id, requestId, status);
+            const { status, isDownloadUnlocked } = req.body;
+            const updated = await request_service_js_1.default.updateStatus(req.user.id, requestId, {
+                status,
+                isDownloadUnlocked,
+            });
             (0, apiResponse_js_1.sendResponse)({
                 res,
                 statusCode: 200,

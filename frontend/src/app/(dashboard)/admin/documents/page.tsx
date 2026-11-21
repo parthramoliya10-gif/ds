@@ -310,36 +310,56 @@ export default function AdminDocumentsPage() {
     }
   };
 
-  const handleToggleStudentPayment = () => {
+  const handleToggleStudentPayment = async () => {
     if (!currentRequest) return;
     const nextState = !currentRequest.balancePaid;
-    setRequests((prev) =>
-      prev.map((r) =>
-        r.id === currentRequest.id
-          ? {
-              ...r,
-              balancePaid: nextState,
-              status: nextState ? "delivered" : "ready",
-            }
-          : r
-      )
-    );
 
-    // Update lock status for all versions of this request
-    setVersions((prev) => ({
-      ...prev,
-      [currentRequest.id]: (prev[currentRequest.id] || []).map((v) => ({
-        ...v,
-        isLocked: !nextState,
-      })),
-    }));
+    try {
+      await api.requests.updateStatus(currentRequest.id, {
+        status: nextState ? "COMPLETED" : "DOCUMENT_UPLOADED",
+        isDownloadUnlocked: nextState,
+      });
 
-    if (nextState) {
-      toast.success(
-        `Milestone payment of ${formatCurrencyINR(currentRequest.balanceAmount || 0)} marked as received! Document is now UNLOCKED for student.`
+      if (nextState) {
+        try {
+          await api.payments.complete({
+            requestId: currentRequest.id,
+            milestone: "FINAL_50",
+          });
+        } catch {}
+      }
+
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === currentRequest.id
+            ? {
+                ...r,
+                balancePaid: nextState,
+                isDownloadUnlocked: nextState,
+                status: nextState ? "delivered" : "ready",
+              }
+            : r
+        )
       );
-    } else {
-      toast.info(`Lock re-engaged: student download is now locked until payment.`);
+
+      // Update lock status for all versions of this request
+      setVersions((prev) => ({
+        ...prev,
+        [currentRequest.id]: (prev[currentRequest.id] || []).map((v) => ({
+          ...v,
+          isLocked: !nextState,
+        })),
+      }));
+
+      if (nextState) {
+        toast.success(
+          `Milestone payment of ${formatCurrencyINR(currentRequest.balanceAmount || 0)} marked as received! Document is now UNLOCKED for student.`
+        );
+      } else {
+        toast.info(`Lock re-engaged: student download is now locked until payment.`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update payment status");
     }
   };
 

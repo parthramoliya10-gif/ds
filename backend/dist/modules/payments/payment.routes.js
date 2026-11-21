@@ -18,9 +18,11 @@ router.use(auth_middleware_js_1.authenticate);
 router.post('/create-order', (0, validate_middleware_js_1.validateRequest)({ body: payment_validation_js_1.createOrderSchema }), payment_controller_js_1.default.createOrder);
 // 3. Verify payment signature after checkout
 router.post('/verify', (0, validate_middleware_js_1.validateRequest)({ body: payment_validation_js_1.verifyPaymentSchema }), payment_controller_js_1.default.verify);
-// 4. User's own payment history
+// 4. Record or complete milestone payment (for verified checkout & sandbox simulation)
+router.post('/complete', payment_controller_js_1.default.completePayment);
+// 5. User's own payment history
 router.get('/my-history', payment_controller_js_1.default.myHistory);
-// 5. Admin global payments list
+// 6. Admin global payments list
 router.get('/admin/all', rbac_middleware_js_1.requireAdmin, payment_controller_js_1.default.adminList);
 exports.default = router;
 //# sourceMappingURL=payment.routes.js.map

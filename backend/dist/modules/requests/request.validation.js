@@ -18,10 +18,13 @@ exports.createRequestSchema = zod_1.z.object({
     priority: zod_1.z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).default('NORMAL'),
 });
 exports.updateRequestStatusSchema = zod_1.z.object({
-    status: zod_1.z.nativeEnum(client_1.RequestStatus, {
+    status: zod_1.z
+        .nativeEnum(client_1.RequestStatus, {
         errorMap: () => ({
             message: 'Invalid status. Allowed values: PENDING, QUOTED, IN_PROGRESS, DOCUMENT_UPLOADED, COMPLETED, CANCELLED',
         }),
-    }),
+    })
+        .optional(),
+    isDownloadUnlocked: zod_1.z.boolean().optional(),
 });
 //# sourceMappingURL=request.validation.js.map

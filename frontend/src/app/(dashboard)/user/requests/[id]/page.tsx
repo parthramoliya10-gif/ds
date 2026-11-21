@@ -390,6 +390,7 @@ export default function UserRequestDetailPage() {
         amount={balanceAmount}
         title={request.title}
         milestoneType="remaining"
+        requestId={request.id}
         onSuccess={handlePaymentSuccess}
       />
 

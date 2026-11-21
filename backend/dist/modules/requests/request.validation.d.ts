@@ -16,16 +16,19 @@ export declare const createRequestSchema: z.ZodObject<{
     priority?: "NORMAL" | "LOW" | "HIGH" | "URGENT" | undefined;
 }>;
 export declare const updateRequestStatusSchema: z.ZodObject<{
-    status: z.ZodNativeEnum<{
+    status: z.ZodOptional<z.ZodNativeEnum<{
         PENDING: "PENDING";
         QUOTED: "QUOTED";
         IN_PROGRESS: "IN_PROGRESS";
         DOCUMENT_UPLOADED: "DOCUMENT_UPLOADED";
         COMPLETED: "COMPLETED";
         CANCELLED: "CANCELLED";
-    }>;
+    }>>;
+    isDownloadUnlocked: z.ZodOptional<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
-    status: "PENDING" | "QUOTED" | "IN_PROGRESS" | "DOCUMENT_UPLOADED" | "COMPLETED" | "CANCELLED";
+    status?: "PENDING" | "QUOTED" | "IN_PROGRESS" | "DOCUMENT_UPLOADED" | "COMPLETED" | "CANCELLED" | undefined;
+    isDownloadUnlocked?: boolean | undefined;
 }, {
-    status: "PENDING" | "QUOTED" | "IN_PROGRESS" | "DOCUMENT_UPLOADED" | "COMPLETED" | "CANCELLED";
+    status?: "PENDING" | "QUOTED" | "IN_PROGRESS" | "DOCUMENT_UPLOADED" | "COMPLETED" | "CANCELLED" | undefined;
+    isDownloadUnlocked?: boolean | undefined;
 }>;

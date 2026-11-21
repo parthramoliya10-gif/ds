@@ -51,6 +51,35 @@ export class PaymentController {
   }
 
   /**
+   * POST /api/v1/payments/complete
+   * Record or finalize milestone payment (for verified checkout & sandbox simulation)
+   */
+  async completePayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new ApiError(401, 'Unauthorized');
+      }
+
+      const { requestId, milestone, transactionId } = req.body;
+      const result = await paymentService.completeMilestonePayment(
+        req.user.id,
+        requestId,
+        milestone,
+        transactionId
+      );
+
+      sendResponse({
+        res,
+        statusCode: 200,
+        message: 'Payment recorded successfully! Download unlocked.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * POST /api/v1/payments/webhook
    * Server-to-Server Razorpay Webhook receiver
    */
