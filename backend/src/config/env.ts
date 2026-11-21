@@ -35,6 +35,9 @@ const envSchema = z.object({
 
   RESEND_API_KEY: z.string().optional().default(''),
   RESEND_FROM_EMAIL: z.string().optional().default(''),
+
+  ADMIN_EMAIL: z.string().optional().default('admin@dsms.internal'),
+  ADMIN_PASSWORD: z.string().optional().default('Admin@12345'),
 });
 
 const parseEnv = () => {
