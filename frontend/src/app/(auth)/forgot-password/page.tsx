@@ -17,6 +17,7 @@ import api from "@/lib/api/client";
 const forgotSchema = z.object({
   email: z
     .string()
+    .trim()
     .min(1, "Mail ID is required")
     .email("Please enter a valid email address"),
 });
@@ -74,7 +75,7 @@ export default function ForgotPasswordPage() {
             <Input
               id="email"
               type="email"
-              placeholder="Enter Mail ID"
+              placeholder="name@example.com"
               {...register("email")}
               className={errors.email ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.email)}

@@ -19,10 +19,12 @@ import { toast } from "sonner";
 const loginSchema = z.object({
   email: z
     .string()
+    .trim()
     .min(1, "Mail ID is required")
     .email("Please enter a valid email address"),
   password: z
     .string()
+    .min(1, "Password is required")
     .min(6, "Password must be at least 6 characters"),
   rememberMe: z.boolean().default(false),
 });
@@ -94,7 +96,7 @@ export default function LoginPage() {
             <Input
               id="email"
               type="email"
-              placeholder="Enter Mail ID"
+              placeholder="name@example.com"
               {...register("email")}
               className={errors.email ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.email)}

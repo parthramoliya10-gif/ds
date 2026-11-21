@@ -20,15 +20,24 @@ import { toast } from "sonner";
 
 const registerSchema = z
   .object({
-    name: z.string().min(2, "Full name must be at least 2 characters"),
+    name: z
+      .string()
+      .trim()
+      .min(1, "Full name is required")
+      .min(2, "Full name must be at least 2 characters")
+      .max(50, "Full name must not exceed 50 characters"),
     email: z
       .string()
+      .trim()
       .min(1, "Mail ID is required")
       .email("Please enter a valid email address"),
     password: z
       .string()
-      .min(8, "Password must be at least 8 characters long")
-      .regex(/[0-9]/, "Password must contain at least one number"),
+      .min(1, "Password is required")
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[A-Z]/, "Password must contain at least one capital letter (A-Z)")
+      .regex(/[0-9]/, "Password must contain at least one number (0-9)")
+      .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character (e.g. !@#$%)"),
     confirmPassword: z.string().min(1, "Please confirm your password"),
     terms: z.boolean().refine((val) => val === true, {
       message: "You must accept the terms of service and organization guidelines",
@@ -63,10 +72,21 @@ export default function RegisterPage() {
     },
   });
 
-  const passwordValue = watch("password");
+  const passwordValue = watch("password") || "";
   const termsValue = watch("terms");
 
+  const hasLength = passwordValue.length >= 8;
+  const hasUpper = /[A-Z]/.test(passwordValue);
+  const hasNumber = /[0-9]/.test(passwordValue);
+  const hasSpecial = /[^A-Za-z0-9]/.test(passwordValue);
+  const isPasswordCriteriaMet = hasLength && hasUpper && hasNumber && hasSpecial;
+
   const onSubmit = async (data: RegisterFormValues) => {
+    if (!isPasswordCriteriaMet) {
+      toast.error("Please fulfill all password requirements before proceeding.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       await registerUser({
@@ -114,7 +134,7 @@ export default function RegisterPage() {
             </Label>
             <Input
               id="name"
-              placeholder="Enter your full name"
+              placeholder="Enter your name"
               {...register("name")}
               className={errors.name ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.name)}
@@ -134,7 +154,7 @@ export default function RegisterPage() {
             <Input
               id="email"
               type="email"
-              placeholder="Enter Mail ID"
+              placeholder="name@example.com"
               {...register("email")}
               className={errors.email ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.email)}
@@ -153,13 +173,13 @@ export default function RegisterPage() {
             </Label>
             <PasswordInput
               id="password"
-              placeholder="Minimum 8 characters with number"
+              placeholder="Min. 8 chars (capital, number, symbol)"
               {...register("password")}
               className={errors.password ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.password)}
             />
-            {/* Live 4-Bar Strength Meter */}
-            <PasswordStrengthMeter password={passwordValue} />
+            {/* Live 4-Bar Strength Meter with requirements */}
+            <PasswordStrengthMeter password={passwordValue} showRequirements />
             {errors.password && (
               <p className="text-[12px] font-medium text-foreground">
                 {errors.password.message}
@@ -217,7 +237,7 @@ export default function RegisterPage() {
           <Button
             type="submit"
             className="w-full h-10 font-medium text-[14px]"
-            disabled={submitting}
+            disabled={submitting || !isPasswordCriteriaMet}
           >
             {submitting ? (
               <span className="flex items-center">
