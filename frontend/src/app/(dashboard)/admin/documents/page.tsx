@@ -9,14 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -25,10 +25,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Request, FinalDocument } from "@/types";
+import { Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
-import { formatCurrencyINR, formatDate } from "@/lib/utils";
+import { formatCurrencyINR, formatDate, isDeadlineUrgent } from "@/lib/utils";
 import { downloadFile } from "@/lib/download";
 import {
   FileText,
@@ -39,11 +39,17 @@ import {
   Download,
   Eye,
   Trash2,
-  AlertCircle,
   ShieldCheck,
   UploadCloud,
-  Check,
   RefreshCw,
+  ArrowLeft,
+  Search,
+  FolderOpen,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Layers,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -61,25 +67,41 @@ interface DocumentVersion {
 }
 
 export default function AdminDocumentsPage() {
-  const [selectedRequestId, setSelectedRequestId] = React.useState<string>("");
   const [requests, setRequests] = React.useState<Request[]>([]);
   const [versions, setVersions] = React.useState<Record<string, DocumentVersion[]>>({});
+  const [selectedRequestId, setSelectedRequestId] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
 
-  // Selected request
-  const currentRequest =
-    requests.find((r) => r.id === selectedRequestId) || requests[0] || null;
+  // Search & Filter state for requests directory
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState<"all" | "needs_upload" | "ready" | "delivered">("all");
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const pageSize = 10;
 
+  // Upload Form State
+  const [uploadedFiles, setUploadedFiles] = React.useState<FileItem[]>([]);
+  const [versionTag, setVersionTag] = React.useState("v1.0");
+  const [versionNote, setVersionNote] = React.useState("");
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [previewDoc, setPreviewDoc] = React.useState<DocumentVersion | null>(null);
+
+  // Selected request (if any)
+  const currentRequest = React.useMemo(() => {
+    if (!selectedRequestId) return null;
+    return requests.find((r) => r.id === selectedRequestId) || null;
+  }, [requests, selectedRequestId]);
+
+  // Initial load: fetch all requests and their final documents
   React.useEffect(() => {
     let mounted = true;
     async function loadAdminDocs() {
+      setIsLoading(true);
       try {
-        const res = await api.requests.list({ limit: 50 });
+        const res = await api.requests.list({ limit: 100 });
         if (mounted && res && Array.isArray(res.requests)) {
           const adapted = res.requests.map(adaptRequestToFrontend);
           setRequests(adapted);
-          if (adapted.length > 0) {
-            setSelectedRequestId(adapted[0].id);
-          }
+
           const versionsMap: Record<string, DocumentVersion[]> = {};
           res.requests.forEach((r: any) => {
             if (r.finalDocuments && r.finalDocuments.length > 0) {
@@ -89,7 +111,7 @@ export default function AdminDocumentsPage() {
                 versionTag: `v${fd.version || r.finalDocuments.length - idx}.0`,
                 fileName: fd.fileName || `${r.title}.pdf`,
                 fileSize: fd.fileSize ? `${(fd.fileSize / (1024 * 1024)).toFixed(1)} MB` : "2.5 MB",
-                pageCount: fd.pageCount || 20,
+                pageCount: fd.pageCount || r.pages || 20,
                 uploadedAt: fd.uploadedAt || fd.createdAt || new Date().toISOString(),
                 versionNote: fd.title || fd.notes || "Final verified deliverable",
                 isLocked: !Boolean(r.isDownloadUnlocked),
@@ -98,9 +120,20 @@ export default function AdminDocumentsPage() {
             }
           });
           setVersions(versionsMap);
+
+          // Check if URL query param has requestId
+          if (typeof window !== "undefined") {
+            const urlParams = new URLSearchParams(window.location.search);
+            const reqId = urlParams.get("requestId");
+            if (reqId && adapted.some((r: Request) => r.id === reqId)) {
+              setSelectedRequestId(reqId);
+            }
+          }
         }
       } catch (err) {
         console.warn("Could not load requests for documents:", err);
+      } finally {
+        if (mounted) setIsLoading(false);
       }
     }
     loadAdminDocs();
@@ -109,32 +142,29 @@ export default function AdminDocumentsPage() {
     };
   }, []);
 
-  // Upload Form State
-  const [uploadedFiles, setUploadedFiles] = React.useState<FileItem[]>([]);
-  const [versionTag, setVersionTag] = React.useState("v1.2");
-  const [versionNote, setVersionNote] = React.useState("");
-  const [isUploading, setIsUploading] = React.useState(false);
-  const [previewDoc, setPreviewDoc] = React.useState<DocumentVersion | null>(null);
-
-  const currentVersions = versions[selectedRequestId] || [];
-  const balanceDue = currentRequest?.balanceAmount || 0;
-  const isUnlocked = Boolean(currentRequest?.balancePaid || currentRequest?.isDownloadUnlocked);
-
   // Sync documents from backend whenever selectedRequestId changes
   React.useEffect(() => {
     if (!selectedRequestId) return;
     let mounted = true;
+    const req = requests.find((r) => r.id === selectedRequestId);
+    const isUnlocked = Boolean(req?.balancePaid || req?.isDownloadUnlocked);
+
+    // Auto-suggest next version tag
+    const existing = versions[selectedRequestId] || [];
+    const nextVer = existing.length > 0 ? `v${existing.length + 1}.0` : "v1.0";
+    setVersionTag(nextVer);
+
     async function loadRequestDocuments() {
       try {
-        const docs = await api.documents.getByRequest(selectedRequestId);
+        const docs = await api.documents.getByRequest(selectedRequestId!);
         if (mounted && Array.isArray(docs)) {
           const mapped: DocumentVersion[] = docs.map((fd: any, idx: number) => ({
             id: fd.id,
-            requestId: selectedRequestId,
+            requestId: selectedRequestId!,
             versionTag: `v${fd.version || docs.length - idx}.0`,
             fileName: fd.fileName || "Deliverable.pdf",
             fileSize: fd.fileSize ? `${(fd.fileSize / (1024 * 1024)).toFixed(1)} MB` : "1.0 MB",
-            pageCount: currentRequest?.pages || 10,
+            pageCount: req?.pages || 10,
             uploadedAt: fd.createdAt || new Date().toISOString(),
             versionNote: fd.title || "Final deliverable file",
             isLocked: !isUnlocked,
@@ -142,8 +172,9 @@ export default function AdminDocumentsPage() {
           }));
           setVersions((prev) => ({
             ...prev,
-            [selectedRequestId]: mapped,
+            [selectedRequestId!]: mapped,
           }));
+          setVersionTag(`v${mapped.length + 1}.0`);
         }
       } catch (err) {
         console.warn("Could not load documents for request:", err);
@@ -153,10 +184,29 @@ export default function AdminDocumentsPage() {
     return () => {
       mounted = false;
     };
-  }, [selectedRequestId, isUnlocked, currentRequest?.pages]);
+  }, [selectedRequestId, requests]);
 
+  // Handle selecting a request and update browser URL search params cleanly
+  const handleSelectRequest = (id: string | null) => {
+    setSelectedRequestId(id);
+    setUploadedFiles([]);
+    setVersionNote("");
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (id) {
+        url.searchParams.set("requestId", id);
+      } else {
+        url.searchParams.delete("requestId");
+      }
+      window.history.pushState({}, "", url.toString());
+    }
+  };
+
+  // Upload handler for current selected request
   const handleUploadDeliverable = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedRequestId || !currentRequest) return;
+
     if (uploadedFiles.length === 0) {
       toast.error("Please drag or select a deliverable file first.");
       return;
@@ -167,13 +217,11 @@ export default function AdminDocumentsPage() {
       return;
     }
 
-    if (!currentRequest) return;
-
     setIsUploading(true);
     const fileItem = uploadedFiles[0];
 
     try {
-      if (fileItem.file && selectedRequestId) {
+      if (fileItem.file) {
         const formData = new FormData();
         formData.append("document", fileItem.file);
         formData.append("title", `${currentRequest.title} - ${versionTag}`);
@@ -183,6 +231,7 @@ export default function AdminDocumentsPage() {
         // Refresh documents from backend
         const docsRes = await api.documents.getByRequest(selectedRequestId);
         if (docsRes && Array.isArray(docsRes)) {
+          const isUnlocked = Boolean(currentRequest.balancePaid || currentRequest.isDownloadUnlocked);
           const mapped: DocumentVersion[] = docsRes.map((fd: any, idx: number) => ({
             id: fd.id,
             requestId: selectedRequestId,
@@ -199,9 +248,10 @@ export default function AdminDocumentsPage() {
             ...prev,
             [selectedRequestId]: mapped,
           }));
+          setVersionTag(`v${mapped.length + 1}.0`);
         }
 
-        // Update current request status to ready / document_uploaded in UI
+        // Update request status to ready in UI
         setRequests((prev) =>
           prev.map((r) =>
             r.id === selectedRequestId ? { ...r, status: "ready" } : r
@@ -221,14 +271,14 @@ export default function AdminDocumentsPage() {
   const handleMarkAsReady = async () => {
     if (!currentRequest) return;
     try {
-      await api.requests.updateStatus(selectedRequestId, "DOCUMENT_UPLOADED");
+      await api.requests.updateStatus(currentRequest.id, "DOCUMENT_UPLOADED");
       setRequests((prev) =>
         prev.map((r) =>
-          r.id === selectedRequestId ? { ...r, status: "ready" } : r
+          r.id === currentRequest.id ? { ...r, status: "ready" } : r
         )
       );
       toast.success(
-        `Request ${selectedRequestId.slice(0, 8)}... marked as READY. Student ${currentRequest.studentName} has been notified to complete the 50% milestone balance.`
+        `Request ${currentRequest.id} marked as READY. Student ${currentRequest.studentName} has been notified to complete milestone balance.`
       );
     } catch (err: any) {
       toast.error(err.message || "Failed to update status");
@@ -267,7 +317,7 @@ export default function AdminDocumentsPage() {
     const nextState = !currentRequest.balancePaid;
     setRequests((prev) =>
       prev.map((r) =>
-        r.id === selectedRequestId
+        r.id === currentRequest.id
           ? {
               ...r,
               balancePaid: nextState,
@@ -280,7 +330,7 @@ export default function AdminDocumentsPage() {
     // Update lock status for all versions of this request
     setVersions((prev) => ({
       ...prev,
-      [selectedRequestId]: (prev[selectedRequestId] || []).map((v) => ({
+      [currentRequest.id]: (prev[currentRequest.id] || []).map((v) => ({
         ...v,
         isLocked: !nextState,
       })),
@@ -288,7 +338,7 @@ export default function AdminDocumentsPage() {
 
     if (nextState) {
       toast.success(
-        `Milestone payment of ${formatCurrencyINR(balanceDue)} marked as received! Document is now UNLOCKED for student.`
+        `Milestone payment of ${formatCurrencyINR(currentRequest.balanceAmount || 0)} marked as received! Document is now UNLOCKED for student.`
       );
     } else {
       toast.info(`Lock re-engaged: student download is now locked until payment.`);
@@ -296,6 +346,7 @@ export default function AdminDocumentsPage() {
   };
 
   const handleDeleteVersion = async (versionId: string) => {
+    if (!selectedRequestId) return;
     try {
       await api.documents.delete(versionId);
       setVersions((prev) => ({
@@ -310,71 +361,444 @@ export default function AdminDocumentsPage() {
     }
   };
 
-  if (requests.length === 0 || !currentRequest) {
+  // Filter and search logic for the requests directory
+  const filteredRequests = React.useMemo(() => {
+    return requests.filter((r) => {
+      const rVersions = versions[r.id] || [];
+      const hasDoc = rVersions.length > 0;
+      const isDeliveredOrUnlocked = Boolean(r.balancePaid || r.isDownloadUnlocked || r.status === "delivered" || r.status === "completed");
+
+      // Status Filter
+      if (statusFilter === "needs_upload" && hasDoc) return false;
+      if (statusFilter === "ready" && (!hasDoc || isDeliveredOrUnlocked)) return false;
+      if (statusFilter === "delivered" && !isDeliveredOrUnlocked) return false;
+
+      // Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchId = (r.id || "").toLowerCase().includes(q);
+        const matchTitle = (r.title || "").toLowerCase().includes(q);
+        const matchStudent = (r.studentName || "").toLowerCase().includes(q);
+        const matchSubject = (r.subject || "").toLowerCase().includes(q);
+        const matchCollege = (r.college || "").toLowerCase().includes(q);
+        return matchId || matchTitle || matchStudent || matchSubject || matchCollege;
+      }
+
+      return true;
+    });
+  }, [requests, versions, statusFilter, searchQuery]);
+
+  // Overall statistics for directory summary cards
+  const stats = React.useMemo(() => {
+    const total = requests.length;
+    let needsUpload = 0;
+    let readyForPayment = 0;
+    let delivered = 0;
+
+    requests.forEach((r) => {
+      const hasDoc = (versions[r.id] || []).length > 0;
+      const isDelivered = Boolean(r.balancePaid || r.isDownloadUnlocked || r.status === "delivered" || r.status === "completed");
+      if (isDelivered) {
+        delivered++;
+      } else if (hasDoc) {
+        readyForPayment++;
+      } else {
+        needsUpload++;
+      }
+    });
+
+    return { total, needsUpload, readyForPayment, delivered };
+  }, [requests, versions]);
+
+  // Pagination calculation
+  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
+  const paginatedRequests = React.useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredRequests.slice(start, start + pageSize);
+  }, [filteredRequests, currentPage, pageSize]);
+
+  // Reset page when filter or search changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter]);
+
+  // =========================================================================
+  // VIEW MODE A: ALL REQUESTS DIRECTORY (Default view when no request is selected)
+  // =========================================================================
+  if (!selectedRequestId || !currentRequest) {
     return (
       <div className="space-y-6 max-w-7xl mx-auto pb-12">
         <PageHeader
           title="Deliverables & Document Management"
-          description="Upload completed student academic tasks, manage revision versioning, toggle readiness status, and verify 50-50 milestone unlock protection."
+          description="Browse student academic requests, track deliverable completion status, and upload final verified task files."
         />
-        <EmptyState
-          icon={<FileText className="h-8 w-8 stroke-[1.5]" />}
-          title="No Active Requests"
-          description="There are currently no task requests to manage deliverables for."
-        />
+
+        {/* Metric Summary Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="rounded-[8px] border border-border bg-background p-4 shadow-none">
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">
+                Total Requests
+              </span>
+              <Layers className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="mt-2 text-2xl font-bold font-mono text-foreground">{stats.total}</div>
+            <p className="text-[11px] text-muted-foreground mt-1">Across all registered students</p>
+          </Card>
+
+          <Card
+            className={`rounded-[8px] border bg-background p-4 shadow-none cursor-pointer transition-all ${
+              statusFilter === "needs_upload" ? "border-amber-500 ring-1 ring-amber-500/20" : "border-border hover:border-amber-500/50"
+            }`}
+            onClick={() => setStatusFilter(statusFilter === "needs_upload" ? "all" : "needs_upload")}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+                Needs Deliverable
+              </span>
+              <Clock className="h-4 w-4 text-amber-500" />
+            </div>
+            <div className="mt-2 text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">{stats.needsUpload}</div>
+            <p className="text-[11px] text-muted-foreground mt-1">Awaiting solution file upload</p>
+          </Card>
+
+          <Card
+            className={`rounded-[8px] border bg-background p-4 shadow-none cursor-pointer transition-all ${
+              statusFilter === "ready" ? "border-blue-500 ring-1 ring-blue-500/20" : "border-border hover:border-blue-500/50"
+            }`}
+            onClick={() => setStatusFilter(statusFilter === "ready" ? "all" : "ready")}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                Ready for Milestone
+              </span>
+              <Lock className="h-4 w-4 text-blue-500" />
+            </div>
+            <div className="mt-2 text-2xl font-bold font-mono text-blue-600 dark:text-blue-400">{stats.readyForPayment}</div>
+            <p className="text-[11px] text-muted-foreground mt-1">Uploaded & locked until 50% balance</p>
+          </Card>
+
+          <Card
+            className={`rounded-[8px] border bg-background p-4 shadow-none cursor-pointer transition-all ${
+              statusFilter === "delivered" ? "border-emerald-500 ring-1 ring-emerald-500/20" : "border-border hover:border-emerald-500/50"
+            }`}
+            onClick={() => setStatusFilter(statusFilter === "delivered" ? "all" : "delivered")}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                Delivered / Unlocked
+              </span>
+              <Unlock className="h-4 w-4 text-emerald-500" />
+            </div>
+            <div className="mt-2 text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">{stats.delivered}</div>
+            <p className="text-[11px] text-muted-foreground mt-1">Full milestone cleared & downloaded</p>
+          </Card>
+        </div>
+
+        {/* Search, Filter Bar and Table */}
+        <Card className="rounded-[8px] border border-border bg-background shadow-none">
+          <CardHeader className="pb-3 border-b border-border">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-[16px] font-semibold text-foreground">
+                  Task Requests Directory
+                </CardTitle>
+                <CardDescription className="text-[13px] text-muted-foreground">
+                  Select any task below to upload deliverable files or manage existing versions.
+                </CardDescription>
+              </div>
+
+              {/* Status Filter Buttons */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Button
+                  size="sm"
+                  variant={statusFilter === "all" ? "default" : "outline"}
+                  onClick={() => setStatusFilter("all")}
+                  className="h-8 text-[12px]"
+                >
+                  All ({stats.total})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={statusFilter === "needs_upload" ? "default" : "outline"}
+                  onClick={() => setStatusFilter("needs_upload")}
+                  className="h-8 text-[12px]"
+                >
+                  Needs Upload ({stats.needsUpload})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={statusFilter === "ready" ? "default" : "outline"}
+                  onClick={() => setStatusFilter("ready")}
+                  className="h-8 text-[12px]"
+                >
+                  Ready ({stats.readyForPayment})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={statusFilter === "delivered" ? "default" : "outline"}
+                  onClick={() => setStatusFilter("delivered")}
+                  className="h-8 text-[12px]"
+                >
+                  Delivered ({stats.delivered})
+                </Button>
+              </div>
+            </div>
+
+            {/* Instant Search Bar */}
+            <div className="pt-3">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by Request ID, Student name, Task title, Subject..."
+                  className="pl-9 h-9 text-[13px] bg-background border-border"
+                />
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="p-12 text-center text-muted-foreground text-[13px] flex items-center justify-center space-x-2">
+                <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+                <span>Loading requests directory...</span>
+              </div>
+            ) : filteredRequests.length === 0 ? (
+              <div className="p-12 text-center">
+                <EmptyState
+                  icon={<FileText className="h-8 w-8 stroke-[1.5]" />}
+                  title="No Matching Requests Found"
+                  description={
+                    searchQuery
+                      ? `No requests matched "${searchQuery}". Try adjusting your search query.`
+                      : "There are currently no task requests matching the selected filter."
+                  }
+                />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-border bg-surface/50">
+                      <TableHead className="text-[12px] font-semibold text-muted-foreground uppercase w-28">Req ID</TableHead>
+                      <TableHead className="text-[12px] font-semibold text-muted-foreground uppercase">Student</TableHead>
+                      <TableHead className="text-[12px] font-semibold text-muted-foreground uppercase">Task & Subject</TableHead>
+                      <TableHead className="text-[12px] font-semibold text-muted-foreground uppercase">Deliverables</TableHead>
+                      <TableHead className="text-[12px] font-semibold text-muted-foreground uppercase">Milestone 2</TableHead>
+                      <TableHead className="text-[12px] font-semibold text-muted-foreground uppercase">Deadline</TableHead>
+                      <TableHead className="text-[12px] font-semibold text-muted-foreground uppercase text-right w-44">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedRequests.map((req) => {
+                      const reqVersions = versions[req.id] || [];
+                      const hasDeliverable = reqVersions.length > 0;
+                      const isUnlocked = Boolean(req.balancePaid || req.isDownloadUnlocked);
+                      const balanceDue = req.balanceAmount || 0;
+                      const urgent = req.urgent || isDeadlineUrgent(req.deadline);
+
+                      return (
+                        <TableRow
+                          key={req.id}
+                          onClick={() => handleSelectRequest(req.id)}
+                          className="border-b border-border hover:bg-surface/80 cursor-pointer transition-colors"
+                        >
+                          {/* Request ID */}
+                          <TableCell className="font-mono text-[12px] font-semibold text-foreground">
+                            {req.id}
+                          </TableCell>
+
+                          {/* Student Info */}
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-foreground text-[13px]">
+                                {req.studentName}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground">
+                                {req.college} • Sem {req.semester}
+                              </span>
+                            </div>
+                          </TableCell>
+
+                          {/* Task & Subject */}
+                          <TableCell>
+                            <div className="flex flex-col max-w-sm">
+                              <span className="font-semibold text-foreground line-clamp-1 text-[13px]">
+                                {req.title}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground">
+                                {req.subject} • {req.pages} pages • {req.format}
+                              </span>
+                            </div>
+                          </TableCell>
+
+                          {/* Deliverable Status */}
+                          <TableCell>
+                            {hasDeliverable ? (
+                              <div className="flex items-center space-x-1.5">
+                                <Badge variant="outline" className="text-[11px] font-mono bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  {reqVersions[0].versionTag} ({reqVersions.length} ver)
+                                </Badge>
+                              </div>
+                            ) : (
+                              <Badge variant="outline" className="text-[11px] bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border-amber-300 dark:border-amber-800">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Needs Deliverable
+                              </Badge>
+                            )}
+                          </TableCell>
+
+                          {/* Milestone 2 Escrow */}
+                          <TableCell>
+                            {isUnlocked ? (
+                              <div className="flex items-center space-x-1 text-emerald-600 dark:text-emerald-400 text-[12px] font-semibold">
+                                <Unlock className="h-3.5 w-3.5" />
+                                <span>Unlocked</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col">
+                                <span className="font-mono text-[12px] font-semibold text-foreground">
+                                  {balanceDue > 0 ? formatCurrencyINR(balanceDue) : "Pending"}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground flex items-center">
+                                  <Lock className="h-2.5 w-2.5 mr-0.5" /> Locked
+                                </span>
+                              </div>
+                            )}
+                          </TableCell>
+
+                          {/* Deadline */}
+                          <TableCell>
+                            <div className="flex items-center space-x-1.5 whitespace-nowrap">
+                              <span className="text-[12px] text-muted-foreground">
+                                {formatDate(req.deadline)}
+                              </span>
+                              {urgent && (
+                                <StatusBadge status="urgent" label="Urgent" className="text-[10px] py-0 px-1.5 h-4" />
+                              )}
+                            </div>
+                          </TableCell>
+
+                          {/* Action Button */}
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                            {hasDeliverable ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleSelectRequest(req.id)}
+                                className="h-8 text-[12px] border-border font-medium"
+                              >
+                                <FolderOpen className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
+                                Manage ({reqVersions.length})
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={() => handleSelectRequest(req.id)}
+                                className="h-8 text-[12px] font-semibold"
+                              >
+                                <UploadCloud className="h-3.5 w-3.5 mr-1" />
+                                Upload File
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-border text-[12px] text-muted-foreground">
+                <span>
+                  Showing page {currentPage} of {totalPages} ({filteredRequests.length} total tasks)
+                </span>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 px-2.5 border-border"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" /> Prev
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 px-2.5 border-border"
+                  >
+                    Next <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
+  // =========================================================================
+  // VIEW MODE B: SPECIFIC REQUEST DELIVERABLES WORKSPACE
+  // =========================================================================
+  const currentVersions = versions[selectedRequestId] || [];
+  const balanceDue = currentRequest.balanceAmount || 0;
+  const isUnlocked = Boolean(currentRequest.balancePaid || currentRequest.isDownloadUnlocked);
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* Header */}
-      <PageHeader
-        title="Deliverables & Document Management"
-        description="Upload completed student academic tasks, manage revision versioning, toggle readiness status, and verify 50-50 milestone unlock protection."
-      />
+      {/* Top Navigation & Request Header Banner */}
+      <div className="space-y-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleSelectRequest(null)}
+          className="h-8 text-[12px] border-border text-foreground hover:bg-surface"
+        >
+          <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+          Back to All Requests
+        </Button>
 
-      {/* Request Selector Header */}
-      <Card className="rounded-[8px] border border-border bg-background shadow-none p-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex-1 space-y-1.5">
-            <Label className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Select Student Task / Request
-            </Label>
-            <Select
-              value={selectedRequestId}
-              onValueChange={(val) => {
-                setSelectedRequestId(val);
-                setUploadedFiles([]);
-              }}
-            >
-              <SelectTrigger className="h-10 text-[14px] bg-background border-border">
-                <SelectValue placeholder="Choose task to manage" />
-              </SelectTrigger>
-              <SelectContent className="border-border bg-background">
-                {requests.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.id} — {r.studentName} ({r.title})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center space-x-3 pt-2 md:pt-4">
-            <div className="text-right">
-              <span className="text-[11px] text-muted-foreground block">Current Status</span>
-              <StatusBadge status={currentRequest.status} />
+        <Card className="rounded-[8px] border border-border bg-background shadow-none p-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <Badge variant="outline" className="font-mono text-[12px] font-bold">
+                  {currentRequest.id}
+                </Badge>
+                <h2 className="text-[16px] font-bold text-foreground">
+                  {currentRequest.title}
+                </h2>
+              </div>
+              <p className="text-[13px] text-muted-foreground">
+                Student: <strong className="text-foreground">{currentRequest.studentName}</strong> • {currentRequest.college} • {currentRequest.subject} ({currentRequest.pages} pages, {currentRequest.format})
+              </p>
             </div>
-            <div className="text-right border-l border-border pl-3">
-              <span className="text-[11px] text-muted-foreground block">Deadline</span>
-              <span className="text-[13px] font-medium text-foreground">
-                {formatDate(currentRequest.deadline)}
-              </span>
+
+            <div className="flex items-center space-x-4">
+              <div className="text-right">
+                <span className="text-[11px] text-muted-foreground block">Current Status</span>
+                <StatusBadge status={currentRequest.status} />
+              </div>
+              <div className="text-right border-l border-border pl-4">
+                <span className="text-[11px] text-muted-foreground block">Deadline</span>
+                <span className="text-[13px] font-medium text-foreground">
+                  {formatDate(currentRequest.deadline)}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       {/* Main 2-Column Section: Upload Deliverable (Left) & Milestone Release Controller (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -416,7 +840,7 @@ export default function AdminDocumentsPage() {
                       id="versionTag"
                       value={versionTag}
                       onChange={(e) => setVersionTag(e.target.value)}
-                      placeholder="e.g. v1.0, v1.1"
+                      placeholder="e.g. v1.0, v2.0"
                       className="h-9 text-[13px] font-mono"
                       required
                     />
@@ -438,7 +862,7 @@ export default function AdminDocumentsPage() {
 
                 <div className="flex items-center justify-between pt-2 border-t border-border">
                   <span className="text-[12px] text-muted-foreground">
-                    Task: <strong className="text-foreground">{currentRequest.title}</strong>
+                    Target: <strong className="text-foreground">{currentRequest.title}</strong>
                   </span>
                   <Button
                     type="submit"
@@ -502,9 +926,9 @@ export default function AdminDocumentsPage() {
                   )}
                   <p className="text-[12px] leading-relaxed text-foreground">
                     {isUnlocked
-                      ? `Student ${currentRequest.studentName} has cleared the remaining milestone via Razorpay. Full file download is unlocked.`
+                      ? `Student ${currentRequest.studentName} has cleared the remaining milestone. Full file download is unlocked.`
                       : balanceDue > 0
-                      ? `Download is locked and encrypted. Student sees a blurred preview and 'Pay ${formatCurrencyINR(balanceDue)} to unlock' button.`
+                      ? `Download is locked. Student sees a blurred preview and 'Pay ${formatCurrencyINR(balanceDue)} to unlock' button.`
                       : `Awaiting quotation dispatch. Once quotation is accepted and advance is paid, milestone escrow tracking activates.`}
                   </p>
                 </div>
