@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
-import { formatDate, isDeadlineUrgent } from "@/lib/utils";
+import { formatDate, isDeadlineUrgent, formatShortId } from "@/lib/utils";
 import { Plus, MessageSquare, Eye, FileText, Search, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { toast } from "sonner";
@@ -91,7 +91,7 @@ export default function UserRequestsListPage() {
           href={`/user/requests/${req.id}`}
           className="hover:underline font-mono font-medium text-foreground"
         >
-          {req.id}
+          {formatShortId(req.id, "REQ")}
         </Link>
       ),
     },

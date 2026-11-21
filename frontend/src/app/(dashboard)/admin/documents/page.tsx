@@ -28,7 +28,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
-import { formatCurrencyINR, formatDate, isDeadlineUrgent } from "@/lib/utils";
+import { formatCurrencyINR, formatDate, formatShortId, isDeadlineUrgent } from "@/lib/utils";
 import { downloadFile } from "@/lib/download";
 import {
   FileText,
@@ -47,9 +47,7 @@ import {
   FolderOpen,
   ChevronLeft,
   ChevronRight,
-  Filter,
   Layers,
-  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -184,7 +182,7 @@ export default function AdminDocumentsPage() {
     return () => {
       mounted = false;
     };
-  }, [selectedRequestId, requests]);
+  }, [selectedRequestId, requests, versions]);
 
   // Handle selecting a request and update browser URL search params cleanly
   const handleSelectRequest = (id: string | null) => {
@@ -278,7 +276,7 @@ export default function AdminDocumentsPage() {
         )
       );
       toast.success(
-        `Request ${currentRequest.id} marked as READY. Student ${currentRequest.studentName} has been notified to complete milestone balance.`
+        `Request ${formatShortId(currentRequest.id, "REQ")} marked as READY. Student ${currentRequest.studentName} has been notified to complete milestone balance.`
       );
     } catch (err: any) {
       toast.error(err.message || "Failed to update status");
@@ -376,7 +374,8 @@ export default function AdminDocumentsPage() {
       // Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchId = (r.id || "").toLowerCase().includes(q);
+        const shortCode = formatShortId(r.id, "REQ").toLowerCase();
+        const matchId = (r.id || "").toLowerCase().includes(q) || shortCode.includes(q);
         const matchTitle = (r.title || "").toLowerCase().includes(q);
         const matchStudent = (r.studentName || "").toLowerCase().includes(q);
         const matchSubject = (r.subject || "").toLowerCase().includes(q);
@@ -607,7 +606,7 @@ export default function AdminDocumentsPage() {
                         >
                           {/* Request ID */}
                           <TableCell className="font-mono text-[12px] font-semibold text-foreground">
-                            {req.id}
+                            {formatShortId(req.id, "REQ")}
                           </TableCell>
 
                           {/* Student Info */}
@@ -773,7 +772,7 @@ export default function AdminDocumentsPage() {
             <div className="space-y-1">
               <div className="flex items-center space-x-2">
                 <Badge variant="outline" className="font-mono text-[12px] font-bold">
-                  {currentRequest.id}
+                  {formatShortId(currentRequest.id, "REQ")}
                 </Badge>
                 <h2 className="text-[16px] font-bold text-foreground">
                   {currentRequest.title}
@@ -992,7 +991,7 @@ export default function AdminDocumentsPage() {
               </CardTitle>
             </div>
             <span className="text-[12px] text-muted-foreground">
-              {currentRequest.id} • {currentRequest.title}
+              {formatShortId(currentRequest.id, "REQ")} • {currentRequest.title}
             </span>
           </div>
         </CardHeader>

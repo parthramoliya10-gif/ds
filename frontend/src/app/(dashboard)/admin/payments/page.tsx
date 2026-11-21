@@ -21,7 +21,7 @@ import {
 import { Payment, Quotation, Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptPaymentToFrontend, adaptRequestToFrontend, adaptQuotationToFrontend } from "@/lib/api/adapters";
-import { formatCurrencyINR, formatDate, formatDateTime } from "@/lib/utils";
+import { formatCurrencyINR, formatDate, formatDateTime, formatShortId } from "@/lib/utils";
 import { downloadTaxInvoice } from "@/lib/invoice";
 import {
   DollarSign,
@@ -278,14 +278,14 @@ export default function AdminPaymentsPage() {
                     filteredTransactions.map((txn) => (
                       <TableRow key={txn.id} className="border-border hover:bg-surface/50">
                         <TableCell className="font-mono text-[12px] font-medium text-foreground">
-                          {txn.transactionId || txn.id}
+                          {formatShortId(txn.transactionId || txn.id, "TXN")}
                         </TableCell>
                         <TableCell className="max-w-xs">
                           <Link
                             href={`/admin/requests/${txn.requestId}`}
                             className="font-medium text-[13px] text-foreground hover:underline line-clamp-1"
                           >
-                            {txn.requestId} • {txn.requestTitle}
+                            {formatShortId(txn.requestId, "REQ")} • {txn.requestTitle}
                           </Link>
                         </TableCell>
                         <TableCell>
@@ -323,7 +323,7 @@ export default function AdminPaymentsPage() {
                                 taskTitle: matchingReq?.title || txn.requestTitle,
                                 subject: matchingReq?.subject,
                               });
-                              toast.success(`Generated tax invoice for ${txn.transactionId || txn.id}`);
+                              toast.success(`Generated tax invoice for ${formatShortId(txn.transactionId || txn.id, "TXN")}`);
                             }}
                             className="h-7 text-[11px] border-border"
                           >
@@ -366,14 +366,14 @@ export default function AdminPaymentsPage() {
                     filteredQuotations.map((quote) => (
                       <TableRow key={quote.id} className="border-border hover:bg-surface/50">
                         <TableCell className="font-mono text-[12px] font-bold text-foreground">
-                          {quote.id}
+                          {formatShortId(quote.id, "QT")}
                         </TableCell>
                         <TableCell className="max-w-xs">
                           <Link
                             href={`/admin/requests/${quote.requestId}`}
                             className="font-medium text-[13px] text-foreground hover:underline"
                           >
-                            {quote.requestId}
+                            {formatShortId(quote.requestId, "REQ")}
                           </Link>
                           {quote.notes && (
                             <p className="text-[11px] text-muted-foreground truncate">{quote.notes}</p>
@@ -449,7 +449,7 @@ export default function AdminPaymentsPage() {
                         <TableCell className="max-w-sm">
                           <div className="space-y-0.5">
                             <span className="font-mono text-[11px] text-muted-foreground">
-                              {item.id} • {item.studentName} ({item.college})
+                              {formatShortId(item.id, "REQ")} • {item.studentName} ({item.college})
                             </span>
                             <h5 className="font-semibold text-[13px] text-foreground line-clamp-1">
                               {item.title}

@@ -13,7 +13,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
-import { formatCurrencyINR, formatDate, isDeadlineUrgent } from "@/lib/utils";
+import { formatCurrencyINR, formatDate, isDeadlineUrgent, formatShortId } from "@/lib/utils";
 import {
   FileText,
   Clock,
@@ -227,7 +227,7 @@ export default function AdminDashboardPage() {
                   <div className="space-y-1 max-w-xl">
                     <div className="flex items-center space-x-2">
                       <span className="font-mono text-[12px] font-medium text-muted-foreground">
-                        {req.id}
+                        {formatShortId(req.id, "REQ")}
                       </span>
                       <StatusBadge status={req.status} className="text-[10px] py-0 px-1.5 h-4" />
                       {urgent && (

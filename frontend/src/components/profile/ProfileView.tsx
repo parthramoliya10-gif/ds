@@ -24,6 +24,7 @@ import {
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatShortId } from "@/lib/utils";
 
 interface ProfileViewProps {
   role?: "student" | "admin";
@@ -235,8 +236,8 @@ export function ProfileView({ role = "student" }: ProfileViewProps) {
       {/* ========================================================================= */}
       <Card className="rounded-[8px] border border-border bg-background shadow-none overflow-hidden">
         <div className="h-24 bg-surface border-b border-border flex items-center px-6 justify-end">
-          <span className="text-[11px] text-muted-foreground font-mono">
-            User ID: {user?.id ? `${user.id.substring(0, 12)}...` : "—"}
+          <span className="text-[11px] text-muted-foreground font-mono font-medium">
+            {role === "admin" ? "Admin ID" : "User ID"}: {formatShortId(user?.id, role === "admin" ? "ADM" : "USR")}
           </span>
         </div>
 

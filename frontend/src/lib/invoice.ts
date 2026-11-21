@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
 import { Payment } from "@/types";
-import { formatCurrencyINR, formatDateTime } from "./utils";
+import { formatCurrencyINR, formatDateTime, formatShortId } from "./utils";
 
 export interface InvoiceDetails {
   studentName?: string;
@@ -101,7 +101,7 @@ export function downloadTaxInvoice(
   doc.setFontSize(9);
   doc.setTextColor(71, 85, 105);
   doc.text(college, 20, 67);
-  doc.text(`Student ID: ${payment.studentId ? payment.studentId.slice(0, 18) : "Verified User"}`, 20, 72);
+  doc.text(`Student ID: ${payment.studentId ? formatShortId(payment.studentId, "USR") : "Verified User"}`, 20, 72);
 
   // Right Column: Payment Details
   doc.setFont("helvetica", "bold");
@@ -115,7 +115,7 @@ export function downloadTaxInvoice(
   doc.text("Transaction ID:", 115, 62);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text(txnId.slice(0, 22), 145, 62);
+  doc.text(formatShortId(txnId, "TXN"), 145, 62);
 
   doc.setFont("helvetica", "normal");
   doc.setTextColor(71, 85, 105);
@@ -158,7 +158,7 @@ export function downloadTaxInvoice(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(100, 116, 139);
-  doc.text(`Task ID: ${payment.requestId.slice(0, 20)}...`, 24, 104);
+  doc.text(`Task ID: ${formatShortId(payment.requestId, "REQ")}`, 24, 104);
   if (details.subject) {
     doc.text(`Subject: ${details.subject}`, 24, 108.5);
   }

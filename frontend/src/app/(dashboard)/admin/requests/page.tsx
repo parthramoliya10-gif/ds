@@ -19,7 +19,7 @@ import {
 import { Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
-import { formatDate, isDeadlineUrgent } from "@/lib/utils";
+import { formatDate, isDeadlineUrgent, formatShortId } from "@/lib/utils";
 import { FileText, Eye, MessageSquare, Filter, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { toast } from "sonner";
@@ -90,7 +90,7 @@ export default function AdminRequestsPage() {
       accessorKey: "id",
       className: "font-mono text-[12px] font-medium w-24",
       cell: (req) => (
-        <span className="font-mono font-medium text-foreground">{req.id}</span>
+        <span className="font-mono font-medium text-foreground">{formatShortId(req.id, "REQ")}</span>
       ),
     },
     {
