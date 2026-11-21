@@ -19,10 +19,27 @@ import { toast } from "sonner";
 import { Send, CheckCircle2 } from "lucide-react";
 
 const contactSchema = z.object({
-  fullName: z.string().min(2, "Full name must be at least 2 characters"),
-  collegeEmail: z.string().email("Please provide a valid email address"),
-  phone: z.string().min(10, "Valid 10-digit phone number required for WhatsApp coordination"),
-  college: z.string().min(2, "Organization name is required"),
+  fullName: z
+    .string()
+    .trim()
+    .min(1, "Full name is required")
+    .min(2, "Full name must be at least 2 characters")
+    .max(60, "Full name must not exceed 60 characters"),
+  collegeEmail: z
+    .string()
+    .trim()
+    .min(1, "Mail ID is required")
+    .email("Please provide a valid email address"),
+  phone: z
+    .string()
+    .trim()
+    .min(1, "Phone number is required")
+    .min(10, "Valid 10-digit phone number required for WhatsApp coordination"),
+  college: z
+    .string()
+    .trim()
+    .min(1, "Organization name is required")
+    .min(2, "Organization name must be at least 2 characters"),
   taskType: z.enum([
     "assignment",
     "lab_manual",
@@ -32,7 +49,11 @@ const contactSchema = z.object({
     "general",
   ]),
   urgency: z.enum(["standard", "urgent_24h", "urgent_12h"]),
-  message: z.string().min(10, "Please enter at least 10 characters describing your inquiry"),
+  message: z
+    .string()
+    .trim()
+    .min(1, "Message is required")
+    .min(10, "Please enter at least 10 characters describing your inquiry"),
 });
 
 type ContactFormValues = z.infer<typeof contactSchema>;
@@ -101,7 +122,7 @@ export function ContactForm() {
           </Label>
           <Input
             id="fullName"
-            placeholder="Enter your full name"
+            placeholder="Enter your name"
             {...register("fullName")}
             className="h-10 text-[14px] bg-background border-border"
           />
@@ -115,12 +136,12 @@ export function ContactForm() {
         {/* Mail ID */}
         <div className="space-y-1.5">
           <Label htmlFor="collegeEmail" className="text-[13px]">
-            Enter Mail ID <span className="text-foreground font-semibold">*</span>
+            Mail ID <span className="text-foreground font-semibold">*</span>
           </Label>
           <Input
             id="collegeEmail"
             type="email"
-            placeholder="Enter Mail ID"
+            placeholder="name@example.com"
             {...register("collegeEmail")}
             className="h-10 text-[14px] bg-background border-border"
           />
@@ -141,7 +162,7 @@ export function ContactForm() {
           <Input
             id="phone"
             type="tel"
-            placeholder="+91 98765 43210"
+            placeholder="e.g. +91 98765 43210"
             {...register("phone")}
             className="h-10 text-[14px] bg-background border-border"
           />
@@ -159,7 +180,7 @@ export function ContactForm() {
           </Label>
           <Input
             id="college"
-            placeholder="e.g. Organization Name"
+            placeholder="e.g. Stanford University / Tech Corp"
             {...register("college")}
             className="h-10 text-[14px] bg-background border-border"
           />

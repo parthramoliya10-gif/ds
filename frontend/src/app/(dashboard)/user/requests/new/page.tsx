@@ -24,13 +24,38 @@ import { CalendarIcon, ArrowLeft, ArrowRight, AlertCircle, Sparkles } from "luci
 import { toast } from "sonner";
 
 const newRequestSchema = z.object({
-  title: z.string().min(5, "Task title must be at least 5 characters"),
-  subject: z.string().min(2, "Subject is required"),
-  college: z.string().min(2, "Organization name is required"),
-  semester: z.string().min(1, "Semester is required"),
-  pages: z.coerce.number().min(1, "Pages must be at least 1"),
+  title: z
+    .string()
+    .trim()
+    .min(1, "Task title is required")
+    .min(5, "Task title must be at least 5 characters")
+    .max(120, "Task title must not exceed 120 characters"),
+  subject: z
+    .string()
+    .trim()
+    .min(1, "Subject/course name is required")
+    .min(2, "Subject name must be at least 2 characters"),
+  college: z
+    .string()
+    .trim()
+    .min(1, "Organization name is required")
+    .min(2, "Organization name must be at least 2 characters"),
+  semester: z
+    .string()
+    .trim()
+    .min(1, "Semester is required")
+    .refine((val) => {
+      const num = parseInt(val, 10);
+      return !isNaN(num) && num >= 1 && num <= 12;
+    }, "Semester must be between 1 and 12"),
+  pages: z
+    .coerce
+    .number({ invalid_type_error: "Page count must be a number" })
+    .int("Page count must be a whole number")
+    .min(1, "Page count must be at least 1")
+    .max(500, "Page count cannot exceed 500"),
   format: z.enum(["typed", "handwritten"]),
-  description: z.string().optional(),
+  description: z.string().trim().optional(),
 });
 
 type NewRequestFormValues = z.infer<typeof newRequestSchema>;
@@ -140,7 +165,7 @@ export default function NewRequestPage() {
               </Label>
               <Input
                 id="title"
-                placeholder="e.g. Assignment / Project Title"
+                placeholder="e.g. DBMS Assignment - Normalized Schema"
                 {...register("title")}
                 className={errors.title ? "border-foreground" : ""}
               />
@@ -154,7 +179,7 @@ export default function NewRequestPage() {
                 <Label htmlFor="subject" className="text-[13px]">Subject / Course</Label>
                 <Input
                   id="subject"
-                  placeholder="e.g. Subject / Course Name"
+                  placeholder="e.g. Database Management Systems (CS-302)"
                   {...register("subject")}
                   className={errors.subject ? "border-foreground" : ""}
                 />
@@ -167,7 +192,7 @@ export default function NewRequestPage() {
                 <Label htmlFor="college" className="text-[13px]">Organization Name</Label>
                 <Input
                   id="college"
-                  placeholder="e.g. Organization Name"
+                  placeholder="e.g. Stanford University / Tech Corp"
                   {...register("college")}
                   className={errors.college ? "border-foreground" : ""}
                 />
@@ -185,6 +210,7 @@ export default function NewRequestPage() {
                   type="number"
                   min={1}
                   max={10}
+                  placeholder="e.g. 5"
                   {...register("semester")}
                   className={errors.semester ? "border-foreground" : ""}
                 />
@@ -199,6 +225,7 @@ export default function NewRequestPage() {
                   id="pages"
                   type="number"
                   min={1}
+                  placeholder="e.g. 10"
                   {...register("pages")}
                   className={errors.pages ? "border-foreground" : ""}
                 />

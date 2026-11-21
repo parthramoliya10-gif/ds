@@ -124,6 +124,11 @@ export default function AdminDocumentsPage() {
       return;
     }
 
+    if (!versionTag.trim()) {
+      toast.error("Please enter a valid version tag (e.g. v1.0).");
+      return;
+    }
+
     if (!currentRequest) return;
 
     setIsUploading(true);

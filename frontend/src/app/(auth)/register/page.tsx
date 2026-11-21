@@ -19,13 +19,20 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
 const registerSchema = z.object({
-  name: z.string().min(2, "Full name must be at least 2 characters"),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Full name is required")
+    .min(2, "Full name must be at least 2 characters")
+    .max(50, "Full name must not exceed 50 characters"),
   email: z
     .string()
+    .trim()
     .min(1, "Mail ID is required")
     .email("Please enter a valid email address"),
   password: z
     .string()
+    .min(1, "Password is required")
     .min(6, "Password must be at least 6 characters"),
   terms: z.boolean().refine((val) => val === true, {
     message: "You must accept the terms of service and academic fair-use guidelines",
@@ -106,7 +113,7 @@ export default function RegisterPage() {
             </Label>
             <Input
               id="name"
-              placeholder="Enter your full name"
+              placeholder="Enter your name"
               {...register("name")}
               className={errors.name ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.name)}
@@ -126,7 +133,7 @@ export default function RegisterPage() {
             <Input
               id="email"
               type="email"
-              placeholder="Enter Mail ID"
+              placeholder="name@example.com"
               {...register("email")}
               className={errors.email ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.email)}
@@ -145,7 +152,7 @@ export default function RegisterPage() {
             </Label>
             <PasswordInput
               id="password"
-              placeholder="Minimum 6 characters"
+              placeholder="At least 6 characters"
               {...register("password")}
               className={errors.password ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.password)}
