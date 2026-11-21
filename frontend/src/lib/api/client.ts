@@ -271,8 +271,14 @@ export const api = {
   chat: {
     getUnreadCount: () =>
       apiRequest<{ unreadCount: number }>("/chat/unread-count", { method: "GET" }),
-    getMessages: (requestId: string, params?: { page?: number; limit?: number }) =>
-      apiRequest(`/chat/${requestId}/messages`, { method: "GET", params }),
+    getMessages: (
+      requestId: string,
+      params?: { page?: number; limit?: number; cursor?: string; todayOnly?: boolean }
+    ) =>
+      apiRequest(`/chat/${requestId}/messages`, {
+        method: "GET",
+        params: params ? { ...params, cursor: params.cursor || undefined } : undefined,
+      }),
     postMessage: (requestId: string, formDataOrBody: FormData | { content: string; messageType?: string; metadata?: any }) => {
       if (formDataOrBody instanceof FormData) {
         return apiRequest(`/chat/${requestId}/messages`, {

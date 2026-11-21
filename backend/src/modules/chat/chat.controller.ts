@@ -40,12 +40,14 @@ export class ChatController {
       }
 
       const requestId = req.params.requestId as string;
-      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 30;
       const cursor = req.query.cursor as string | undefined;
+      const todayOnly = req.query.todayOnly === 'true' || (!cursor && req.query.all !== 'true');
 
       const history = await chatService.getConversationMessages(requestId, req.user, {
         limit,
         cursor,
+        todayOnly,
       });
 
       sendResponse({

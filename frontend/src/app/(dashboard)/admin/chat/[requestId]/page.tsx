@@ -22,7 +22,7 @@ import {
   adaptQuotationToFrontend,
 } from "@/lib/api/adapters";
 import { SOCKET_EVENTS } from "@/lib/socket/socketClient";
-import { ArrowLeft, ShieldCheck, Plus, ExternalLink, Trash2, MoreVertical, FileText, Eraser } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Plus, ExternalLink, Trash2, MoreVertical, FileText, Eraser, Loader2, Clock } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +44,11 @@ export default function AdminChatConversationPage() {
 
   const [request, setRequest] = React.useState<Request | null>(null);
   const [messages, setMessages] = React.useState<Message[]>([]);
+  const [hasMoreOlder, setHasMoreOlder] = React.useState(false);
+  const [nextCursor, setNextCursor] = React.useState<string | null>(null);
+  const [isLoadingOlder, setIsLoadingOlder] = React.useState(false);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const isPrependingOlderRef = React.useRef(false);
   const [currentQuotation, setCurrentQuotation] = React.useState<Quotation | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [isClearChatOpen, setIsClearChatOpen] = React.useState(false);
@@ -80,12 +85,63 @@ export default function AdminChatConversationPage() {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
+    if (isPrependingOlderRef.current) return;
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   React.useEffect(() => {
+    if (isPrependingOlderRef.current) return;
     scrollToBottom();
-  }, [messages, isTyping]);
+  }, [messages.length, isTyping]);
+
+  const loadOlderMessages = React.useCallback(async () => {
+    if (!nextCursor || isLoadingOlder) return;
+    setIsLoadingOlder(true);
+    isPrependingOlderRef.current = true;
+
+    const container = scrollContainerRef.current;
+    const prevScrollHeight = container?.scrollHeight || 0;
+    const prevScrollTop = container?.scrollTop || 0;
+
+    try {
+      const res = await api.chat.getMessages(requestId, { cursor: nextCursor });
+      if (res && Array.isArray(res.messages)) {
+        const olderAdapted = res.messages.map(adaptMessageToFrontend);
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const fresh = olderAdapted.filter((m: Message) => !existingIds.has(m.id));
+          return [...fresh, ...prev];
+        });
+        setHasMoreOlder(Boolean(res.hasMore));
+        setNextCursor(res.nextCursor || null);
+
+        // Keep scroll position smooth without jumping
+        requestAnimationFrame(() => {
+          if (container) {
+            const newScrollHeight = container.scrollHeight;
+            container.scrollTop = prevScrollTop + (newScrollHeight - prevScrollHeight);
+          }
+          setTimeout(() => {
+            isPrependingOlderRef.current = false;
+          }, 150);
+        });
+      } else {
+        isPrependingOlderRef.current = false;
+      }
+    } catch (err) {
+      console.warn("Failed to load older messages:", err);
+      isPrependingOlderRef.current = false;
+    } finally {
+      setIsLoadingOlder(false);
+    }
+  }, [requestId, nextCursor, isLoadingOlder]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    if (target.scrollTop <= 40 && hasMoreOlder && !isLoadingOlder && nextCursor) {
+      loadOlderMessages();
+    }
+  };
 
   // 1. Fetch Request Details and Messages History immediately on requestId change
   React.useEffect(() => {
@@ -118,6 +174,8 @@ export default function AdminChatConversationPage() {
             if (Array.isArray(chatRes.value.messages)) {
               setMessages(chatRes.value.messages.map(adaptMessageToFrontend));
             }
+            setHasMoreOlder(Boolean(chatRes.value.hasMore));
+            setNextCursor(chatRes.value.nextCursor || null);
             if (typeof (chatRes.value as any)?.isCounterpartOnline === "boolean") {
               setIsCounterpartOnline((chatRes.value as any).isCounterpartOnline);
             }
@@ -552,8 +610,35 @@ export default function AdminChatConversationPage() {
       </div>
 
       {/* Message Stream */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
-        <DateSeparator label="Student Inquiry & Specification Review" />
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3"
+      >
+        {/* Older messages loader button / indicator */}
+        {hasMoreOlder && (
+          <div className="flex justify-center my-2">
+            <button
+              onClick={loadOlderMessages}
+              disabled={isLoadingOlder}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-full bg-surface hover:bg-surface-hover border border-border text-muted-foreground hover:text-foreground transition-all shadow-xs disabled:opacity-60 cursor-pointer"
+            >
+              {isLoadingOlder ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                  <span>Loading earlier conversation...</span>
+                </>
+              ) : (
+                <>
+                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Scroll up or click to view earlier messages</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        <DateSeparator label="Review & Communication" />
 
         {/* Security Notice */}
         <div className="bg-surface border border-border rounded-[8px] p-2.5 text-center max-w-md mx-auto space-y-0.5">
@@ -565,6 +650,38 @@ export default function AdminChatConversationPage() {
             Student will see real-time updates and tick receipts as you send responses.
           </p>
         </div>
+
+        {messages.length === 0 && !loading && (
+          <div className="text-center py-6 px-4 rounded-[8px] bg-surface/50 border border-border/60 max-w-sm mx-auto my-4 space-y-2">
+            <p className="text-[12px] font-semibold text-foreground">No messages today</p>
+            <p className="text-[11px] text-muted-foreground">
+              {hasMoreOlder
+                ? "Earlier messages from previous days are available above."
+                : "Send a message below to start communicating with the student."}
+            </p>
+            {hasMoreOlder && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadOlderMessages}
+                disabled={isLoadingOlder}
+                className="h-7 text-[11px] mt-1"
+              >
+                {isLoadingOlder ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Clock className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                    Load Earlier Messages
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        )}
 
         {messages.map((msg) => {
           if (msg.type === "quotation" || (msg.quotation && msg.type !== "system")) {

@@ -115,7 +115,7 @@ async function runEndToEndVerification() {
       newRequest.id,
       { id: testAdminId, email: 'e2e_admin@example.com', role: Role.ADMIN, isBlocked: false }
     );
-    const readMsg = updatedMessages.messages.find((m) => m.id === userMessage.id);
+    const readMsg = updatedMessages.messages.find((m: any) => m.id === userMessage.id);
     console.log(`✅ Message Status after Admin opened chat: ${readMsg?.status} (2 blue ticks: READ)\n`);
 
     // -------------------------------------------------------------

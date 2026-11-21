@@ -4,10 +4,12 @@ import { ApiError } from '../../utils/apiError.js';
 import { AuthenticatedUser } from '../../types/express.js';
 import { uploadBufferToCloudinary } from '../../utils/cloudinary.js';
 import { isUserOnline, isAnyAdminOnline } from '../../sockets/socket.server.js';
+import cacheService from '../../services/cache.service.js';
 
 export interface GetMessagesOptions {
   limit?: number;
   cursor?: string; // Message ID for cursor pagination
+  todayOnly?: boolean;
 }
 
 export interface PostMessageInput {
@@ -111,56 +113,145 @@ export class ChatService {
       throw new ApiError(403, 'Forbidden: You do not have permission to view this chat.');
     }
 
-    const limit = Math.min(options.limit || 50, 100);
-
-    // 2. Query messages with cursor-based pagination
-    const messages = await prisma.message.findMany({
-      where: { conversationId: conversation.id },
-      take: limit + 1,
-      ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
-      orderBy: { createdAt: 'desc' },
-      include: {
-        userSender: {
-          select: {
-            id: true,
-            fullName: true,
-            avatarUrl: true,
-          },
-        },
-        adminSender: {
-          select: {
-            id: true,
-            fullName: true,
-            avatarUrl: true,
-          },
-        },
-      },
-    });
-
-    // Filter out messages that this user deleted for themselves ('Delete for me')
-    const visibleMessages = messages.filter((msg) => {
-      const meta = msg.metadata as any;
-      if (meta && Array.isArray(meta.deletedFor) && meta.deletedFor.includes(user.id)) {
-        return false;
-      }
-      return true;
-    });
-
-    const hasMore = visibleMessages.length > limit;
-    const items = hasMore ? visibleMessages.slice(0, limit) : visibleMessages;
-    // Capture cursor of the oldest message in this batch BEFORE reversing!
-    const nextCursor = hasMore ? items[items.length - 1].id : null;
+    const limit = Math.min(options.limit || 30, 100);
     const counterpartOnline =
       user.role === Role.ADMIN
         ? isUserOnline(conversation.request.userId)
         : isAnyAdminOnline();
 
-    return {
+    // =========================================================================
+    // 2A. TODAY-ONLY MODE (Initial Page Load: Only today's messages load first)
+    // =========================================================================
+    if (options.todayOnly && !options.cursor) {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const cacheKey = `dsms:chat:${requestId}:today:${user.id}`;
+      const cached = await cacheService.get<any>(cacheKey);
+      if (cached) {
+        return {
+          ...cached,
+          isCounterpartOnline: counterpartOnline,
+        };
+      }
+
+      // Query only messages sent today (gte todayStart)
+      const todayMessages = await prisma.message.findMany({
+        where: {
+          conversationId: conversation.id,
+          createdAt: { gte: todayStart },
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          userSender: {
+            select: { id: true, fullName: true, avatarUrl: true },
+          },
+          adminSender: {
+            select: { id: true, fullName: true, avatarUrl: true },
+          },
+        },
+      });
+
+      // Filter out messages deleted for caller ('Delete for me')
+      const visibleToday = todayMessages.filter((msg) => {
+        const meta = msg.metadata as any;
+        return !(meta && Array.isArray(meta.deletedFor) && meta.deletedFor.includes(user.id));
+      });
+
+      // Check if any older messages exist before today
+      const olderCount = await prisma.message.count({
+        where: {
+          conversationId: conversation.id,
+          createdAt: { lt: todayStart },
+        },
+      });
+
+      // Oldest message of today will be cursor for loading older messages
+      let nextCursor: string | null = null;
+      if (visibleToday.length > 0) {
+        nextCursor = olderCount > 0 ? visibleToday[visibleToday.length - 1].id : null;
+      } else if (olderCount > 0) {
+        nextCursor = 'before_today';
+      }
+
+      const result = {
+        conversationId: conversation.id,
+        messages: [...visibleToday].reverse().map(formatMessageSender),
+        nextCursor,
+        hasMore: olderCount > 0,
+        isTodayOnly: true,
+        todayCount: visibleToday.length,
+        olderCount,
+        isCounterpartOnline: counterpartOnline,
+      };
+
+      // Cache today's message view in Upstash Redis (30 seconds TTL)
+      await cacheService.set(cacheKey, result, 30);
+      return result;
+    }
+
+    // =========================================================================
+    // 2B. OLDER MESSAGES / CURSOR PAGINATION (Triggered when user scrolls up)
+    // =========================================================================
+    const cursorKey = options.cursor ? `dsms:chat:${requestId}:cursor:${options.cursor}:${user.id}` : null;
+    if (cursorKey) {
+      const cached = await cacheService.get<any>(cursorKey);
+      if (cached) {
+        return {
+          ...cached,
+          isCounterpartOnline: counterpartOnline,
+        };
+      }
+    }
+
+    let whereClause: any = { conversationId: conversation.id };
+    if (options.cursor === 'before_today') {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      whereClause.createdAt = { lt: todayStart };
+    }
+
+    const messages = await prisma.message.findMany({
+      where: whereClause,
+      take: limit + 1,
+      ...(options.cursor && options.cursor !== 'before_today'
+        ? { cursor: { id: options.cursor }, skip: 1 }
+        : {}),
+      orderBy: { createdAt: 'desc' },
+      include: {
+        userSender: {
+          select: { id: true, fullName: true, avatarUrl: true },
+        },
+        adminSender: {
+          select: { id: true, fullName: true, avatarUrl: true },
+        },
+      },
+    });
+
+    const visibleMessages = messages.filter((msg) => {
+      const meta = msg.metadata as any;
+      return !(meta && Array.isArray(meta.deletedFor) && meta.deletedFor.includes(user.id));
+    });
+
+    const hasMore = visibleMessages.length > limit;
+    const items = hasMore ? visibleMessages.slice(0, limit) : visibleMessages;
+    const nextCursor = hasMore ? items[items.length - 1].id : null;
+
+    const result = {
       conversationId: conversation.id,
-      messages: [...items].reverse().map(formatMessageSender), // chronologically ordered (oldest to newest)
+      messages: [...items].reverse().map(formatMessageSender),
       nextCursor,
+      hasMore,
+      isTodayOnly: false,
       isCounterpartOnline: counterpartOnline,
     };
+
+    if (cursorKey) {
+      // Historical messages rarely change, cache for 120s
+      await cacheService.set(cursorKey, result, 120);
+    }
+
+    return result;
   }
 
   /**
@@ -252,6 +343,8 @@ export class ChatService {
         },
       },
     });
+
+    await cacheService.delPattern(`dsms:chat:${requestId}:*`);
 
     return formatMessageSender(message);
   }
@@ -373,6 +466,8 @@ export class ChatService {
         },
       });
 
+      await cacheService.delPattern(`dsms:chat:${requestId}:*`);
+
       return {
         type: 'for_everyone' as const,
         messageId,
@@ -397,6 +492,8 @@ export class ChatService {
           },
         },
       });
+
+      await cacheService.delPattern(`dsms:chat:${requestId}:*`);
 
       return {
         type: 'for_me' as const,
@@ -456,6 +553,8 @@ export class ChatService {
         await prisma.$transaction(updates);
       }
     }
+
+    await cacheService.delPattern(`dsms:chat:${requestId}:*`);
 
     return {
       success: true,
