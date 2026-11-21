@@ -7,7 +7,7 @@ import { Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { cn } from "@/lib/utils";
+import { cn, formatShortId } from "@/lib/utils";
 import { Search, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useSocket } from "@/context/SocketContext";
@@ -257,7 +257,7 @@ export default function AdminChatLayout({
                         )}
                       />
                       <span className="text-[12px] font-mono font-medium text-muted-foreground truncate max-w-[160px]">
-                        {req.id.substring(0, 8)}... • {req.studentName || "Student"}
+                        {formatShortId(req.id, "REQ")} • {req.studentName || "Student"}
                       </span>
                     </div>
 

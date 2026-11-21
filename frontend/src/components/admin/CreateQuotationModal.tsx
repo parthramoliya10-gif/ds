@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Quotation } from "@/types";
 import api from "@/lib/api/client";
 import { adaptQuotationToFrontend } from "@/lib/api/adapters";
-import { formatCurrencyINR } from "@/lib/utils";
+import { formatCurrencyINR, formatShortId } from "@/lib/utils";
 import { ShieldCheck, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
@@ -116,7 +116,7 @@ export function CreateQuotationModal({
             </DialogTitle>
           </div>
           <DialogDescription className="text-[13px] text-muted-foreground line-clamp-1">
-            {requestId} • {requestTitle}
+            {formatShortId(requestId, "REQ")} • {requestTitle}
           </DialogDescription>
         </DialogHeader>
 

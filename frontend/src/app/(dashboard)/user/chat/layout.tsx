@@ -7,7 +7,7 @@ import { Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn, formatShortId } from "@/lib/utils";
 import { Search, Trash2 } from "lucide-react";
 import { useSocket } from "@/context/SocketContext";
 import { SOCKET_EVENTS } from "@/lib/socket/socketClient";
@@ -262,7 +262,7 @@ export default function UserChatLayout({
                         )}
                       />
                       <span className="text-[12px] font-mono font-medium text-muted-foreground">
-                        {req.id.substring(0, 8)}...
+                        {formatShortId(req.id, "REQ")}
                       </span>
                     </div>
 

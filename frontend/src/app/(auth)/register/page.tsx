@@ -115,7 +115,7 @@ export default function RegisterPage() {
 
       <CardContent className="space-y-4">
         {/* Google Authentication */}
-        <GoogleAuthButton label="Sign up with Google" />
+        <GoogleAuthButton label="Continue with Google" />
 
         <div className="relative flex items-center justify-center my-4">
           <div className="absolute inset-0 flex items-center">

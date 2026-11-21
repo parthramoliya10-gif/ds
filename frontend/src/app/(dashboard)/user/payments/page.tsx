@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Payment, Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptPaymentToFrontend, adaptRequestToFrontend } from "@/lib/api/adapters";
-import { formatCurrencyINR, formatDate } from "@/lib/utils";
+import { formatCurrencyINR, formatDate, formatShortId } from "@/lib/utils";
 import { downloadTaxInvoice } from "@/lib/invoice";
 import {
   CreditCard,
@@ -77,7 +77,7 @@ export default function UserPaymentsPage() {
       taskTitle: matchingReq?.title || payment.requestTitle,
       subject: matchingReq?.subject,
     });
-    toast.success(`Tax invoice generated for ${payment.transactionId || payment.id}!`);
+    toast.success(`Tax invoice generated for ${formatShortId(payment.transactionId || payment.id, "TXN")}!`);
   };
 
   const paymentColumns: Column<Payment>[] = [
@@ -85,7 +85,7 @@ export default function UserPaymentsPage() {
       header: "Txn ID",
       accessorKey: "transactionId",
       className: "font-mono text-[12px] font-medium w-36",
-      cell: (p) => p.transactionId || p.id,
+      cell: (p) => formatShortId(p.transactionId || p.id, "TXN"),
     },
     {
       header: "Task & Description",
@@ -96,10 +96,10 @@ export default function UserPaymentsPage() {
             href={`/user/requests/${p.requestId}`}
             className="font-semibold text-foreground hover:underline line-clamp-1"
           >
-            {p.requestTitle || p.requestId}
+            {p.requestTitle || formatShortId(p.requestId, "REQ")}
           </Link>
           <span className="text-[12px] text-muted-foreground font-mono">
-            {p.requestId}
+            {formatShortId(p.requestId, "REQ")}
           </span>
         </div>
       ),
