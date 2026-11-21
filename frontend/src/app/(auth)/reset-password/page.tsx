@@ -20,15 +20,19 @@ const resetPasswordSchema = z
   .object({
     email: z
       .string()
+      .trim()
       .min(1, "Mail ID is required")
       .email("Please enter a valid email address"),
     otp: z
       .string()
+      .trim()
+      .min(1, "Verification code is required")
       .min(6, "Verification code must be 6 digits")
       .max(6, "Verification code must be 6 digits")
-      .regex(/^\d{6}$/, "Code must contain exactly 6 numbers"),
+      .regex(/^\d{6}$/, "Code must contain exactly 6 digits"),
     password: z
       .string()
+      .min(1, "New password is required")
       .min(6, "New password must be at least 6 characters"),
     confirmPassword: z
       .string()
@@ -154,7 +158,7 @@ export default function ResetPasswordPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter Mail ID"
+                  placeholder="name@example.com"
                   {...register("email")}
                   className={errors.email ? "border-foreground" : ""}
                   aria-invalid={Boolean(errors.email)}
@@ -226,7 +230,7 @@ export default function ResetPasswordPage() {
                 </Label>
                 <PasswordInput
                   id="confirmPassword"
-                  placeholder="Repeat new password"
+                  placeholder="Re-enter your new password"
                   {...register("confirmPassword")}
                   className={errors.confirmPassword ? "border-foreground" : ""}
                   aria-invalid={Boolean(errors.confirmPassword)}
