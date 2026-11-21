@@ -90,8 +90,10 @@ export default function RegisterPage() {
         <GoogleAuthButton label="Sign up with Google" />
 
         <div className="relative flex items-center justify-center my-4">
-          <div className="border-t border-border w-full" />
-          <span className="bg-background px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider relative z-10">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border" />
+          </div>
+          <span className="relative z-10 bg-background px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
             or sign up with email
           </span>
         </div>
@@ -119,7 +121,7 @@ export default function RegisterPage() {
           {/* Email ID */}
           <div className="space-y-1.5">
             <Label htmlFor="email" className="text-[13px] font-medium">
-              Enter Mail ID
+              Mail ID
             </Label>
             <Input
               id="email"

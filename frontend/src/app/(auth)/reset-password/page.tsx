@@ -149,7 +149,7 @@ export default function ResetPasswordPage() {
               {/* Mail ID */}
               <div className="space-y-1.5">
                 <Label htmlFor="email" className="text-[13px] font-medium">
-                  Enter Mail ID
+                  Mail ID
                 </Label>
                 <Input
                   id="email"
