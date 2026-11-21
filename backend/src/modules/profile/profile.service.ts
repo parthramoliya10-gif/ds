@@ -323,14 +323,16 @@ export class ProfileService {
     role: Role,
     params: { currentPassword?: string; newPassword: string }
   ) {
-    if (params.currentPassword) {
-      const { error: signInError } = await supabaseClient.auth.signInWithPassword({
-        email,
-        password: params.currentPassword,
-      });
-      if (signInError) {
-        throw new ApiError(400, 'Current password is incorrect.');
-      }
+    if (!params.currentPassword) {
+      throw new ApiError(400, 'Current password is required.');
+    }
+
+    const { error: signInError } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password: params.currentPassword,
+    });
+    if (signInError) {
+      throw new ApiError(400, 'Current password is incorrect.');
     }
 
     const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {

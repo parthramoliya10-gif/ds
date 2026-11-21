@@ -11,14 +11,14 @@ export declare class DocumentService {
         createdAt: Date;
         updatedAt: Date;
         requestId: string;
-        secureUrl: string;
-        title: string;
-        version: number;
         uploadedByAdminId: string;
+        title: string;
         fileName: string;
         cloudinaryPublicId: string;
+        secureUrl: string;
         fileSize: number;
         mimeType: string;
+        version: number;
         downloadCount: number;
     }>;
     /**
@@ -31,13 +31,13 @@ export declare class DocumentService {
         documents: {
             id: string;
             createdAt: Date;
-            secureUrl: string;
             title: string;
-            version: number;
             fileName: string;
             cloudinaryPublicId: string;
+            secureUrl: string;
             fileSize: number;
             mimeType: string;
+            version: number;
             downloadCount: number;
         }[];
     }>;

@@ -408,22 +408,23 @@ export class AuthService {
     // 1. Verify OTP code against OtpStore for PASSWORD_RESET
     otpStore.verifyOtp(normalizedEmail, token, 'PASSWORD_RESET');
 
-    // 2. Find user in Supabase Auth to update their password
-    const { data: usersData, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
-    if (listErr) {
-      throw new ApiError(500, 'Failed to process password update.');
+    // 2. Find user identifier in database or Supabase Auth to update password
+    const dbUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const dbAdmin = await prisma.admin.findUnique({ where: { email: normalizedEmail } });
+    let authUserId = dbUser?.id || dbAdmin?.id;
+
+    if (!authUserId) {
+      const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const found = usersData?.users.find((u) => u.email?.toLowerCase() === normalizedEmail);
+      authUserId = found?.id;
     }
 
-    const authUser = usersData?.users.find(
-      (u) => u.email?.toLowerCase() === normalizedEmail
-    );
-
-    if (!authUser) {
+    if (!authUserId) {
       throw new ApiError(404, 'Authentication account not found.');
     }
 
     // 3. Update password in Supabase Auth via Admin API
-    const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
+    const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
       password: newPassword,
     });
 
@@ -432,9 +433,7 @@ export class AuthService {
     }
 
     // 4. Audit Log
-    const dbUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-    const dbAdmin = await prisma.admin.findUnique({ where: { email: normalizedEmail } });
-    const actorId = dbUser?.id || dbAdmin?.id || authUser.id;
+    const actorId = authUserId;
     const actorRole = dbAdmin ? Role.ADMIN : Role.USER;
 
     await prisma.auditLog.create({
@@ -600,6 +599,12 @@ export class AuthService {
       }
 
       const demotedUser = await prisma.$transaction(async (tx) => {
+        // Reassign any completed client documents to the acting admin so CASCADE does not destroy client files
+        await tx.finalDocument.updateMany({
+          where: { uploadedByAdminId: targetUserId },
+          data: { uploadedByAdminId: adminId },
+        });
+
         await tx.admin.delete({ where: { id: targetUserId } });
         return tx.user.upsert({
           where: { id: targetUserId },

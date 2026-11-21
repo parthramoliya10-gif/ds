@@ -126,39 +126,16 @@ export default function VerifyOtpPage() {
         token: fullCode,
       })) as any;
 
-      // 2. Establish client-side Supabase session & cookies so middleware allows dashboard access
-      const pendingPassword =
-        typeof window !== "undefined"
-          ? sessionStorage.getItem("dsms_pending_password")
-          : null;
+      // 2. Establish client-side Supabase session & cookies using backend tokens
+      const accessToken = res?.session?.accessToken || res?.accessToken;
+      const refreshToken = res?.session?.refreshToken || res?.refreshToken;
 
-      let sessionEstablished = false;
-
-      // Primary strategy: native Supabase password sign-in (sets all @supabase/ssr cookies)
-      if (pendingPassword) {
+      if (accessToken && refreshToken) {
         try {
-          const { error: signInErr } = await supabase.auth.signInWithPassword({
-            email,
-            password: pendingPassword,
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
           });
-          if (!signInErr) {
-            sessionEstablished = true;
-          }
-        } catch (authErr) {
-          console.warn("Client signInWithPassword failed:", authErr);
-        }
-      }
-
-      // Fallback strategy: setSession using tokens returned by backend
-      if (!sessionEstablished && res?.accessToken && res?.refreshToken) {
-        try {
-          const { error: setErr } = await supabase.auth.setSession({
-            access_token: res.accessToken,
-            refresh_token: res.refreshToken,
-          });
-          if (!setErr) {
-            sessionEstablished = true;
-          }
         } catch (setErr) {
           console.warn("Client setSession failed:", setErr);
         }
@@ -166,8 +143,8 @@ export default function VerifyOtpPage() {
 
       // Store backend JWT for API calls and clean up temporary storage
       if (typeof window !== "undefined") {
-        if (res?.accessToken) {
-          localStorage.setItem("dsms_auth_token", res.accessToken);
+        if (accessToken) {
+          localStorage.setItem("dsms_auth_token", accessToken);
         }
         sessionStorage.removeItem("dsms_pending_email");
         sessionStorage.removeItem("dsms_pending_name");

@@ -1,4 +1,5 @@
 import multer from 'multer';
+import path from 'path';
 import { Request } from 'express';
 import { ApiError } from '../utils/apiError.js';
 
@@ -15,11 +16,23 @@ const allowedMimeTypes = [
   'image/webp',
 ];
 
+const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png', '.webp'];
+
 const fileFilter = (
   _req: Request,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (!allowedExtensions.includes(ext)) {
+    return cb(
+      new ApiError(
+        400,
+        `Unsupported file extension: '${ext}'. Allowed: PDF, DOC, DOCX, TXT, JPEG, PNG, WEBP`
+      )
+    );
+  }
+
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {

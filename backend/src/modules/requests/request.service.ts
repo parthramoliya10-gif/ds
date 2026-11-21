@@ -245,8 +245,17 @@ export class RequestService {
       }),
     ]);
 
+    // Mask secureUrl unless request is verified and download is unlocked
+    const sanitizedRequests = requests.map((r: any) => ({
+      ...r,
+      finalDocuments: (r.finalDocuments || []).map((fd: any) => ({
+        ...fd,
+        secureUrl: r.isDownloadUnlocked ? fd.secureUrl : undefined,
+      })),
+    }));
+
     return {
-      requests,
+      requests: sanitizedRequests,
       pagination: {
         total,
         page,

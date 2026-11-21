@@ -35,6 +35,19 @@ export interface RazorpayModalProps {
   onSuccess: (paymentDetails: { transactionId: string; amount: number }) => void;
 }
 
+const loadRazorpayScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") return resolve(false);
+    if ((window as any).Razorpay) return resolve(true);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 export function RazorpayModal({
   isOpen,
   onClose,
@@ -75,6 +88,50 @@ export function RazorpayModal({
           quotationId,
           milestone,
         });
+
+        const scriptLoaded = await loadRazorpayScript();
+
+        if (scriptLoaded && orderData?.keyId && orderData?.orderId && (window as any).Razorpay) {
+          const options = {
+            key: orderData.keyId,
+            amount: orderData.amount,
+            currency: orderData.currency || "USD",
+            name: "DSMS Organization",
+            description: title,
+            order_id: orderData.orderId,
+            handler: async (response: any) => {
+              try {
+                await api.payments.verify({
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                });
+                setTransactionId(response.razorpay_payment_id);
+                setStatus("success");
+                onSuccess({
+                  transactionId: response.razorpay_payment_id,
+                  amount,
+                });
+              } catch (verifyErr) {
+                console.error("Payment verification failed:", verifyErr);
+                setStatus("failure");
+              }
+            },
+            modal: {
+              ondismiss: () => {
+                setStatus("idle");
+              },
+            },
+            theme: {
+              color: "#000000",
+            },
+          };
+
+          const rzp = new (window as any).Razorpay(options);
+          rzp.open();
+          return;
+        }
+
         const txn = orderData?.orderId || "TXN_RZP_" + Math.random().toString(36).substring(2, 10).toUpperCase();
         setTransactionId(txn);
         setStatus("success");
@@ -83,6 +140,8 @@ export function RazorpayModal({
       }
     } catch (apiErr) {
       console.warn("Backend payment order creation fallback:", apiErr);
+      setStatus("failure");
+      return;
     }
 
     await new Promise((resolve) => setTimeout(resolve, 1000));

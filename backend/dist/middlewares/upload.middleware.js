@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.uploadProfileAvatar = exports.uploadSingleFinalDocument = exports.uploadReferenceFiles = void 0;
 const multer_1 = __importDefault(require("multer"));
+const path_1 = __importDefault(require("path"));
 const apiError_js_1 = require("../utils/apiError.js");
 // In-memory storage: file kept in Buffer for malware/validation check & Cloudinary stream
 const storage = multer_1.default.memoryStorage();
@@ -17,7 +18,12 @@ const allowedMimeTypes = [
     'image/png',
     'image/webp',
 ];
+const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png', '.webp'];
 const fileFilter = (_req, file, cb) => {
+    const ext = path_1.default.extname(file.originalname).toLowerCase();
+    if (!allowedExtensions.includes(ext)) {
+        return cb(new apiError_js_1.ApiError(400, `Unsupported file extension: '${ext}'. Allowed: PDF, DOC, DOCX, TXT, JPEG, PNG, WEBP`));
+    }
     if (allowedMimeTypes.includes(file.mimetype)) {
         cb(null, true);
     }

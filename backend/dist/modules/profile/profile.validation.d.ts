@@ -71,12 +71,12 @@ export declare const updateProfileSchema: z.ZodObject<{
     address?: string | null | undefined;
 }>;
 export declare const changePasswordSchema: z.ZodObject<{
-    currentPassword: z.ZodOptional<z.ZodString>;
+    currentPassword: z.ZodString;
     newPassword: z.ZodString;
 }, "strip", z.ZodTypeAny, {
+    currentPassword: string;
     newPassword: string;
-    currentPassword?: string | undefined;
 }, {
+    currentPassword: string;
     newPassword: string;
-    currentPassword?: string | undefined;
 }>;

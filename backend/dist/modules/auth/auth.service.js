@@ -360,26 +360,27 @@ class AuthService {
         const normalizedEmail = email.trim().toLowerCase();
         // 1. Verify OTP code against OtpStore for PASSWORD_RESET
         otp_store_js_1.default.verifyOtp(normalizedEmail, token, 'PASSWORD_RESET');
-        // 2. Find user in Supabase Auth to update their password
-        const { data: usersData, error: listErr } = await supabase_js_1.supabaseAdmin.auth.admin.listUsers();
-        if (listErr) {
-            throw new apiError_js_1.ApiError(500, 'Failed to process password update.');
+        // 2. Find user identifier in database or Supabase Auth to update password
+        const dbUser = await prisma_js_1.default.user.findUnique({ where: { email: normalizedEmail } });
+        const dbAdmin = await prisma_js_1.default.admin.findUnique({ where: { email: normalizedEmail } });
+        let authUserId = dbUser?.id || dbAdmin?.id;
+        if (!authUserId) {
+            const { data: usersData } = await supabase_js_1.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+            const found = usersData?.users.find((u) => u.email?.toLowerCase() === normalizedEmail);
+            authUserId = found?.id;
         }
-        const authUser = usersData?.users.find((u) => u.email?.toLowerCase() === normalizedEmail);
-        if (!authUser) {
+        if (!authUserId) {
             throw new apiError_js_1.ApiError(404, 'Authentication account not found.');
         }
         // 3. Update password in Supabase Auth via Admin API
-        const { error: updateErr } = await supabase_js_1.supabaseAdmin.auth.admin.updateUserById(authUser.id, {
+        const { error: updateErr } = await supabase_js_1.supabaseAdmin.auth.admin.updateUserById(authUserId, {
             password: newPassword,
         });
         if (updateErr) {
             throw new apiError_js_1.ApiError(500, updateErr.message || 'Failed to update password.');
         }
         // 4. Audit Log
-        const dbUser = await prisma_js_1.default.user.findUnique({ where: { email: normalizedEmail } });
-        const dbAdmin = await prisma_js_1.default.admin.findUnique({ where: { email: normalizedEmail } });
-        const actorId = dbUser?.id || dbAdmin?.id || authUser.id;
+        const actorId = authUserId;
         const actorRole = dbAdmin ? client_1.Role.ADMIN : client_1.Role.USER;
         await prisma_js_1.default.auditLog.create({
             data: {
@@ -519,6 +520,11 @@ class AuthService {
                 throw new apiError_js_1.ApiError(404, 'Target admin not found in admins table.');
             }
             const demotedUser = await prisma_js_1.default.$transaction(async (tx) => {
+                // Reassign any completed client documents to the acting admin so CASCADE does not destroy client files
+                await tx.finalDocument.updateMany({
+                    where: { uploadedByAdminId: targetUserId },
+                    data: { uploadedByAdminId: adminId },
+                });
                 await tx.admin.delete({ where: { id: targetUserId } });
                 return tx.user.upsert({
                     where: { id: targetUserId },

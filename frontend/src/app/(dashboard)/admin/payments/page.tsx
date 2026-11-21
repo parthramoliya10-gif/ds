@@ -145,11 +145,20 @@ export default function AdminPaymentsPage() {
   );
 
   const handleExportCSV = () => {
+    // Sanitize values against CSV/spreadsheet formula injection (=, +, -, @)
+    const sanitizeCell = (val: any) => {
+      const str = String(val ?? "").replace(/"/g, '""');
+      if (/^[=+\-@\t\r]/.test(str)) {
+        return `'${str}`;
+      }
+      return str;
+    };
+
     const csvHeader = "Transaction ID,Request ID,Task Title,Student,Milestone,Amount (USD),Status,Date\n";
     const csvRows = payments
       .map(
         (t) =>
-          `"${t.transactionId || t.id}","${t.requestId}","${t.requestTitle || t.requestId}","${t.studentId || "Student"}","${t.milestone} 50%",${t.amount},"${t.status}","${t.paidAt || new Date().toISOString()}"`
+          `"${sanitizeCell(t.transactionId || t.id)}","${sanitizeCell(t.requestId)}","${sanitizeCell(t.requestTitle || t.requestId)}","${sanitizeCell(t.studentId || "Student")}","${sanitizeCell(t.milestone)} 50%",${t.amount},"${sanitizeCell(t.status)}","${sanitizeCell(t.paidAt || new Date().toISOString())}"`
       )
       .join("\n");
 

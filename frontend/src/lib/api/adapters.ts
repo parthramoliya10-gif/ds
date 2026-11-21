@@ -208,7 +208,10 @@ export function adaptFinalDocumentToFrontend(backendDoc: any): FinalDocument {
       : "1.2 MB",
     fileUrl: backendDoc.secureUrl || "#",
     secureUrl: backendDoc.secureUrl,
-    isLocked: !backendDoc.secureUrl && !backendDoc.request?.isDownloadUnlocked,
+    isLocked:
+      backendDoc.isLocked !== undefined
+        ? Boolean(backendDoc.isLocked)
+        : !Boolean(backendDoc.isDownloadUnlocked ?? backendDoc.request?.isDownloadUnlocked),
     version: backendDoc.version || 1,
     downloadCount: backendDoc.downloadCount || 0,
     uploadedAt: backendDoc.createdAt || new Date().toISOString(),

@@ -51,7 +51,7 @@ export async function middleware(request: NextRequest) {
   // Role routing for authenticated users
   if (user) {
     const role = (user.user_metadata?.role || user.app_metadata?.role || "").toLowerCase();
-    const isAdmin = role === "admin" || Boolean(user.email && user.email.toLowerCase().includes("admin"));
+    const isAdmin = role === "admin";
 
     // Already logged-in user accessing login/register
     if (isAuthPath) {

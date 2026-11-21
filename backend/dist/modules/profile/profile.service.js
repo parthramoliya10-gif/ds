@@ -269,14 +269,15 @@ class ProfileService {
      * 5. Change password via Supabase Auth (verifies currentPassword if supplied)
      */
     async changePassword(userId, email, role, params) {
-        if (params.currentPassword) {
-            const { error: signInError } = await supabase_js_1.supabaseClient.auth.signInWithPassword({
-                email,
-                password: params.currentPassword,
-            });
-            if (signInError) {
-                throw new apiError_js_1.ApiError(400, 'Current password is incorrect.');
-            }
+        if (!params.currentPassword) {
+            throw new apiError_js_1.ApiError(400, 'Current password is required.');
+        }
+        const { error: signInError } = await supabase_js_1.supabaseClient.auth.signInWithPassword({
+            email,
+            password: params.currentPassword,
+        });
+        if (signInError) {
+            throw new apiError_js_1.ApiError(400, 'Current password is incorrect.');
         }
         const { error } = await supabase_js_1.supabaseAdmin.auth.admin.updateUserById(userId, {
             password: params.newPassword,

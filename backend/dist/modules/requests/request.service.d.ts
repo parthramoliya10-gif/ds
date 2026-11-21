@@ -72,13 +72,13 @@ export declare class RequestService {
         finalDocuments: {
             id: string;
             createdAt: Date;
-            secureUrl: string;
             title: string;
-            version: number;
             fileName: string;
             cloudinaryPublicId: string;
+            secureUrl: string;
             fileSize: number;
             mimeType: string;
+            version: number;
             downloadCount: number;
         }[];
         status: import(".prisma/client").$Enums.RequestStatus;
@@ -96,72 +96,7 @@ export declare class RequestService {
      * Get requests for the logged-in User
      */
     getUserRequests(userId: string, query: ListRequestsQuery): Promise<{
-        requests: ({
-            conversation: {
-                id: string;
-                messages: {
-                    createdAt: Date;
-                    senderRole: import(".prisma/client").$Enums.Role;
-                    content: string;
-                }[];
-                _count: {
-                    messages: number;
-                };
-            } | null;
-            quotations: {
-                status: import(".prisma/client").$Enums.QuotationStatus;
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
-                requestId: string;
-                version: number;
-                totalAmount: number;
-                advanceAmount: number;
-                remainingAmount: number;
-                currency: string;
-                terms: string | null;
-                estimatedDays: number | null;
-            }[];
-            payments: {
-                status: import(".prisma/client").$Enums.PaymentStatus;
-                id: string;
-                createdAt: Date;
-                requestId: string;
-                currency: string;
-                milestone: import(".prisma/client").$Enums.PaymentMilestone;
-                amount: number;
-                razorpayPaymentId: string | null;
-                paidAt: Date | null;
-            }[];
-            _count: {
-                quotations: number;
-                payments: number;
-                referenceFiles: number;
-                finalDocuments: number;
-            };
-            finalDocuments: {
-                id: string;
-                createdAt: Date;
-                secureUrl: string;
-                title: string;
-                version: number;
-                fileName: string;
-                fileSize: number;
-                mimeType: string;
-                downloadCount: number;
-            }[];
-        } & {
-            status: import(".prisma/client").$Enums.RequestStatus;
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            userId: string;
-            title: string;
-            description: string;
-            category: string | null;
-            priority: string;
-            isDownloadUnlocked: boolean;
-        })[];
+        requests: any[];
         pagination: {
             total: number;
             page: number;
@@ -225,12 +160,12 @@ export declare class RequestService {
             finalDocuments: {
                 id: string;
                 createdAt: Date;
-                secureUrl: string;
                 title: string;
-                version: number;
                 fileName: string;
+                secureUrl: string;
                 fileSize: number;
                 mimeType: string;
+                version: number;
                 downloadCount: number;
             }[];
         } & {
@@ -311,13 +246,13 @@ export declare class RequestService {
         finalDocuments: {
             id: string;
             createdAt: Date;
-            secureUrl: string;
             title: string;
-            version: number;
             fileName: string;
             cloudinaryPublicId: string;
+            secureUrl: string;
             fileSize: number;
             mimeType: string;
+            version: number;
             downloadCount: number;
         }[];
         status: import(".prisma/client").$Enums.RequestStatus;

@@ -87,3 +87,38 @@ export const rateLimiter = async (
   current.count += 1;
   next();
 };
+
+/**
+ * Strict authentication rate limiter: 15 requests per minute per IP
+ * Specifically protects login, password reset, and OTP generation from brute-force/credential stuffing
+ */
+export const authRateLimiter = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const clientIp =
+    (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
+    req.socket.remoteAddress ||
+    '127.0.0.1';
+
+  const key = `auth_${clientIp}`;
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const maxAuthRequests = 15;
+
+  const current = memoryLimitMap.get(key);
+  if (!current || now > current.expiresAt) {
+    memoryLimitMap.set(key, { count: 1, expiresAt: now + windowMs });
+    return next();
+  }
+
+  if (current.count >= maxAuthRequests) {
+    return next(
+      new ApiError(429, 'Too many authentication attempts. Please wait 1 minute before trying again.')
+    );
+  }
+
+  current.count += 1;
+  next();
+};

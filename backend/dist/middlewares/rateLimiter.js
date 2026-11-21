@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.rateLimiter = void 0;
+exports.authRateLimiter = exports.rateLimiter = void 0;
 const ratelimit_1 = require("@upstash/ratelimit");
 const redis_1 = require("@upstash/redis");
 const env_js_1 = __importDefault(require("../config/env.js"));
@@ -76,4 +76,28 @@ const rateLimiter = async (req, _res, next) => {
     next();
 };
 exports.rateLimiter = rateLimiter;
+/**
+ * Strict authentication rate limiter: 15 requests per minute per IP
+ * Specifically protects login, password reset, and OTP generation from brute-force/credential stuffing
+ */
+const authRateLimiter = async (req, _res, next) => {
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+        req.socket.remoteAddress ||
+        '127.0.0.1';
+    const key = `auth_${clientIp}`;
+    const now = Date.now();
+    const windowMs = 60 * 1000;
+    const maxAuthRequests = 15;
+    const current = memoryLimitMap.get(key);
+    if (!current || now > current.expiresAt) {
+        memoryLimitMap.set(key, { count: 1, expiresAt: now + windowMs });
+        return next();
+    }
+    if (current.count >= maxAuthRequests) {
+        return next(new apiError_js_1.ApiError(429, 'Too many authentication attempts. Please wait 1 minute before trying again.'));
+    }
+    current.count += 1;
+    next();
+};
+exports.authRateLimiter = authRateLimiter;
 //# sourceMappingURL=rateLimiter.js.map

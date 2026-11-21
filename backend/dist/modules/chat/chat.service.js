@@ -358,25 +358,29 @@ class ChatService {
             select: { id: true, metadata: true },
         });
         if (messages.length > 0) {
-            const updates = messages.map((msg) => {
-                const currentMeta = msg.metadata || {};
-                const deletedFor = Array.isArray(currentMeta.deletedFor)
-                    ? [...currentMeta.deletedFor]
-                    : [];
-                if (!deletedFor.includes(user.id)) {
-                    deletedFor.push(user.id);
-                }
-                return prisma_js_1.default.message.update({
-                    where: { id: msg.id },
-                    data: {
-                        metadata: {
-                            ...currentMeta,
-                            deletedFor,
+            const chunkSize = 50;
+            for (let i = 0; i < messages.length; i += chunkSize) {
+                const chunk = messages.slice(i, i + chunkSize);
+                const updates = chunk.map((msg) => {
+                    const currentMeta = msg.metadata || {};
+                    const deletedFor = Array.isArray(currentMeta.deletedFor)
+                        ? [...currentMeta.deletedFor]
+                        : [];
+                    if (!deletedFor.includes(user.id)) {
+                        deletedFor.push(user.id);
+                    }
+                    return prisma_js_1.default.message.update({
+                        where: { id: msg.id },
+                        data: {
+                            metadata: {
+                                ...currentMeta,
+                                deletedFor,
+                            },
                         },
-                    },
+                    });
                 });
-            });
-            await prisma_js_1.default.$transaction(updates);
+                await prisma_js_1.default.$transaction(updates);
+            }
         }
         return {
             success: true,

@@ -30,7 +30,7 @@ exports.updateProfileSchema = zod_1.z.object({
     specializations: zod_1.z.array(zod_1.z.string().trim().min(1).max(60)).max(20).optional(),
 });
 exports.changePasswordSchema = zod_1.z.object({
-    currentPassword: zod_1.z.string().min(1).optional(),
+    currentPassword: zod_1.z.string({ required_error: 'Current password is required' }).min(1, 'Current password is required'),
     newPassword: zod_1.z
         .string({ required_error: 'New password is required' })
         .min(8, 'New password must be at least 8 characters long')

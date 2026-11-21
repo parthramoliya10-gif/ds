@@ -60,7 +60,7 @@ const errorHandler = (err, _req, res, _next) => {
         statusCode,
         message,
         errors: errors.length > 0 ? errors : undefined,
-        stack: env_js_1.default.NODE_ENV === 'development' ? err.stack : undefined,
+        stack: statusCode >= 500 && env_js_1.default.NODE_ENV === 'development' ? err.stack : undefined,
     });
 };
 exports.errorHandler = errorHandler;

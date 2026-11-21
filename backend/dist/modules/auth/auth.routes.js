@@ -8,6 +8,7 @@ const auth_controller_js_1 = __importDefault(require("./auth.controller.js"));
 const auth_middleware_js_1 = require("../../middlewares/auth.middleware.js");
 const rbac_middleware_js_1 = require("../../middlewares/rbac.middleware.js");
 const validate_middleware_js_1 = require("../../middlewares/validate.middleware.js");
+const rateLimiter_js_1 = require("../../middlewares/rateLimiter.js");
 const auth_validation_js_1 = require("./auth.validation.js");
 const profile_validation_js_1 = require("../profile/profile.validation.js");
 const router = (0, express_1.Router)();
@@ -19,14 +20,14 @@ router.get('/google', auth_controller_js_1.default.googleLogin);
 // Establish HttpOnly Cookie Session (after OAuth callback)
 router.post('/session', (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.establishSessionSchema }), auth_controller_js_1.default.establishSession);
 // Email OTP Login / Registration
-router.post('/otp/send', (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.sendOtpSchema }), auth_controller_js_1.default.sendOtp);
-router.post('/otp/verify', (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.verifyOtpSchema }), auth_controller_js_1.default.verifyOtp);
+router.post('/otp/send', rateLimiter_js_1.authRateLimiter, (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.sendOtpSchema }), auth_controller_js_1.default.sendOtp);
+router.post('/otp/verify', rateLimiter_js_1.authRateLimiter, (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.verifyOtpSchema }), auth_controller_js_1.default.verifyOtp);
 // Email & Password Registration / Login
-router.post('/register', (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.registerSchema }), auth_controller_js_1.default.register);
-router.post('/login', (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.loginSchema }), auth_controller_js_1.default.login);
+router.post('/register', rateLimiter_js_1.authRateLimiter, (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.registerSchema }), auth_controller_js_1.default.register);
+router.post('/login', rateLimiter_js_1.authRateLimiter, (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.loginSchema }), auth_controller_js_1.default.login);
 // Forgot & Reset Password (6-Digit OTP Verified)
-router.post('/forgot-password', (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.forgotPasswordSchema }), auth_controller_js_1.default.forgotPassword);
-router.post('/reset-password', (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.resetPasswordSchema }), auth_controller_js_1.default.resetPassword);
+router.post('/forgot-password', rateLimiter_js_1.authRateLimiter, (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.forgotPasswordSchema }), auth_controller_js_1.default.forgotPassword);
+router.post('/reset-password', rateLimiter_js_1.authRateLimiter, (0, validate_middleware_js_1.validateRequest)({ body: auth_validation_js_1.resetPasswordSchema }), auth_controller_js_1.default.resetPassword);
 // Refresh Session & Logout
 router.post('/refresh', auth_controller_js_1.default.refresh);
 router.post('/logout', auth_controller_js_1.default.logout);

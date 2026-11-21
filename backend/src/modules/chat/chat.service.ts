@@ -432,26 +432,29 @@ export class ChatService {
     });
 
     if (messages.length > 0) {
-      const updates = messages.map((msg) => {
-        const currentMeta = (msg.metadata as any) || {};
-        const deletedFor = Array.isArray(currentMeta.deletedFor)
-          ? [...currentMeta.deletedFor]
-          : [];
-        if (!deletedFor.includes(user.id)) {
-          deletedFor.push(user.id);
-        }
-        return prisma.message.update({
-          where: { id: msg.id },
-          data: {
-            metadata: {
-              ...currentMeta,
-              deletedFor,
+      const chunkSize = 50;
+      for (let i = 0; i < messages.length; i += chunkSize) {
+        const chunk = messages.slice(i, i + chunkSize);
+        const updates = chunk.map((msg) => {
+          const currentMeta = (msg.metadata as any) || {};
+          const deletedFor = Array.isArray(currentMeta.deletedFor)
+            ? [...currentMeta.deletedFor]
+            : [];
+          if (!deletedFor.includes(user.id)) {
+            deletedFor.push(user.id);
+          }
+          return prisma.message.update({
+            where: { id: msg.id },
+            data: {
+              metadata: {
+                ...currentMeta,
+                deletedFor,
+              },
             },
-          },
+          });
         });
-      });
-
-      await prisma.$transaction(updates);
+        await prisma.$transaction(updates);
+      }
     }
 
     return {

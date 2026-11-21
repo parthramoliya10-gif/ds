@@ -277,7 +277,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== "undefined") {
         sessionStorage.setItem("dsms_pending_email", data.email);
         sessionStorage.setItem("dsms_pending_name", data.fullName);
-        sessionStorage.setItem("dsms_pending_password", data.password);
       }
 
       router.push("/verify-otp");
