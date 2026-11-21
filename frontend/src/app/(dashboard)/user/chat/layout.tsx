@@ -7,7 +7,7 @@ import { Request } from "@/types";
 import api from "@/lib/api/client";
 import { adaptRequestToFrontend } from "@/lib/api/adapters";
 import { Input } from "@/components/ui/input";
-import { cn, formatShortId } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Search, Trash2 } from "lucide-react";
 import { useSocket } from "@/context/SocketContext";
 import { SOCKET_EVENTS } from "@/lib/socket/socketClient";
@@ -261,8 +261,8 @@ export default function UserChatLayout({
                           hasUnread ? "bg-emerald-500" : "bg-foreground"
                         )}
                       />
-                      <span className="text-[12px] font-mono font-medium text-muted-foreground">
-                        {formatShortId(req.id, "REQ")}
+                      <span className="text-[12px] font-semibold text-foreground truncate max-w-[180px]">
+                        {req.subject || "Academic Task"}
                       </span>
                     </div>
 
