@@ -23,17 +23,24 @@ export interface StepperProps {
 }
 
 export function Stepper({ currentStatus, className }: StepperProps) {
-  const getStepIndex = (status: RequestStatus): number => {
+  const norm = (currentStatus || "").toLowerCase();
+  const isCancelled = norm === "cancelled";
+  const isCompleted = norm === "delivered" || norm === "completed";
+
+  const getStepIndex = (status: string): number => {
     switch (status) {
       case "pending":
         return 0;
       case "quoted":
+      case "sent":
         return 1;
       case "advance_paid":
         return 2;
       case "in_progress":
         return 3;
       case "ready":
+      case "document_uploaded":
+      case "payment_due":
         return 4;
       case "delivered":
       case "completed":
@@ -43,15 +50,25 @@ export function Stepper({ currentStatus, className }: StepperProps) {
     }
   };
 
-  const activeIndex = getStepIndex(currentStatus);
+  const activeIndex = getStepIndex(norm);
+
+  if (isCancelled) {
+    return (
+      <div className={cn("w-full py-2", className)}>
+        <div className="flex items-center justify-center p-3 rounded-[6px] bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 text-[13px] font-medium">
+          This order has been cancelled.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("w-full overflow-x-auto py-2", className)}>
       <div className="min-w-[620px] px-4 flex items-center justify-between">
         {STEPS.map((step, idx) => {
-          const isDone = idx < activeIndex;
-          const isCurrent = idx === activeIndex;
-          const isUpcoming = idx > activeIndex;
+          const isDone = isCompleted ? true : idx < activeIndex;
+          const isCurrent = !isCompleted && idx === activeIndex;
+          const isUpcoming = isCompleted ? false : idx > activeIndex;
 
           return (
             <React.Fragment key={step.id}>
@@ -93,7 +110,7 @@ export function Stepper({ currentStatus, className }: StepperProps) {
                 <div
                   className={cn(
                     "flex-1 h-[2px] mx-2 -mt-6 transition-colors",
-                    idx < activeIndex ? "bg-foreground" : "bg-border"
+                    isCompleted || idx < activeIndex ? "bg-foreground" : "bg-border"
                   )}
                 />
               )}

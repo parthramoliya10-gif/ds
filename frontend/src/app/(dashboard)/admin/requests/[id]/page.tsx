@@ -508,28 +508,17 @@ export default function AdminRequestDetailPage() {
           {/* Quotation Versions */}
           <Card className="rounded-[8px] border border-border bg-background shadow-none">
             <CardHeader className="pb-3 border-b border-border">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <ShieldCheck className="h-4 w-4 text-foreground" />
-                  <CardTitle className="text-[16px] font-semibold text-foreground">
-                    Quotation Versions & History ({quotations.length})
-                  </CardTitle>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsQuotationModalOpen(true)}
-                  className="h-8 text-[12px] border-border font-medium"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  New Quotation
-                </Button>
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="h-4 w-4 text-foreground" />
+                <CardTitle className="text-[16px] font-semibold text-foreground">
+                  Quotation Versions & History ({quotations.length})
+                </CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-5 space-y-4">
               {quotations.length === 0 ? (
                 <p className="text-[13px] text-muted-foreground italic">
-                  No quotation issued yet. Use &quot;New Quotation&quot; to issue the first milestone breakdown.
+                  No quotation issued yet.
                 </p>
               ) : (
                 quotations.map((quote) => (

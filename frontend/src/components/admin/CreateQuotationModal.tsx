@@ -36,7 +36,7 @@ export function CreateQuotationModal({
   defaultAmount = 1400,
   onSubmitQuotation,
 }: CreateQuotationModalProps) {
-  const [amount, setAmount] = React.useState<number>(defaultAmount);
+  const [amount, setAmount] = React.useState<string>(defaultAmount ? String(defaultAmount) : "");
   const [deliveryDate, setDeliveryDate] = React.useState("Within 24 Hours");
   const [notes, setNotes] = React.useState(
     "Includes full source code implementation, verified screenshots, and university-standard formatting."
@@ -44,23 +44,24 @@ export function CreateQuotationModal({
   const [submitting, setSubmitting] = React.useState(false);
 
   React.useEffect(() => {
-    if (defaultAmount) setAmount(defaultAmount);
+    if (defaultAmount) setAmount(String(defaultAmount));
   }, [defaultAmount]);
 
   // Auto 50/50 calculation
-  const advanceAmount = Math.round(amount / 2);
-  const remainingAmount = amount - advanceAmount;
+  const numericAmount = Number(amount) || 0;
+  const advanceAmount = Math.round(numericAmount / 2);
+  const remainingAmount = numericAmount - advanceAmount;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || amount <= 0) return;
+    if (!numericAmount || numericAmount <= 0) return;
 
     setSubmitting(true);
     try {
       if (requestId && !requestId.startsWith("REQ-100")) {
         const created = await api.quotations.create({
           requestId,
-          totalAmount: Number(amount),
+          totalAmount: numericAmount,
           terms: notes,
           estimatedDays: deliveryDate.includes("24") ? 1 : 2,
         });
@@ -68,7 +69,7 @@ export function CreateQuotationModal({
           const adapted = adaptQuotationToFrontend(created);
           onSubmitQuotation(adapted);
           setSubmitting(false);
-          toast.success(`Quotation for ${formatCurrencyINR(amount)} dispatched to student.`);
+          toast.success(`Quotation for ${formatCurrencyINR(numericAmount)} dispatched to student.`);
           onClose();
           return;
         }
@@ -82,7 +83,7 @@ export function CreateQuotationModal({
     const newQuotation: Quotation = {
       id: "QT-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
       requestId,
-      amount,
+      amount: numericAmount,
       advanceAmount,
       remainingAmount,
       estimatedDelivery: deliveryDate,
@@ -93,7 +94,7 @@ export function CreateQuotationModal({
 
     onSubmitQuotation(newQuotation);
     setSubmitting(false);
-    toast.success(`Quotation for ${formatCurrencyINR(amount)} dispatched to student.`);
+    toast.success(`Quotation for ${formatCurrencyINR(numericAmount)} dispatched to student.`);
     onClose();
   };
 
@@ -121,10 +122,19 @@ export function CreateQuotationModal({
             <Input
               id="quotationAmount"
               type="number"
-              min="100"
-              step="50"
+              min="1"
               value={amount}
-              onChange={(e) => setAmount(Number(e.target.value) || 0)}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "") {
+                  setAmount("");
+                } else {
+                  // Remove leading zero when followed by other digits (e.g. "0745" -> "745")
+                  const cleaned = val.replace(/^0+(?=\d)/, "");
+                  setAmount(cleaned);
+                }
+              }}
+              placeholder="Enter quotation amount"
               className="text-[16px] font-semibold h-10 font-mono"
               required
             />
@@ -190,7 +200,7 @@ export function CreateQuotationModal({
             </Button>
             <Button
               type="submit"
-              disabled={submitting || amount <= 0}
+              disabled={submitting || numericAmount <= 0}
               className="h-9 text-[13px] font-semibold"
             >
               {submitting ? "Sending..." : "Dispatch Quotation"}
