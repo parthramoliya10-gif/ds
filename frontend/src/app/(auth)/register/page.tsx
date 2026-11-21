@@ -33,7 +33,10 @@ const registerSchema = z.object({
   password: z
     .string()
     .min(1, "Password is required")
-    .min(6, "Password must be at least 6 characters"),
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one capital letter (A-Z)")
+    .regex(/[0-9]/, "Password must contain at least one number (0-9)")
+    .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character (e.g. !@#$%)"),
   terms: z.boolean().refine((val) => val === true, {
     message: "You must accept the terms of service and academic fair-use guidelines",
   }),
@@ -62,10 +65,21 @@ export default function RegisterPage() {
     },
   });
 
-  const passwordValue = watch("password");
+  const passwordValue = watch("password") || "";
   const termsValue = watch("terms");
 
+  const hasLength = passwordValue.length >= 8;
+  const hasUpper = /[A-Z]/.test(passwordValue);
+  const hasNumber = /[0-9]/.test(passwordValue);
+  const hasSpecial = /[^A-Za-z0-9]/.test(passwordValue);
+  const isPasswordCriteriaMet = hasLength && hasUpper && hasNumber && hasSpecial;
+
   const onSubmit = async (data: RegisterFormValues) => {
+    if (!isPasswordCriteriaMet) {
+      toast.error("Please fulfill all password requirements before proceeding.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       await registerUser({
@@ -152,13 +166,13 @@ export default function RegisterPage() {
             </Label>
             <PasswordInput
               id="password"
-              placeholder="At least 6 characters"
+              placeholder="Min. 8 chars (capital, number, symbol)"
               {...register("password")}
               className={errors.password ? "border-foreground" : ""}
               aria-invalid={Boolean(errors.password)}
             />
-            {/* Live 4-Bar Strength Meter */}
-            <PasswordStrengthMeter password={passwordValue} />
+            {/* Live 4-Bar Strength Meter with requirements */}
+            <PasswordStrengthMeter password={passwordValue} showRequirements />
             {errors.password && (
               <p className="text-[12px] font-medium text-foreground">
                 {errors.password.message}
@@ -197,7 +211,7 @@ export default function RegisterPage() {
           <Button
             type="submit"
             className="w-full h-10 font-medium text-[14px]"
-            disabled={submitting}
+            disabled={submitting || !isPasswordCriteriaMet}
           >
             {submitting ? (
               <span className="flex items-center">
